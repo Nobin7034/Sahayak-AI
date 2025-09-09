@@ -2,8 +2,10 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { OAuth2Client } from 'google-auth-library';
 
 const router = express.Router();
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Register route
 router.post('/register', async (req, res) => {
@@ -38,7 +40,8 @@ router.post('/register', async (req, res) => {
       email,
       password: hashedPassword,
       phone,
-      role
+      role,
+      provider: 'local'
     });
 
     await user.save();
@@ -136,6 +139,68 @@ router.post('/login', async (req, res) => {
       message: 'Login failed',
       error: error.message
     });
+  }
+});
+
+// Google Sign-In
+router.post('/google', async (req, res) => {
+  try {
+    const { credential } = req.body; // Google ID token from frontend
+    if (!credential) {
+      return res.status(400).json({ success: false, message: 'Missing credential' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name, picture } = payload;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email not available from Google' });
+    }
+
+    let user = await User.findOne({ $or: [{ googleId }, { email }] });
+    if (!user) {
+      user = await User.create({
+        name: name || email.split('@')[0],
+        email,
+        googleId,
+        provider: 'google',
+        avatar: picture
+      });
+    } else {
+      // Link googleId if user exists by email
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.provider = 'google';
+        user.avatar = user.avatar || picture;
+        await user.save();
+      }
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    return res.json({ success: true, token, user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      lastLogin: user.lastLogin,
+      avatar: user.avatar
+    }});
+  } catch (err) {
+    console.error('Google auth error:', err);
+    return res.status(401).json({ success: false, message: 'Google authentication failed' });
   }
 });
 

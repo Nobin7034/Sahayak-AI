@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Mail, Phone, Lock, Eye, EyeOff, User } from "lucide-react";
+import { GoogleLogin } from '@react-oauth/google';
+import axios from 'axios';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -15,24 +17,27 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { register, signInWithGoogle } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
 
-  // Inline validation rules
+  // Strict validation rules
   const validateField = (name, value) => {
     switch (name) {
       case "firstName":
         if (!value.trim()) return "First name is required";
         if (value.length < 2) return "First name must be at least 2 characters";
+        if (!/^[A-Za-z]+$/.test(value)) return "First name must contain only letters";
         break;
       case "lastName":
         if (!value.trim()) return "Last name is required";
         if (value.length < 2) return "Last name must be at least 2 characters";
+        if (!/^[A-Za-z]+$/.test(value)) return "Last name must contain only letters";
         break;
       case "email":
         if (!value) return "Email is required";
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-          return "Enter a valid email address";
+        // Strict email regex
+        if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value))
+          return "Enter a valid email address (example: user@example.com)";
         break;
       case "phone":
         if (!value) return "Phone number is required";
@@ -46,7 +51,7 @@ const Register = () => {
             value
           )
         ) {
-          return "Password must be at least 8 chars, include uppercase, lowercase, number & special char";
+          return "Password must be min 8 chars, include uppercase, lowercase, number & special char";
         }
         break;
       default:
@@ -66,19 +71,22 @@ const Register = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Strict live validation on input change
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    // Update form data
     setFormData({
       ...formData,
       [name]: value,
     });
 
-    // Inline validate this field
+    // Validate this field live
     const errorMsg = validateField(name, value);
-    setErrors({
-      ...errors,
+    setErrors((prev) => ({
+      ...prev,
       [name]: errorMsg,
-    });
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -97,6 +105,25 @@ const Register = () => {
       setErrors({ general: "Registration failed. Please try again." });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (credResp) => {
+    try {
+      const { data } = await axios.post('http://localhost:5000/api/auth/google', {
+        credential: credResp.credential
+      });
+      if (data?.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+        navigate('/dashboard');
+      } else {
+        setErrors({ general: 'Google sign-in failed' });
+      }
+    } catch (e) {
+      console.error(e);
+      setErrors({ general: 'Google sign-in failed' });
     }
   };
 
@@ -271,17 +298,7 @@ const Register = () => {
 
           {/* Google Sign-In */}
           <div className="mt-6">
-            <button
-              onClick={signInWithGoogle}
-              className="w-full flex items-center justify-center gap-2 border border-gray-300 py-3 rounded-lg hover:bg-gray-50 transition"
-            >
-              <img
-                src="https://developers.google.com/identity/images/g-logo.png"
-                alt="Google"
-                className="w-5 h-5"
-              />
-              Sign in with Google
-            </button>
+            <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setErrors({ general: 'Google sign-in failed' })} useOneTap />
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-600">
