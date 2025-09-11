@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Mail, Phone, Lock, Eye, EyeOff, User } from "lucide-react";
-import { GoogleLogin } from '@react-oauth/google';
-import axios from 'axios';
+import { GoogleLogin } from '@react-oauth/google'
+import axios from 'axios'
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -108,24 +108,7 @@ const Register = () => {
     }
   };
 
-  const handleGoogleSuccess = async (credResp) => {
-    try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/google', {
-        credential: credResp.credential
-      });
-      if (data?.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-        navigate('/dashboard');
-      } else {
-        setErrors({ general: 'Google sign-in failed' });
-      }
-    } catch (e) {
-      console.error(e);
-      setErrors({ general: 'Google sign-in failed' });
-    }
-  };
+
 
   return (
     <div className="min-h-screen flex">
@@ -298,7 +281,28 @@ const Register = () => {
 
           {/* Google Sign-In */}
           <div className="mt-6">
-            <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setErrors({ general: 'Google sign-in failed' })} useOneTap />
+            <GoogleLogin
+              onSuccess={async (credResp) => {
+                try {
+                  const { data } = await axios.post('http://localhost:5000/api/auth/google', {
+                    credential: credResp.credential
+                  })
+                  if (data?.success) {
+                    localStorage.setItem('token', data.token)
+                    localStorage.setItem('user', JSON.stringify(data.user))
+                    axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
+                    navigate('/dashboard')
+                  } else {
+                    setErrors({ general: 'Google sign-in failed' })
+                  }
+                } catch (e) {
+                  console.error(e)
+                  setErrors({ general: 'Google sign-in failed' })
+                }
+              }}
+              onError={() => setErrors({ general: 'Google sign-in failed' })}
+              useOneTap
+            />
           </div>
 
           <p className="mt-6 text-center text-sm text-gray-600">

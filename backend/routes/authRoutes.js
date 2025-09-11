@@ -142,7 +142,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Google Sign-In
+// Google Sign-In (ID token from @react-oauth/google)
 router.post('/google', async (req, res) => {
   try {
     const { credential } = req.body; // Google ID token from frontend
@@ -171,7 +171,6 @@ router.post('/google', async (req, res) => {
         avatar: picture
       });
     } else {
-      // Link googleId if user exists by email
       if (!user.googleId) {
         user.googleId = googleId;
         user.provider = 'google';

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { 
   Users, 
   FileText, 
@@ -204,29 +205,29 @@ const AdminDashboard = () => {
         <div className="mt-8">
           <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <button className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <Link to="/admin/users" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <Users className="h-8 w-8 text-blue-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage Users</p>
               <p className="text-sm text-gray-600">View and manage user accounts</p>
-            </button>
+            </Link>
             
-            <button className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <Link to="/admin/services" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <FileText className="h-8 w-8 text-green-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage Services</p>
               <p className="text-sm text-gray-600">Add, edit, or remove services</p>
-            </button>
+            </Link>
             
-            <button className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <Link to="/admin/appointments" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <Calendar className="h-8 w-8 text-yellow-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage Appointments</p>
               <p className="text-sm text-gray-600">View and update appointments</p>
-            </button>
+            </Link>
             
-            <button className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <Link to="/admin/news" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <Settings className="h-8 w-8 text-purple-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage News</p>
               <p className="text-sm text-gray-600">Create and publish news</p>
-            </button>
+            </Link>
           </div>
         </div>
       </div>

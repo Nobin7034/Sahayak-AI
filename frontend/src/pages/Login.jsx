@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
@@ -53,28 +53,15 @@ const Login = () => {
     }
   };
 
-  const handleGoogleSuccess = async (credResp) => {
-    try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/google', {
-        credential: credResp.credential
-      });
-      if (data?.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-        if (formData.role === "admin") {
-          navigate("/admin/dashboard");
-        } else {
-          navigate("/dashboard");
-        }
-      } else {
-        setError('Google sign-in failed');
-      }
-    } catch (e) {
-      console.error(e);
-      setError('Google sign-in failed');
+
+
+  // Optional: handle redirect-based Google OAuth in future
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('token') || params.has('error')) {
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
-  };
+  }, []);
 
   return (
     <div className="min-h-screen flex">
@@ -232,9 +219,37 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Google Button */}
+          {/* Google Sign-In */}
           <div className="mt-4">
-            <GoogleLogin onSuccess={handleGoogleSuccess} onError={() => setError('Google sign-in failed')} useOneTap />
+            <GoogleLogin
+              onSuccess={async (credResp) => {
+                try {
+                  const { data } = await axios.post('http://localhost:5000/api/auth/google', {
+                    credential: credResp.credential
+                  })
+                  if (data?.success) {
+                    localStorage.setItem('token', data.token)
+                    localStorage.setItem('user', JSON.stringify(data.user))
+                    axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
+                    if (formData.role === 'admin') navigate('/admin/dashboard')
+                    else navigate('/dashboard')
+                  } else {
+                    setError('Google sign-in failed')
+                  }
+                } catch (e) {
+                  console.error(e)
+                  setError('Google sign-in failed')
+                }
+              }}
+              onError={(error) => {
+                console.error('Google Sign-In Error:', error);
+                setError(`Google sign-in failed: ${error?.error || 'Unknown error'}`);
+              }}
+              useOneTap={false}
+              cookiePolicy={'single_host_origin'}
+              context="signin"
+              auto_select={false}
+            />
           </div>
 
           {/* Footer */}
