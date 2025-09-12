@@ -21,7 +21,7 @@ If you're encountering the error: `Error 400: origin_mismatch` when trying to si
 Make sure your `.env` or `.env.local` file contains the correct Google Client ID:
 
 ```
-VITE_GOOGLE_CLIENT_ID=your-client-id-here.apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=245496151346-k5ce3ci7n3llm9csgdun1khmmfr853uq.apps.googleusercontent.com
 ```
 
 ### 3. Development Server Configuration

@@ -24,27 +24,38 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem('token')
       const storedUser = localStorage.getItem('user')
       
+      console.log('AuthContext - Initializing auth...')
+      console.log('AuthContext - Token exists:', !!token)
+      console.log('AuthContext - Stored user exists:', !!storedUser)
+      
       if (token && storedUser) {
         try {
           // Set axios default header
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+          console.log('AuthContext - Set authorization header')
           
           // Verify token is still valid
           const response = await axios.get('/auth/me')
+          console.log('AuthContext - Token verification response:', response.data)
+          
           if (response.data.success) {
             setUser(response.data.user)
+            console.log('AuthContext - User set from token verification:', response.data.user)
           } else {
             // Token invalid, clear storage
+            console.log('AuthContext - Token verification failed, clearing storage')
             localStorage.removeItem('token')
             localStorage.removeItem('user')
             delete axios.defaults.headers.common['Authorization']
           }
         } catch (error) {
-          console.error('Token verification failed:', error)
+          console.error('AuthContext - Token verification failed:', error)
           localStorage.removeItem('token')
           localStorage.removeItem('user')
           delete axios.defaults.headers.common['Authorization']
         }
+      } else {
+        console.log('AuthContext - No token or stored user found')
       }
       setLoading(false)
     }
@@ -67,6 +78,9 @@ export const AuthProvider = ({ children }) => {
       if (response.data.success) {
         const { token, user } = response.data
         
+        console.log('AuthContext - Storing token:', token)
+        console.log('AuthContext - Storing user:', user)
+        
         // Store token and user data
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
@@ -75,7 +89,7 @@ export const AuthProvider = ({ children }) => {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
         
         setUser(user)
-        return { success: true }
+        return { success: true, token, user }
       } else {
         console.log('Login failed:', response.data.message)
         return { success: false, error: response.data.message }

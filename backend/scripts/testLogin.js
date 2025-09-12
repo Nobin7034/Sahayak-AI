@@ -4,7 +4,7 @@ const testLogin = async () => {
   try {
     console.log('Testing admin login...');
     
-    const response = await axios.post('http://localhost:5001/api/auth/login', {
+    const response = await axios.post('http://localhost:5000/api/auth/login', {
       email: 'admin@akshaya.gov.in',
       password: 'admin123',
       role: 'admin'

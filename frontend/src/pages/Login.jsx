@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { GoogleLogin } from '@react-oauth/google';
-import axios from 'axios';
+import { GoogleLogin } from "@react-oauth/google";
+import axios from "axios";
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -19,53 +19,86 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  // Handle input changes
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Handle normal login (email/password)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      const result = await login(
-        formData.email,
-        formData.password,
-        formData.role
-      );
+      const result = await login(formData.email, formData.password, formData.role);
+
       if (result.success) {
-        if (formData.role === "admin") {
-          navigate("/admin/dashboard");
-        } else {
-          navigate("/dashboard");
-        }
+        localStorage.setItem("token", result.token);
+        localStorage.setItem("user", JSON.stringify(result.user));
+        axios.defaults.headers.common["Authorization"] = `Bearer ${result.token}`;
+
+        const destination =
+          formData.role === "admin" ? "/admin/dashboard" : "/dashboard";
+        navigate(destination);
       } else {
         setError(result.error || "Login failed");
       }
     } catch (err) {
+      console.error("❌ Login error:", err);
       setError("Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-
-
-  // Optional: handle redirect-based Google OAuth in future
+  // Cleanup any OAuth query params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has('token') || params.has('error')) {
+    if (params.has("token") || params.has("error")) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
+  // Handle Google login success
+  const handleGoogleSuccess = async (credResp) => {
+    try {
+      if (!credResp.credential) {
+        setError("Google login failed: No credential received");
+        return;
+      }
+
+      console.log("✅ Google credential received");
+
+      // ✅ FIX: send as `token`, not `credential`
+      const { data } = await axios.post("http://localhost:5000/api/auth/google", {
+        token: credResp.credential,
+        role: formData.role,
+      });
+
+      if (data?.success) {
+        console.log("✅ Google login success, storing token + user");
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        axios.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+
+        const destination =
+          formData.role === "admin" ? "/admin/dashboard" : "/dashboard";
+        navigate(destination);
+      } else {
+        console.error("❌ Backend Google login failed:", data);
+        setError("Google sign-in failed: " + (data?.message || "Unknown error"));
+      }
+    } catch (e) {
+      console.error("❌ Exception during Google login:", e);
+      setError(`Google sign-in failed: ${e.response?.data?.message || e.message}`);
+    }
+  };
+
   return (
     <div className="min-h-screen flex">
-      {/* Left Side with Background + Quote */}
+      {/* Left Side */}
       <div className="hidden md:flex w-1/2 bg-black relative items-center justify-center rounded-r-3xl overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1526498460520-4c246339dccb?auto=format&fit=crop&w=1000&q=80"
@@ -100,13 +133,15 @@ const Login = () => {
             Enter your email and password to access your account
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded text-xs">
-                {error}
-              </div>
-            )}
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded text-xs mb-3">
+              {error}
+            </div>
+          )}
 
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
               <label
@@ -209,7 +244,7 @@ const Login = () => {
               </a>
             </div>
 
-            {/* Sign In button */}
+            {/* Sign In Button */}
             <button
               type="submit"
               disabled={loading}
@@ -219,36 +254,20 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Google Sign-In */}
+          {/* Google Login */}
           <div className="mt-4">
             <GoogleLogin
-              onSuccess={async (credResp) => {
-                try {
-                  const { data } = await axios.post('http://localhost:5000/api/auth/google', {
-                    credential: credResp.credential
-                  })
-                  if (data?.success) {
-                    localStorage.setItem('token', data.token)
-                    localStorage.setItem('user', JSON.stringify(data.user))
-                    axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`
-                    if (formData.role === 'admin') navigate('/admin/dashboard')
-                    else navigate('/dashboard')
-                  } else {
-                    setError('Google sign-in failed')
-                  }
-                } catch (e) {
-                  console.error(e)
-                  setError('Google sign-in failed')
-                }
-              }}
-              onError={(error) => {
-                console.error('Google Sign-In Error:', error);
-                setError(`Google sign-in failed: ${error?.error || 'Unknown error'}`);
+              onSuccess={handleGoogleSuccess}
+              onError={(err) => {
+                console.error("Google Sign-In Error:", err);
+                setError("Google sign-in failed. Try again.");
               }}
               useOneTap={false}
-              cookiePolicy={'single_host_origin'}
-              context="signin"
-              auto_select={false}
+              type="standard"
+              theme="outline"
+              text="signin_with"
+              shape="rectangular"
+              size="large"
             />
           </div>
 

@@ -50,9 +50,9 @@ const AdminNews = () => {
     try {
       let response
       if (editingNews) {
-        response = await axios.put(`/admin/news/${editingNews._id}`, formData)
+        response = await axios.put(`/admin/news/${editingNews._id}`, newsData)
       } else {
-        response = await axios.post('/admin/news', formData)
+        response = await axios.post('/admin/news', newsData)
       }
 
       if (response.data.success) {

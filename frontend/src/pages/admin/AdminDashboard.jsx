@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { 
   Users, 
   FileText, 
@@ -12,8 +11,10 @@ import {
   Eye
 } from 'lucide-react'
 import axios from 'axios'
+import { useAuth } from '../../contexts/AuthContext'
 
 const AdminDashboard = () => {
+  const { user } = useAuth()
   const [stats, setStats] = useState(null)
   const [mostVisitedServices, setMostVisitedServices] = useState([])
   const [recentAppointments, setRecentAppointments] = useState([])
@@ -21,12 +22,61 @@ const AdminDashboard = () => {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    console.log('AdminDashboard - Current user:', user)
+    console.log('AdminDashboard - User role:', user?.role)
+    console.log('AdminDashboard - Is admin:', user?.role === 'admin')
+    
+    // Check localStorage directly as well
+    const storedToken = localStorage.getItem('token')
+    const storedUser = localStorage.getItem('user')
+    console.log('AdminDashboard - Stored token exists:', !!storedToken)
+    console.log('AdminDashboard - Stored user exists:', !!storedUser)
+    
+    if (user && user.role === 'admin') {
+      fetchDashboardData()
+    } else if (user && user.role !== 'admin') {
+      setError('Access denied. Admin privileges required.')
+      setLoading(false)
+    } else if (!user) {
+      // If no user but we have stored data, there might be an issue
+      if (storedToken && storedUser) {
+        setError('Session expired. Please login again.')
+      } else {
+        setError('Please login as admin to access this page.')
+      }
+      setLoading(false)
+    }
+  }, [user])
 
   const fetchDashboardData = async () => {
     try {
-      const response = await axios.get('/admin/dashboard-stats')
+      setLoading(true)
+      setError('')
+      
+      // Ensure we have a token
+      const token = localStorage.getItem('token')
+      console.log('AdminDashboard - Token from localStorage:', token)
+      
+      if (!token || token === 'undefined' || token === 'null') {
+        setError('No authentication token found. Please login again.')
+        setLoading(false)
+        return
+      }
+
+      // Set authorization header for this request specifically
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+
+      console.log('AdminDashboard - Making request with config:', config)
+      
+      const response = await axios.get('/admin/dashboard-stats', config)
+      
+      console.log('AdminDashboard - Dashboard response:', response.data)
+      
       if (response.data.success) {
         setStats(response.data.data.stats)
         setMostVisitedServices(response.data.data.mostVisitedServices)
@@ -35,8 +85,20 @@ const AdminDashboard = () => {
         setError('Failed to fetch dashboard data')
       }
     } catch (error) {
-      console.error('Dashboard data error:', error)
-      setError('Failed to fetch dashboard data')
+      console.error('AdminDashboard - Dashboard data error:', error)
+      console.error('AdminDashboard - Error response:', error.response?.data)
+      console.error('AdminDashboard - Request headers:', error.config?.headers)
+      
+      if (error.response?.status === 401) {
+        setError('Authentication failed. Please login again as admin.')
+        // Clear invalid token
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      } else if (error.response?.status === 403) {
+        setError('Access denied. Admin privileges required.')
+      } else {
+        setError(error.response?.data?.message || 'Failed to fetch dashboard data')
+      }
     } finally {
       setLoading(false)
     }
@@ -68,13 +130,31 @@ const AdminDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600">{error}</p>
-          <button 
-            onClick={fetchDashboardData}
-            className="mt-4 btn-primary"
-          >
-            Retry
-          </button>
+          <p className="text-red-600 mb-4">{error}</p>
+          <div className="space-x-4">
+            <button 
+              onClick={fetchDashboardData}
+              className="btn-primary"
+            >
+              Retry
+            </button>
+            {error.includes('Authentication failed') || error.includes('login again') || error.includes('Session expired') ? (
+              <>
+                <button 
+                  onClick={() => {
+                    // Clear all stored data
+                    localStorage.removeItem('token')
+                    localStorage.removeItem('user')
+                    delete axios.defaults.headers.common['Authorization']
+                    window.location.href = '/login'
+                  }}
+                  className="btn-secondary"
+                >
+                  Clear Session & Login
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
     )
@@ -205,29 +285,29 @@ const AdminDashboard = () => {
         <div className="mt-8">
           <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Link to="/admin/users" className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <a href="/admin/users" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <Users className="h-8 w-8 text-blue-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage Users</p>
               <p className="text-sm text-gray-600">View and manage user accounts</p>
-            </Link>
+            </a>
             
-            <Link to="/admin/services" className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <a href="/admin/services" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <FileText className="h-8 w-8 text-green-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage Services</p>
               <p className="text-sm text-gray-600">Add, edit, or remove services</p>
-            </Link>
+            </a>
             
-            <Link to="/admin/appointments" className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <a href="/admin/appointments" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <Calendar className="h-8 w-8 text-yellow-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage Appointments</p>
               <p className="text-sm text-gray-600">View and update appointments</p>
-            </Link>
+            </a>
             
-            <Link to="/admin/news" className="card p-6 text-center hover:shadow-lg transition-shadow">
+            <a href="/admin/news" className="card p-6 text-center hover:shadow-lg transition-shadow">
               <Settings className="h-8 w-8 text-purple-600 mx-auto mb-3" />
               <p className="font-medium text-gray-900">Manage News</p>
               <p className="text-sm text-gray-600">Create and publish news</p>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
