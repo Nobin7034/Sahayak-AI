@@ -12,6 +12,7 @@ import Appointments from './pages/Appointments'
 import News from './pages/News'
 import NewsDetail from './pages/NewsDetail'
 import Dashboard from './pages/Dashboard'
+import Profile from './pages/Profile'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminProtectedRoute from './components/AdminProtectedRoute'
 import AdminLayout from './components/AdminLayout'
@@ -29,7 +30,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={
             <div className="min-h-screen bg-gray-50">
-              <Navbar />
+              <Navbar showPublic={true} />
               <LandingPage />
               <Footer />
             </div>
@@ -96,6 +97,15 @@ function App() {
               <div className="min-h-screen bg-gray-50">
                 <Navbar />
                 <Dashboard />
+                <Footer />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <Profile />
                 <Footer />
               </div>
             </ProtectedRoute>

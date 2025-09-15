@@ -113,57 +113,74 @@ const Services = () => {
 
         {/* Services Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredServices.map((service) => (
-            <div key={service.id} className="card overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{service.name}</h3>
-                    <span className="inline-block bg-primary/10 text-primary text-sm px-3 py-1 rounded-full">
-                      {service.category}
-                    </span>
-                  </div>
-                </div>
+          {filteredServices.map((service) => {
+            // Pick a preview image from the first document (direct image or template image)
+            const firstDoc = (service.documents && service.documents[0]) || null
+            const preview = firstDoc ? (firstDoc.imageUrl || firstDoc?.template?.imageUrl) : null
+            return (
+              <div key={service._id} className="card overflow-hidden">
 
-                <p className="text-gray-600 mb-6">{service.description}</p>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-2">
-                      <IndianRupee className="w-4 h-4 text-secondary" />
-                      <span className="text-gray-600">Fee:</span>
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{service.name}</h3>
+                      <span className="inline-block bg-primary/10 text-primary text-sm px-3 py-1 rounded-full">
+                        {service.category}
+                      </span>
                     </div>
-                    <span className="font-semibold text-secondary">
-                      {service.fee === 0 ? 'Free' : `₹${service.fee}`}
-                    </span>
                   </div>
-                  
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-orange-500" />
-                      <span className="text-gray-600">Processing Time:</span>
+
+                  <p className="text-gray-600 mb-6">{service.description}</p>
+
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <IndianRupee className="w-4 h-4 text-secondary" />
+                        <span className="text-gray-600">Fee:</span>
+                      </div>
+                      <span className="font-semibold text-secondary">
+                        {service.fee === 0 ? 'Free' : `₹${service.fee}`}
+                      </span>
                     </div>
-                    <span className="font-semibold text-orange-600">{service.processingTime}</span>
+                    
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center space-x-2">
+                        <Clock className="w-4 h-4 text-orange-500" />
+                        <span className="text-gray-600">Processing Time:</span>
+                      </div>
+                      <span className="font-semibold text-orange-600">{service.processingTime}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="mb-6">
-                  <h4 className="font-semibold text-gray-900 mb-2">Required Documents:</h4>
-                  <div className="text-sm text-gray-600">
-                    {service.requiredDocuments?.length || 0} documents required
+                  <div className="mb-6">
+                    <h4 className="font-semibold text-gray-900 mb-2">Required Documents:</h4>
+                    {service.documents && service.documents.length > 0 ? (
+                      <ul className="text-sm text-gray-600 list-disc ml-5 space-y-1">
+                        {service.documents.slice(0, 3).map((d, i) => (
+                          <li key={i}>{d.name}</li>
+                        ))}
+                        {service.documents.length > 3 && (
+                          <li className="text-gray-500">+{service.documents.length - 3} more</li>
+                        )}
+                      </ul>
+                    ) : (
+                      <div className="text-sm text-gray-600">
+                        {service.requiredDocuments?.length || 0} documents required
+                      </div>
+                    )}
                   </div>
-                </div>
 
-                <Link
-                  to={`/service/${service._id}`}
-                  className="w-full btn-primary flex items-center justify-center"
-                >
-                  View Details & Apply
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </Link>
+                  <Link
+                    to={`/service/${service._id}`}
+                    className="w-full btn-primary flex items-center justify-center"
+                  >
+                    View Details & Apply
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {filteredServices.length === 0 && (

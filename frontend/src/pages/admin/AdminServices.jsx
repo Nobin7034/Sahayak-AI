@@ -440,7 +440,35 @@ const AdminServices = () => {
                             <div className="text-xs text-gray-500 mt-1">Selecting a template will use its image</div>
                           </div>
                           <div>
-                            <label className="block text-xs text-gray-600 mb-1">Or paste image URL</label>
+                            <label className="block text-xs text-gray-600 mb-1">Upload from your PC</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0]
+                                if (!file) return
+                                const fd = new FormData()
+                                fd.append('image', file)
+                                try {
+                                  const res = await axios.post('/admin/document-templates/upload', fd, {
+                                    headers: { 'Content-Type': 'multipart/form-data' }
+                                  })
+                                  if (res.data?.success && res.data?.imageUrl) {
+                                    updateDocument(idx, { imageUrl: res.data.imageUrl, templateId: '' })
+                                  } else {
+                                    alert('Upload failed')
+                                  }
+                                } catch (err) {
+                                  console.error('Upload failed', err)
+                                  alert('Upload failed')
+                                }
+                              }}
+                              className="w-full px-3 py-2 border rounded"
+                            />
+                            <div className="text-xs text-gray-500 mt-1">The file will be stored in backend/uploads and accessible by URL.</div>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Or paste direct image URL</label>
                             <input
                               type="url"
                               value={d.imageUrl}
@@ -448,7 +476,7 @@ const AdminServices = () => {
                               className="w-full px-3 py-2 border rounded"
                               placeholder="http://localhost:5000/uploads/..."
                             />
-                            <div className="text-xs text-gray-500 mt-1">Upload via Templates tab to get an URL, or reuse a template.</div>
+                            <div className="text-xs text-gray-500 mt-1">Paste any accessible image URL. If you uploaded above, it already set the URL.</div>
                           </div>
                         </div>
 
@@ -459,6 +487,40 @@ const AdminServices = () => {
                               alt="preview"
                               className="w-48 h-auto rounded border"
                             />
+                          </div>
+                        )}
+
+                        {/* Save as reusable template when using a direct URL */}
+                        {d.imageUrl && !d.templateId && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Template title"
+                              value={d._templateTitle || d.name}
+                              onChange={(e) => updateDocument(idx, { _templateTitle: e.target.value })}
+                              className="flex-1 px-3 py-2 border rounded"
+                            />
+                            <button
+                              type="button"
+                              className="btn-secondary text-sm"
+                              onClick={async () => {
+                                try {
+                                  const payload = { title: d._templateTitle || d.name || 'Document', imageUrl: d.imageUrl }
+                                  const res = await axios.post('/admin/document-templates', payload)
+                                  if (res.data?.success && res.data?.data) {
+                                    setTemplates(prev => [res.data.data, ...prev])
+                                    updateDocument(idx, { templateId: res.data.data._id, imageUrl: '', _templateTitle: '' })
+                                  } else {
+                                    alert('Failed to save template')
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to save template', err)
+                                  alert('Failed to save template')
+                                }
+                              }}
+                            >
+                              Save as reusable template
+                            </button>
                           </div>
                         )}
 

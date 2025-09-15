@@ -4,10 +4,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { Menu, X, User, LogOut } from 'lucide-react'
 import { useState } from 'react'
 
-const Navbar = () => {
+const Navbar = ({ showPublic = false }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -30,10 +31,10 @@ const Navbar = () => {
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-primary transition-colors">
+            <Link to={!showPublic && user ? "/dashboard" : "/"} className="text-gray-700 hover:text-primary transition-colors">
               Home
             </Link>
-            {user ? (
+            {!showPublic && user ? (
               <>
                 <Link to="/services" className="text-gray-700 hover:text-primary transition-colors">
                   Services
@@ -44,21 +45,33 @@ const Navbar = () => {
                 <Link to="/news" className="text-gray-700 hover:text-primary transition-colors">
                   News
                 </Link>
-                <Link to="/dashboard" className="text-gray-700 hover:text-primary transition-colors">
-                  Dashboard
-                </Link>
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <User className="w-4 h-4" />
-                    <span className="text-sm text-gray-700">{user.name}</span>
-                  </div>
+                
+                <div className="relative" onMouseEnter={() => setIsUserMenuOpen(true)} onMouseLeave={() => setIsUserMenuOpen(false)}>
                   <button
-                    onClick={handleLogout}
-                    className="flex items-center space-x-1 text-gray-700 hover:text-red-600 transition-colors"
+                    className="flex items-center space-x-2 text-gray-700 hover:text-primary transition-colors"
                   >
-                    <LogOut className="w-4 h-4" />
-                    <span>Logout</span>
+                    <User className="w-4 h-4" />
+                    <span className="text-sm">{user.name}</span>
                   </button>
+                  {isUserMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-40 bg-white border rounded-lg shadow-lg py-2 z-50">
+                      <Link
+                        to="/profile"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        title="Profile"
+                      >
+                        Profile
+                      </Link>
+                      <button
+                        onClick={() => { setIsUserMenuOpen(false); handleLogout() }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" />
+                      Logout
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -89,13 +102,13 @@ const Navbar = () => {
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t">
               <Link
-                to="/"
+                to={!showPublic && user ? "/dashboard" : "/"}
                 className="block px-3 py-2 text-gray-700 hover:text-primary transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Home
               </Link>
-              {user ? (
+              {!showPublic && user ? (
                 <>
                   <Link
                     to="/services"
@@ -119,11 +132,11 @@ const Navbar = () => {
                     News
                   </Link>
                   <Link
-                    to="/dashboard"
+                    to="/profile"
                     className="block px-3 py-2 text-gray-700 hover:text-primary transition-colors"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Dashboard
+                    Profile
                   </Link>
                   <div className="px-3 py-2 border-t">
                     <div className="flex items-center space-x-2 mb-2">

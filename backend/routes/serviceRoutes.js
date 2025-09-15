@@ -9,6 +9,7 @@ router.get('/', async (req, res) => {
   try {
     const services = await Service.find({ isActive: true })
       .select('-createdBy')
+      .populate('documents.template')
       .sort({ visitCount: -1, createdAt: -1 });
 
     res.json({
@@ -30,7 +31,8 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const service = await Service.findById(id);
+    const service = await Service.findById(id)
+      .populate('documents.template');
     if (!service || !service.isActive) {
       return res.status(404).json({
         success: false,

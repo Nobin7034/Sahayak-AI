@@ -194,4 +194,80 @@ router.get("/me", async (req, res) => {
   }
 });
 
+// ---------------- UPDATE CURRENT USER ----------------
+router.put("/me", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ success: false, message: "No token provided" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const { name, phone, avatar } = req.body;
+    if (typeof name === 'string' && name.trim()) user.name = name.trim();
+    if (typeof phone === 'string') user.phone = phone.trim();
+    if (typeof avatar === 'string') user.avatar = avatar.trim();
+
+    await user.save();
+
+    const sanitized = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      avatar: user.avatar,
+      provider: user.provider,
+      lastLogin: user.lastLogin,
+      createdAt: user.createdAt
+    };
+
+    res.json({ success: true, message: 'Profile updated', user: sanitized });
+  } catch (error) {
+    console.error('❌ Update user error:', error);
+    res.status(500).json({ success: false, message: 'Update failed', error: error.message });
+  }
+});
+
+// ---------------- CHANGE PASSWORD (LOCAL ONLY) ----------------
+router.put('/me/password', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.provider !== 'local') {
+      return res.status(400).json({ success: false, message: 'Password managed by Google account' });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Current and new password are required' });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('❌ Change password error:', error);
+    res.status(500).json({ success: false, message: 'Password update failed', error: error.message });
+  }
+});
+
 export default router;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Navigate, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Clock, IndianRupee, FileText, Image, CheckCircle, Calendar, Loader2 } from 'lucide-react'
+import { ArrowLeft, Clock, IndianRupee, FileText, Image, CheckCircle, Calendar, Loader2, Eye, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 
@@ -10,6 +10,7 @@ const ServiceDetails = () => {
   const [service, setService] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [preview, setPreview] = useState({ open: false, title: '', url: '' })
 
   useEffect(() => {
     fetchService()
@@ -126,14 +127,25 @@ const ServiceDetails = () => {
                               <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Required</span>
                             </div>
                             {d.notes && <p className="text-gray-600 mb-4">{d.notes}</p>}
-                            {preview ? (
-                              <div className="mt-2">
-                                <img src={preview} alt={`${d.name} sample`} className="w-full max-w-md rounded border" />
-                                <div className="text-xs text-gray-500 mt-2">Sample image</div>
-                              </div>
-                            ) : (
-                              <div className="text-sm text-gray-500">No sample image available</div>
-                            )}
+                            <div className="mt-2 flex items-center gap-3">
+                              <span className="text-xs text-gray-600">Preview:</span>
+                              <button
+                                type="button"
+                                className="inline-flex items-center text-primary hover:text-blue-700 text-sm"
+                                onClick={() => {
+                                  const url = d.imageUrl || d?.template?.imageUrl
+                                  if (!url) return
+                                  setPreview({ open: true, title: d.name, url })
+                                }}
+                                disabled={!(d.imageUrl || d?.template?.imageUrl)}
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View sample
+                              </button>
+                              {!(d.imageUrl || d?.template?.imageUrl) && (
+                                <span className="text-xs text-gray-400">No sample available</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -216,6 +228,27 @@ const ServiceDetails = () => {
           </div>
         </div>
       </div>
+
+      {/* Image Preview Modal */}
+      {preview.open && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">{preview.title}</h3>
+              <button
+                className="text-gray-500 hover:text-gray-700"
+                onClick={() => setPreview({ open: false, title: '', url: '' })}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <img src={preview.url} alt={preview.title} className="w-full h-auto rounded border" />
+              <div className="text-xs text-gray-500 mt-2">Sample document image</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
