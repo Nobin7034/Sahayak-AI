@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
@@ -111,8 +111,7 @@ const Login = () => {
             Get Everything <br /> You Want
           </h1>
           <p className="text-sm max-w-xs text-gray-200">
-            You can get everything you want if you work hard, trust the process,
-            and stick to the plan.
+           Akshaya, an innovative project implemented in the State of Kerala aimed at bridging the digital divide, addresses the issues of ICT access, basic skill sets and availability of relevant content.
           </p>
         </div>
       </div>
@@ -123,6 +122,13 @@ const Login = () => {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <span className="text-lg font-semibold">Sahayak AI</span>
+          </div>
+
+          {/* Back to Home */}
+          <div className="mb-4">
+            <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-black">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
+            </Link>
           </div>
 
           {/* Title */}

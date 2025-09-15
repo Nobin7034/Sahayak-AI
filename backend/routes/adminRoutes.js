@@ -1,14 +1,90 @@
 import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import User from '../models/User.js';
 import Service from '../models/Service.js';
 import News from '../models/News.js';
 import Appointment from '../models/Appointment.js';
+import DocumentTemplate from '../models/DocumentTemplate.js';
 import { adminAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Ensure uploads directory exists in the same folder the server serves from
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Multer storage configuration
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, 'news-' + uniqueSuffix + ext);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+  if (allowed.includes(file.mimetype)) cb(null, true);
+  else cb(new Error('Only JPEG, PNG, WEBP images are allowed'));
+};
+
+const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
+
 // Apply admin authentication middleware to all routes
 router.use(adminAuth);
+
+// Document Template Management
+router.get('/document-templates', async (req, res) => {
+  try {
+    const templates = await DocumentTemplate.find().sort({ createdAt: -1 });
+    res.json({ success: true, data: templates });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch templates', error: error.message });
+  }
+});
+
+router.post('/document-templates', async (req, res) => {
+  try {
+    const { title, description, imageUrl } = req.body;
+    if (!title || !imageUrl) {
+      return res.status(400).json({ success: false, message: 'title and imageUrl are required' });
+    }
+    const tpl = await DocumentTemplate.create({ title, description, imageUrl, createdBy: req.user.userId });
+    res.status(201).json({ success: true, data: tpl });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to create template', error: error.message });
+  }
+});
+
+// Upload an image for document templates
+router.post('/document-templates/upload', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No image uploaded' });
+    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    res.status(201).json({ success: true, imageUrl });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to upload image', error: error.message });
+  }
+});
+
+router.delete('/document-templates/:id', async (req, res) => {
+  try {
+    await DocumentTemplate.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Template deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete template', error: error.message });
+  }
+});
 
 // Dashboard Statistics
 router.get('/dashboard-stats', async (req, res) => {
@@ -134,6 +210,7 @@ router.get('/services', async (req, res) => {
   try {
     const services = await Service.find()
       .populate('createdBy', 'name email')
+      .populate('documents.template')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -161,7 +238,8 @@ router.post('/services', async (req, res) => {
     await service.save();
 
     const populatedService = await Service.findById(service._id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('documents.template');
 
     res.status(201).json({
       success: true,
@@ -185,7 +263,8 @@ router.put('/services/:id', async (req, res) => {
       id,
       req.body,
       { new: true }
-    ).populate('createdBy', 'name email');
+    ).populate('createdBy', 'name email')
+     .populate('documents.template');
 
     if (!service) {
       return res.status(404).json({
@@ -256,10 +335,13 @@ router.get('/news', async (req, res) => {
   }
 });
 
-router.post('/news', async (req, res) => {
+router.post('/news', upload.single('image'), async (req, res) => {
   try {
+    const imageUrl = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : undefined;
+
     const newsData = {
       ...req.body,
+      imageUrl,
       createdBy: req.user.userId
     };
 
@@ -284,12 +366,18 @@ router.post('/news', async (req, res) => {
   }
 });
 
-router.put('/news/:id', async (req, res) => {
+router.put('/news/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
+
+    const update = { ...req.body };
+    if (req.file) {
+      update.imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    }
+
     const news = await News.findByIdAndUpdate(
       id,
-      req.body,
+      update,
       { new: true }
     ).populate('createdBy', 'name email');
 

@@ -110,31 +110,56 @@ const ServiceDetails = () => {
               </p>
 
               <div className="space-y-6">
-                {service.requiredDocuments && service.requiredDocuments.length > 0 ? (
-                  service.requiredDocuments.map((doc, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 bg-red-100 text-red-600">
-                          <span className="text-xs font-bold">!</span>
-                        </div>
-                        
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 className="text-lg font-semibold text-gray-900">{doc}</h3>
-                            <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">
-                              Required
-                            </span>
+                {/* Prefer new documents with images; fallback to legacy list */}
+                {service.documents && service.documents.length > 0 ? (
+                  service.documents.map((d, index) => {
+                    const preview = d.imageUrl || d?.template?.imageUrl
+                    return (
+                      <div key={index} className="border border-gray-200 rounded-lg p-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 bg-red-100 text-red-600">
+                            <span className="text-xs font-bold">!</span>
                           </div>
-                          
-                          <p className="text-gray-600 mb-4">Please ensure this document is original or self-attested copy.</p>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-2">
+                              <h3 className="text-lg font-semibold text-gray-900">{d.name}</h3>
+                              <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Required</span>
+                            </div>
+                            {d.notes && <p className="text-gray-600 mb-4">{d.notes}</p>}
+                            {preview ? (
+                              <div className="mt-2">
+                                <img src={preview} alt={`${d.name} sample`} className="w-full max-w-md rounded border" />
+                                <div className="text-xs text-gray-500 mt-2">Sample image</div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-500">No sample image available</div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No specific documents required for this service.
-                  </div>
+                  service.requiredDocuments && service.requiredDocuments.length > 0 ? (
+                    service.requiredDocuments.map((doc, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 bg-red-100 text-red-600">
+                            <span className="text-xs font-bold">!</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-2">
+                              <h3 className="text-lg font-semibold text-gray-900">{doc}</h3>
+                              <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Required</span>
+                            </div>
+                            <p className="text-gray-600 mb-4">Please ensure this document is original or self-attested copy.</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">No specific documents required for this service.</div>
+                  )
                 )}
               </div>
 

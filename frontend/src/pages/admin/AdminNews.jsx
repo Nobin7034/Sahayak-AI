@@ -14,8 +14,11 @@ const AdminNews = () => {
     content: '',
     summary: '',
     category: 'general',
-    isPublished: false
+    isPublished: false,
+    imageAlt: ''
   })
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState('')
 
   const categories = [
     { value: 'announcement', label: 'Announcement' },
@@ -48,11 +51,23 @@ const AdminNews = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      const data = new FormData()
+      data.append('title', formData.title)
+      data.append('summary', formData.summary)
+      data.append('content', formData.content)
+      data.append('category', formData.category)
+      data.append('isPublished', formData.isPublished)
+      if (formData.imageAlt) data.append('imageAlt', formData.imageAlt)
+      if (imageFile) data.append('image', imageFile)
       let response
       if (editingNews) {
-        response = await axios.put(`/admin/news/${editingNews._id}`, newsData)
+        response = await axios.put(`/admin/news/${editingNews._id}`, data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
       } else {
-        response = await axios.post('/admin/news', newsData)
+        response = await axios.post('/admin/news', data, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
       }
 
       if (response.data.success) {
@@ -62,7 +77,7 @@ const AdminNews = () => {
       }
     } catch (error) {
       console.error('Save news error:', error)
-      alert('Failed to save news')
+      alert(error.response?.data?.message || 'Failed to save news')
     }
   }
 
@@ -73,8 +88,11 @@ const AdminNews = () => {
       content: newsItem.content,
       summary: newsItem.summary,
       category: newsItem.category,
-      isPublished: newsItem.isPublished
+      isPublished: newsItem.isPublished,
+      imageAlt: newsItem.imageAlt || ''
     })
+    setImagePreview(newsItem.imageUrl || '')
+    setImageFile(null)
     setShowModal(true)
   }
 
@@ -98,8 +116,11 @@ const AdminNews = () => {
       content: '',
       summary: '',
       category: 'general',
-      isPublished: false
+      isPublished: false,
+      imageAlt: ''
     })
+    setImageFile(null)
+    setImagePreview('')
     setEditingNews(null)
   }
 
@@ -208,6 +229,11 @@ const AdminNews = () => {
                     <span>Published: {new Date(newsItem.publishDate).toLocaleDateString()}</span>
                   )}
                 </div>
+                {newsItem.imageUrl && (
+                  <div className="mt-3">
+                    <img src={newsItem.imageUrl} alt={newsItem.imageAlt || newsItem.title} className="w-full max-w-md rounded border" />
+                  </div>
+                )}
               </div>
 
               <div className="flex space-x-2 ml-4">
@@ -252,6 +278,44 @@ const AdminNews = () => {
                 {editingNews ? 'Edit News' : 'Add New News'}
               </h3>
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cover Image
+                  </label>
+                  <div className="flex items-start gap-4">
+                    <div className="w-32 h-20 bg-gray-100 border rounded overflow-hidden flex items-center justify-center">
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xs text-gray-500">No image</span>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setImageFile(file)
+                            setImagePreview(URL.createObjectURL(file))
+                          }
+                        }}
+                        className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">JPEG, PNG, or WEBP. Max 5MB.</p>
+                      <input
+                        type="text"
+                        name="imageAlt"
+                        value={formData.imageAlt}
+                        onChange={handleChange}
+                        placeholder="Image alt text (for accessibility)"
+                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Title

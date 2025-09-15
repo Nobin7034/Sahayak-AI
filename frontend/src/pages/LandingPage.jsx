@@ -1,9 +1,22 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, MapPin, Phone, Star, Calendar, FileText, Shield, Users } from 'lucide-react'
-import { newsData, akshayaCenters } from '../data/mockData'
+import axios from 'axios'
+import { akshayaCenters } from '../data/mockData'
 
 const LandingPage = () => {
+  const [latest, setLatest] = useState([])
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await axios.get('/news/latest/3')
+        if (res.data.success) setLatest(res.data.data)
+      } catch (e) {
+        console.error('Failed to load latest news', e)
+      }
+    }
+    load()
+  }, [])
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
@@ -95,19 +108,23 @@ const LandingPage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {newsData.slice(0, 3).map((news) => (
-              <article key={news.id} className="card overflow-hidden">
-                <img
-                  src={news.image}
-                  alt={news.title}
-                  className="w-full h-48 object-cover"
-                />
+            {latest.map((news) => (
+              <article key={news._id} className="card overflow-hidden">
+                {news.imageUrl && (
+                  <img
+                    src={(news.imageUrl || '').replace(/\\/g, '/').startsWith('/uploads')
+                      ? `http://localhost:5000${(news.imageUrl || '').replace(/\\/g, '/')}`
+                      : (news.imageUrl || '').replace(/\\/g, '/')}
+                    alt={news.imageAlt || news.title}
+                    className="w-full h-48 object-cover"
+                  />
+                )}
                 <div className="p-6">
-                  <div className="text-sm text-gray-500 mb-2">{news.date}</div>
+                  <div className="text-sm text-gray-500 mb-2">{new Date(news.publishDate).toLocaleDateString('en-IN')}</div>
                   <h3 className="text-xl font-semibold mb-3 text-gray-900">{news.title}</h3>
-                  <p className="text-gray-600 mb-4">{news.excerpt}</p>
+                  <p className="text-gray-600 mb-4">{news.summary}</p>
                   <Link
-                    to={`/news/${news.id}`}
+                    to={`/news/${news._id}`}
                     className="text-primary hover:text-blue-700 font-semibold inline-flex items-center"
                   >
                     Read More <ArrowRight className="ml-2 w-4 h-4" />

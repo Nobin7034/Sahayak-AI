@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { Mail, Phone, Lock, Eye, EyeOff, User } from "lucide-react";
+import { Mail, Phone, Lock, Eye, EyeOff, User, ArrowLeft } from "lucide-react";
 import { GoogleLogin } from '@react-oauth/google'
 import axios from 'axios'
 
@@ -132,6 +132,12 @@ const Register = () => {
       {/* RIGHT SIDE */}
       <div className="w-full lg:w-1/2 bg-white flex items-center justify-center">
         <div className="max-w-md w-full px-8 py-12">
+          {/* Back to Home */}
+          <div className="mb-4">
+            <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-black">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
+            </Link>
+          </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
             Create an account
           </h2>

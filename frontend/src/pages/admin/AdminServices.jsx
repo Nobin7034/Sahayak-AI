@@ -16,11 +16,27 @@ const AdminServices = () => {
     fee: '',
     processingTime: '',
     requiredDocuments: '',
+    documents: [], // [{ name, imageUrl, templateId, notes }]
     isActive: true
   })
 
   useEffect(() => {
     fetchServices()
+  }, [])
+
+  // Document templates for reuse
+  const [templates, setTemplates] = useState([])
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const res = await axios.get('/admin/document-templates')
+        if (res.data.success) setTemplates(res.data.data)
+      } catch (e) {
+        console.warn('Failed to load document templates', e)
+      }
+    }
+    loadTemplates()
   }, [])
 
   const fetchServices = async () => {
@@ -46,7 +62,14 @@ const AdminServices = () => {
       const serviceData = {
         ...formData,
         fee: parseFloat(formData.fee),
-        requiredDocuments: formData.requiredDocuments.split(',').map(doc => doc.trim()).filter(doc => doc)
+        requiredDocuments: formData.requiredDocuments.split(',').map(doc => doc.trim()).filter(doc => doc),
+        // Map UI documents to API shape
+        documents: (formData.documents || []).map(d => ({
+          name: d.name,
+          notes: d.notes,
+          imageUrl: d.imageUrl || undefined,
+          template: d.templateId || undefined,
+        }))
       }
 
       let response
@@ -75,7 +98,13 @@ const AdminServices = () => {
       category: service.category,
       fee: service.fee.toString(),
       processingTime: service.processingTime,
-      requiredDocuments: service.requiredDocuments.join(', '),
+      requiredDocuments: (service.requiredDocuments || []).join(', '),
+      documents: (service.documents || []).map(d => ({
+        name: d.name,
+        notes: d.notes || '',
+        imageUrl: d.imageUrl || d?.template?.imageUrl || '',
+        templateId: d?.template?._id || (typeof d.template === 'string' ? d.template : undefined)
+      })),
       isActive: service.isActive
     })
     setShowModal(true)
@@ -130,6 +159,23 @@ const AdminServices = () => {
         </div>
       </div>
     )
+  }
+
+
+
+  // Handlers to manage documents in form
+  const addEmptyDocument = () => {
+    setFormData(prev => ({ ...prev, documents: [...(prev.documents || []), { name: '', notes: '', imageUrl: '', templateId: '' }] }))
+  }
+  const updateDocument = (idx, patch) => {
+    setFormData(prev => {
+      const docs = [...(prev.documents || [])]
+      docs[idx] = { ...docs[idx], ...patch }
+      return { ...prev, documents: docs }
+    })
+  }
+  const removeDocument = (idx) => {
+    setFormData(prev => ({ ...prev, documents: (prev.documents || []).filter((_, i) => i !== idx) }))
   }
 
   return (
@@ -330,17 +376,98 @@ const AdminServices = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Required Documents (comma-separated)
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Required Documents (legacy, optional)
                   </label>
                   <textarea
                     name="requiredDocuments"
                     value={formData.requiredDocuments}
                     onChange={handleChange}
                     rows={2}
-                    placeholder="e.g., Aadhaar Card, Birth Certificate, Passport Photo"
+                    placeholder="Comma separated names for backward compatibility"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
+                </div>
+
+                {/* New: Documents with sample images */}
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-700">Documents with sample images</label>
+                    <button type="button" className="btn-secondary text-sm" onClick={addEmptyDocument}>Add Document</button>
+                  </div>
+
+                  {(formData.documents || []).length === 0 && (
+                    <div className="text-sm text-gray-500">No documents added yet.</div>
+                  )}
+
+                  <div className="space-y-4">
+                    {(formData.documents || []).map((d, idx) => (
+                      <div key={idx} className="border rounded-md p-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Document Name</label>
+                            <input
+                              type="text"
+                              value={d.name}
+                              onChange={(e) => updateDocument(idx, { name: e.target.value })}
+                              className="w-full px-3 py-2 border rounded"
+                              placeholder="e.g., Aadhaar Card"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
+                            <input
+                              type="text"
+                              value={d.notes}
+                              onChange={(e) => updateDocument(idx, { notes: e.target.value })}
+                              className="w-full px-3 py-2 border rounded"
+                              placeholder="Any special instruction"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Use saved template</label>
+                            <select
+                              value={d.templateId || ''}
+                              onChange={(e) => updateDocument(idx, { templateId: e.target.value, imageUrl: '' })}
+                              className="w-full px-3 py-2 border rounded"
+                            >
+                              <option value="">None</option>
+                              {templates.map(t => (
+                                <option key={t._id} value={t._id}>{t.title}</option>
+                              ))}
+                            </select>
+                            <div className="text-xs text-gray-500 mt-1">Selecting a template will use its image</div>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Or paste image URL</label>
+                            <input
+                              type="url"
+                              value={d.imageUrl}
+                              onChange={(e) => updateDocument(idx, { imageUrl: e.target.value, templateId: '' })}
+                              className="w-full px-3 py-2 border rounded"
+                              placeholder="http://localhost:5000/uploads/..."
+                            />
+                            <div className="text-xs text-gray-500 mt-1">Upload via Templates tab to get an URL, or reuse a template.</div>
+                          </div>
+                        </div>
+
+                        {(d.imageUrl || (d.templateId && templates.find(t => t._id === d.templateId)?.imageUrl)) && (
+                          <div className="mt-3">
+                            <img
+                              src={d.imageUrl || templates.find(t => t._id === d.templateId)?.imageUrl}
+                              alt="preview"
+                              className="w-48 h-auto rounded border"
+                            />
+                          </div>
+                        )}
+
+                        <div className="mt-3 text-right">
+                          <button type="button" className="text-red-600 text-sm" onClick={() => removeDocument(idx)}>Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="flex items-center">

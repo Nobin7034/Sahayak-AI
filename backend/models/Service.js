@@ -22,8 +22,14 @@ const serviceSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  requiredDocuments: [{
-    type: String
+  // Backward compatible: keep simple list
+  requiredDocuments: [{ type: String }],
+  // New richer structure for documents with optional reusable template reference
+  documents: [{
+    name: { type: String, required: true },
+    template: { type: mongoose.Schema.Types.ObjectId, ref: 'DocumentTemplate' },
+    imageUrl: { type: String }, // stored when not using a template
+    notes: { type: String }
   }],
   isActive: {
     type: Boolean,

@@ -18,6 +18,12 @@ const newsSchema = new mongoose.Schema({
     required: true,
     enum: ['announcement', 'update', 'alert', 'general']
   },
+  imageUrl: {
+    type: String
+  },
+  imageAlt: {
+    type: String
+  },
   isPublished: {
     type: Boolean,
     default: false

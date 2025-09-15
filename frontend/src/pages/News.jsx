@@ -1,14 +1,44 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar, ArrowRight, Search } from 'lucide-react'
-import { newsData } from '../data/mockData'
+import axios from 'axios'
+
+const withBaseUploads = (url) => {
+  if (!url) return ''
+  const norm = url.replace(/\\/g, '/'); // normalize backslashes
+  if (norm.startsWith('http')) return norm
+  if (norm.startsWith('/uploads')) return `http://localhost:5000${norm}`
+  if (norm.startsWith('uploads')) return `http://localhost:5000/${norm}`
+  return norm
+}
 
 const News = () => {
   const [searchTerm, setSearchTerm] = useState('')
+  const [items, setItems] = useState([])
+  const [external, setExternal] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredNews = newsData.filter(news =>
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const [localRes, extRes] = await Promise.all([
+          axios.get('/news'),
+          axios.get('/news/external/kerala', { params: { source: 'rss', limit: 6 } })
+        ])
+        if (localRes.data.success) setItems(localRes.data.data.news)
+        if (extRes.data.success) setExternal(extRes.data.data)
+      } catch (e) {
+        console.error('Failed to load news', e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchNews()
+  }, [])
+
+  const filteredNews = items.filter(news =>
     news.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    news.excerpt.toLowerCase().includes(searchTerm.toLowerCase())
+    news.summary.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -37,20 +67,22 @@ const News = () => {
 
         {/* News Grid */}
         <div className="space-y-8">
-          {filteredNews.map((news, index) => (
-            <article key={news.id} className="card overflow-hidden">
+          {filteredNews.map((news) => (
+            <article key={news._id} className="card overflow-hidden">
               <div className="md:flex">
                 <div className="md:w-1/3">
-                  <img
-                    src={news.image}
-                    alt={news.title}
-                    className="w-full h-64 md:h-full object-cover"
-                  />
+                  {news.imageUrl && (
+                    <img
+                      src={withBaseUploads(news.imageUrl)}
+                      alt={news.imageAlt || news.title}
+                      className="w-full h-64 md:h-full object-cover"
+                    />
+                  )}
                 </div>
                 <div className="md:w-2/3 p-8">
                   <div className="flex items-center space-x-2 text-sm text-gray-500 mb-3">
                     <Calendar className="w-4 h-4" />
-                    <span>{new Date(news.date).toLocaleDateString('en-IN', {
+                    <span>{new Date(news.publishDate).toLocaleDateString('en-IN', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
@@ -58,10 +90,10 @@ const News = () => {
                   </div>
                   
                   <h2 className="text-2xl font-bold text-gray-900 mb-4">{news.title}</h2>
-                  <p className="text-gray-600 mb-6 leading-relaxed">{news.excerpt}</p>
+                  <p className="text-gray-600 mb-6 leading-relaxed">{news.summary}</p>
                   
                   <Link
-                    to={`/news/${news.id}`}
+                    to={`/news/${news._id}`}
                     className="inline-flex items-center text-primary hover:text-blue-700 font-semibold"
                   >
                     Read Full Article <ArrowRight className="ml-2 w-4 h-4" />
@@ -70,6 +102,25 @@ const News = () => {
               </div>
             </article>
           ))}
+
+          {/* External Kerala news */}
+          {external.length > 0 && (
+            <div className="pt-6 border-t">
+              <h3 className="text-lg font-semibold mb-4">Latest Kerala Government News (external)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {external.map((n, idx) => (
+                  <a key={idx} href={n.link} target="_blank" rel="noopener noreferrer" className="card p-4 hover:shadow-lg transition-shadow">
+                    {n.imageUrl && (
+                      <img src={n.imageUrl} alt={n.title} className="w-full h-40 object-cover rounded mb-3" />
+                    )}
+                    <div className="text-sm text-gray-500 mb-1">{n.publishDate ? new Date(n.publishDate).toLocaleDateString('en-IN') : ''}</div>
+                    <div className="font-semibold text-gray-900 mb-2">{n.title}</div>
+                    <div className="text-gray-600 text-sm">{n.summary}</div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {filteredNews.length === 0 && (
