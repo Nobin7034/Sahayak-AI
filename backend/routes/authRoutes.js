@@ -67,6 +67,21 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// ---------------- CHECK EMAIL (live validation) ----------------
+router.get('/check-email', async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+    const existing = await User.findOne({ email }).lean();
+    return res.json({ success: true, exists: !!existing });
+  } catch (error) {
+    console.error('❌ Email check error:', error);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // ---------------- LOGIN ----------------
 router.post("/login", async (req, res) => {
   try {

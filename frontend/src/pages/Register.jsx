@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Mail, Phone, Lock, Eye, EyeOff, User, ArrowLeft } from "lucide-react";
@@ -12,8 +12,10 @@ const Register = () => {
     email: "",
     phone: "",
     password: "",
+    confirmPassword: "",
   });
   const [errors, setErrors] = useState({});
+  const [emailStatus, setEmailStatus] = useState({ checking: false, exists: false });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -54,6 +56,10 @@ const Register = () => {
           return "Password must be min 8 chars, include uppercase, lowercase, number & special char";
         }
         break;
+      case "confirmPassword":
+        if (!value) return "Please confirm your password";
+        if (value !== formData.password) return "Passwords do not match";
+        break;
       default:
         return "";
     }
@@ -87,11 +93,58 @@ const Register = () => {
       ...prev,
       [name]: errorMsg,
     }));
+
+    // Live email existence check (debounced via setTimeout in separate effect)
+    if (name === 'email') {
+      setEmailStatus((s) => ({ ...s, exists: false }));
+    }
   };
+
+  // Debounced email availability check
+  useEffect(() => {
+    const email = formData.email.trim();
+    if (!email) {
+      setEmailStatus({ checking: false, exists: false });
+      return;
+    }
+
+    // Check only if email passes format validation
+    if (validateField('email', email)) {
+      setEmailStatus({ checking: false, exists: false });
+      return;
+    }
+
+    let active = true;
+    setEmailStatus({ checking: true, exists: false });
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await axios.get(`/auth/check-email`, { params: { email } });
+        if (!active) return;
+        setEmailStatus({ checking: false, exists: !!data?.exists });
+        setErrors((prev) => ({ ...prev, email: data?.exists ? 'Email already exists' : '' }));
+      } catch (e) {
+        if (!active) return;
+        setEmailStatus({ checking: false, exists: false });
+      }
+    }, 400); // debounce 400ms
+
+    return () => { active = false; clearTimeout(t); };
+  }, [formData.email]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateAll()) return;
+    // Extra safety: ensure passwords match
+    if (formData.password !== formData.confirmPassword) {
+      setErrors((prev) => ({ ...prev, confirmPassword: 'Passwords do not match' }));
+      return;
+    }
+
+    // Block submit if email exists
+    if (emailStatus.exists) {
+      setErrors((prev) => ({ ...prev, email: 'Email already exists' }));
+      return;
+    }
 
     setLoading(true);
     try {
@@ -208,10 +261,19 @@ const Register = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="Enter email"
-                  className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
-                    errors.email ? "border-red-500" : "border-gray-300"
+                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
+                    errors.email ? "border-red-500" : emailStatus.exists ? 'border-red-500' : "border-gray-300"
                   }`}
                 />
+                {/* Right-side status icon */}
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  {emailStatus.checking && (
+                    <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                  )}
+                </div>
               </div>
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -272,6 +334,40 @@ const Register = () => {
               </div>
               {errors.password && (
                 <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Confirm Password
+              </label>
+              <div className="relative mt-1">
+                <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="Re-enter password"
+                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
+                    errors.confirmPassword ? "border-red-500" : "border-gray-300"
+                  }`}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+              </div>
+              {errors.confirmPassword && (
+                <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
               )}
             </div>
 
