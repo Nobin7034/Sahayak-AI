@@ -1,11 +1,11 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import axios from 'axios';
 import User from "../models/User.js";
-import { OAuth2Client } from "google-auth-library";
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // ---------------- Helper: generate JWT ----------------
 const generateToken = (user) => {
@@ -117,57 +117,64 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// ---------------- GOOGLE SIGN-IN ----------------
+// ---------------- GOOGLE SIGN-IN (via Firebase ID token) ----------------
 router.post("/google", async (req, res) => {
   try {
-    const idToken = req.body.token; // ✅ Expect token from frontend body
+    const idToken = req.body.token; // Firebase ID token from client
 
     if (!idToken) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing Google ID token" });
+      return res.status(400).json({ success: false, message: "Missing Firebase ID token" });
     }
 
-    console.log("🟢 Received Google token:", idToken ? "Present" : "Missing");
-
-    // ✅ Verify token with Google
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    const payload = ticket.getPayload();
-
-    console.log("✅ Google payload:", payload);
-
-    const { sub: googleId, email, name, picture } = payload;
+    // Verify Firebase ID token using Admin SDK, with REST fallback if Admin is not configured
+    const adminModule = await import('../config/firebaseAdmin.js');
+    let uid, email, name, picture;
+    try {
+      const decoded = await adminModule.default.auth().verifyIdToken(idToken);
+      ({ uid, email, name, picture } = decoded);
+    } catch (adminErr) {
+      try {
+        const apiKey = process.env.FIREBASE_WEB_API_KEY;
+        if (!apiKey) throw new Error('FIREBASE_WEB_API_KEY not set');
+        const resp = await axios.post(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+          { idToken },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        const users = resp?.data?.users || [];
+        if (!users.length) throw new Error('Invalid Firebase ID token');
+        const u = users[0];
+        uid = u.localId;
+        email = u.email;
+        name = u.displayName || (email ? email.split('@')[0] : 'User');
+        picture = u.photoUrl;
+      } catch (restErr) {
+        throw adminErr;
+      }
+    }
 
     let user = await User.findOne({ email });
     if (!user) {
       user = await User.create({
         name: name || email.split("@")[0],
         email,
-        googleId,
+        googleId: uid,
         provider: "google",
         avatar: picture,
         role: req.body.role || "user",
       });
-    } else {
-      if (!user.googleId) {
-        user.googleId = googleId;
-        user.provider = "google";
-        user.avatar = user.avatar || picture;
-        await user.save();
-      }
+    } else if (!user.googleId) {
+      user.googleId = uid;
+      user.provider = "google";
+      user.avatar = user.avatar || picture;
+      await user.save();
     }
 
     user.lastLogin = new Date();
     await user.save();
 
-    const token = generateToken(user);
-
+    // No backend JWT; client will send Firebase ID token on each request
     res.json({
       success: true,
-      token,
       user: {
         id: user._id,
         name: user.name,
@@ -177,35 +184,27 @@ router.post("/google", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("❌ Google auth error:", err.message);
+    console.error("❌ Google auth error:", err?.response?.data || err?.message || err);
     res.status(401).json({
       success: false,
       message: "Google authentication failed",
-      error: err.message,
+      error: err?.message || 'Unknown error',
+      details: err?.response?.data,
     });
   }
 });
 
-// ---------------- CURRENT USER ----------------
-router.get("/me", async (req, res) => {
+// ---------------- CURRENT USER (uses Firebase-authenticated request) ----------------
+router.get("/me", authenticate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ success: false, message: "No token provided" });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
-    const user = await User.findById(decoded.userId).select("-password");
+    const user = await User.findById(req.user.userId).select("-password");
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-
     res.json({ success: true, user });
   } catch (error) {
     console.error("❌ Get user error:", error);
-    res
-      .status(401)
-      .json({ success: false, message: "Invalid token", error: error.message });
+    res.status(500).json({ success: false, message: "Server error", error: error.message });
   }
 });
 

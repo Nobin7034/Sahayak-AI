@@ -11,7 +11,7 @@ dotenv.config();
 connectDB();
 
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 
 // Resolve __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
