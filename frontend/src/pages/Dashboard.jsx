@@ -12,7 +12,9 @@ import {
   Phone,
   Mail,
   MapPin,
-  Loader2
+  Loader2,
+  Edit3,
+  X
 } from 'lucide-react'
 
 const Dashboard = () => {
@@ -25,6 +27,10 @@ const Dashboard = () => {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [editingAppointment, setEditingAppointment] = useState(null)
+  const [editForm, setEditForm] = useState({ appointmentDate: '', timeSlot: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState({ type: '', text: '' })
 
   useEffect(() => {
     // Only fetch data if user is logged in
@@ -63,6 +69,57 @@ const Dashboard = () => {
       setLoading(false)
     }
   }, [user])
+
+  // Handle edit appointment
+  const handleEditAppointment = (appointment) => {
+    setEditingAppointment(appointment._id)
+    setEditForm({
+      appointmentDate: new Date(appointment.appointmentDate).toISOString().split('T')[0],
+      timeSlot: appointment.timeSlot,
+      notes: appointment.notes || ''
+    })
+    setMessage({ type: '', text: '' })
+  }
+
+  // Handle save appointment changes
+  const handleSaveAppointment = async (e) => {
+    e.preventDefault()
+    try {
+      setSaving(true)
+      setMessage({ type: '', text: '' })
+      
+      const response = await axios.put(`/appointments/${editingAppointment}`, editForm)
+      
+      if (response.data.success) {
+        // Update the appointment in the list
+        setAppointments(prev => prev.map(apt => 
+          apt._id === editingAppointment ? response.data.data : apt
+        ))
+        setEditingAppointment(null)
+        setMessage({ type: 'success', text: 'Appointment updated successfully!' })
+      } else {
+        setMessage({ type: 'error', text: response.data.message || 'Failed to update appointment' })
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to update appointment' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingAppointment(null)
+    setEditForm({ appointmentDate: '', timeSlot: '', notes: '' })
+    setMessage({ type: '', text: '' })
+  }
+
+  // Get available time slots (you can make this dynamic)
+  const timeSlots = [
+    '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+    '12:00 PM', '12:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+    '04:00 PM', '04:30 PM', '05:00 PM'
+  ]
 
   // Show loading state
   if (loading) {
@@ -107,6 +164,24 @@ const Dashboard = () => {
             Here's an overview of your government service applications and appointments
           </p>
         </div>
+
+        {/* Message Display */}
+        {message.text && (
+          <div className={`mb-6 p-4 rounded-lg border ${
+            message.type === 'success' 
+              ? 'bg-green-50 border-green-200 text-green-800' 
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {message.type === 'success' ? (
+                <CheckCircle className="w-5 h-5" />
+              ) : (
+                <AlertTriangle className="w-5 h-5" />
+              )}
+              <span className="text-sm">{message.text}</span>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -223,33 +298,133 @@ const Dashboard = () => {
                       key={appointment._id}
                       className="p-4 border border-gray-200 rounded-lg"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-gray-900">{appointment.service?.name}</h3>
-                        <span className={`text-sm px-2 py-1 rounded ${
-                          appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
-                          appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {appointment.status}
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-4 h-4" />
-                          <span>{new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.timeSlot}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="w-4 h-4" />
-                          <span>Akshaya Service Center</span>
-                        </div>
-                        {appointment.notes && (
-                          <div className="flex items-start space-x-2">
-                            <FileText className="w-4 h-4 mt-0.5" />
-                            <span>{appointment.notes}</span>
+                      {editingAppointment === appointment._id ? (
+                        // Edit Form
+                        <form onSubmit={handleSaveAppointment} className="space-y-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-semibold text-gray-900">Edit Appointment</h3>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
                           </div>
-                        )}
-                      </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Date
+                              </label>
+                              <input
+                                type="date"
+                                value={editForm.appointmentDate}
+                                onChange={(e) => setEditForm({ ...editForm, appointmentDate: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
+                                min={new Date().toISOString().split('T')[0]}
+                                required
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Time Slot
+                              </label>
+                              <select
+                                value={editForm.timeSlot}
+                                onChange={(e) => setEditForm({ ...editForm, timeSlot: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
+                                required
+                              >
+                                <option value="">Select time</option>
+                                {timeSlots.map(slot => (
+                                  <option key={slot} value={slot}>{slot}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Notes (Optional)
+                            </label>
+                            <textarea
+                              value={editForm.notes}
+                              onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
+                              rows={3}
+                              placeholder="Add any additional notes..."
+                            />
+                          </div>
+                          
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              disabled={saving}
+                              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            >
+                              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                              {saving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        // Display Mode
+                        <>
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold text-gray-900">{appointment.service?.name}</h3>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-sm px-2 py-1 rounded ${
+                                appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                                appointment.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {appointment.status}
+                              </span>
+                              {appointment.canEdit && (
+                                <button
+                                  onClick={() => handleEditAppointment(appointment)}
+                                  className="text-primary hover:text-blue-700 p-1"
+                                  title="Edit appointment"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-sm text-gray-600">
+                            <div className="flex items-center space-x-2">
+                              <Calendar className="w-4 h-4" />
+                              <span>{new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.timeSlot}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <MapPin className="w-4 h-4" />
+                              <span>Akshaya Service Center</span>
+                            </div>
+                            {appointment.notes && (
+                              <div className="flex items-start space-x-2">
+                                <FileText className="w-4 h-4 mt-0.5" />
+                                <span>{appointment.notes}</span>
+                              </div>
+                            )}
+                            {!appointment.canEdit && appointment.status === 'pending' && (
+                              <div className="flex items-center space-x-2 text-orange-600">
+                                <Clock className="w-4 h-4" />
+                                <span className="text-xs">Cannot edit within 3 hours of appointment</span>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -288,9 +463,12 @@ const Dashboard = () => {
                   <span className="text-gray-700">{user?.phone}</span>
                 </div>
               </div>
-              <button className="w-full mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <Link
+                to="/profile"
+                className="block w-full mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center"
+              >
                 Edit Profile
-              </button>
+              </Link>
             </div>
 
             {/* Quick Actions */}

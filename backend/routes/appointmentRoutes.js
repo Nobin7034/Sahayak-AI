@@ -15,9 +15,23 @@ router.get('/', async (req, res) => {
       .populate('service', 'name category fee processingTime')
       .sort({ createdAt: -1 });
 
+    // Add canEdit flag to each appointment
+    const now = new Date();
+    const appointmentsWithEditFlag = appointments.map(appointment => {
+      const appointmentTime = new Date(appointment.appointmentDate);
+      const timeDiff = appointmentTime.getTime() - now.getTime();
+      const hoursDiff = timeDiff / (1000 * 60 * 60);
+      const canEdit = appointment.status === 'pending' && hoursDiff > 3;
+      
+      return {
+        ...appointment.toObject(),
+        canEdit
+      };
+    });
+
     res.json({
       success: true,
-      data: appointments
+      data: appointmentsWithEditFlag
     });
   } catch (error) {
     console.error('Get appointments error:', error);
@@ -103,9 +117,19 @@ router.get('/:id', async (req, res) => {
       });
     }
 
+    // Check if appointment can be edited (more than 3 hours away and pending)
+    const now = new Date();
+    const appointmentTime = new Date(appointment.appointmentDate);
+    const timeDiff = appointmentTime.getTime() - now.getTime();
+    const hoursDiff = timeDiff / (1000 * 60 * 60);
+    const canEdit = appointment.status === 'pending' && hoursDiff > 3;
+
     res.json({
       success: true,
-      data: appointment
+      data: {
+        ...appointment.toObject(),
+        canEdit
+      }
     });
   } catch (error) {
     console.error('Get appointment error:', error);
@@ -117,7 +141,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update appointment (only if pending)
+// Update appointment (only if pending and more than 3 hours away)
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -133,6 +157,19 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Appointment not found or cannot be modified'
+      });
+    }
+
+    // Check if appointment is more than 3 hours away
+    const now = new Date();
+    const appointmentTime = new Date(appointment.appointmentDate);
+    const timeDiff = appointmentTime.getTime() - now.getTime();
+    const hoursDiff = timeDiff / (1000 * 60 * 60);
+
+    if (hoursDiff <= 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointment cannot be modified within 3 hours of scheduled time'
       });
     }
 

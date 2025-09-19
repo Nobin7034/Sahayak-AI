@@ -209,15 +209,9 @@ router.get("/me", authenticate, async (req, res) => {
 });
 
 // ---------------- UPDATE CURRENT USER ----------------
-router.put("/me", async (req, res) => {
+router.put("/me", authenticate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ success: false, message: "No token provided" });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
@@ -249,14 +243,9 @@ router.put("/me", async (req, res) => {
 });
 
 // ---------------- CHANGE PASSWORD (LOCAL ONLY) ----------------
-router.put('/me/password', async (req, res) => {
+router.put('/me/password', authenticate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
-    }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    const user = await User.findById(decoded.userId);
+    const user = await User.findById(req.user.userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }

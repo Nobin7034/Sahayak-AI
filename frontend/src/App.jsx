@@ -21,6 +21,7 @@ import AdminUsers from './pages/admin/AdminUsers'
 import AdminServices from './pages/admin/AdminServices'
 import AdminNews from './pages/admin/AdminNews'
 import AdminAppointments from './pages/admin/AdminAppointments'
+import AdminSettings from './pages/admin/AdminSettings'
 
 function App() {
   return (
@@ -144,6 +145,13 @@ function App() {
             <AdminProtectedRoute>
               <AdminLayout>
                 <AdminAppointments />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <AdminSettings />
               </AdminLayout>
             </AdminProtectedRoute>
           } />
