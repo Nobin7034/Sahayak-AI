@@ -66,9 +66,16 @@ const AdminServices = () => {
         // Map UI documents to API shape
         documents: (formData.documents || []).map(d => ({
           name: d.name,
+          requirement: d.requirement || 'mandatory',
           notes: d.notes,
           imageUrl: d.imageUrl || undefined,
           template: d.templateId || undefined,
+          alternatives: (d.alternatives || []).map(a => ({
+            name: a.name,
+            notes: a.notes,
+            imageUrl: a.imageUrl || undefined,
+            template: a.templateId || undefined,
+          }))
         }))
       }
 
@@ -101,9 +108,16 @@ const AdminServices = () => {
       requiredDocuments: (service.requiredDocuments || []).join(', '),
       documents: (service.documents || []).map(d => ({
         name: d.name,
+        requirement: d.requirement || 'mandatory',
         notes: d.notes || '',
         imageUrl: d.imageUrl || d?.template?.imageUrl || '',
-        templateId: d?.template?._id || (typeof d.template === 'string' ? d.template : undefined)
+        templateId: d?.template?._id || (typeof d.template === 'string' ? d.template : undefined),
+        alternatives: (d.alternatives || []).map(a => ({
+          name: a.name,
+          notes: a.notes || '',
+          imageUrl: a.imageUrl || a?.template?.imageUrl || '',
+          templateId: a?.template?._id || (typeof a.template === 'string' ? a.template : undefined)
+        }))
       })),
       isActive: service.isActive
     })
@@ -165,7 +179,7 @@ const AdminServices = () => {
 
   // Handlers to manage documents in form
   const addEmptyDocument = () => {
-    setFormData(prev => ({ ...prev, documents: [...(prev.documents || []), { name: '', notes: '', imageUrl: '', templateId: '' }] }))
+    setFormData(prev => ({ ...prev, documents: [...(prev.documents || []), { name: '', requirement: 'mandatory', notes: '', imageUrl: '', templateId: '', alternatives: [] }] }))
   }
   const updateDocument = (idx, patch) => {
     setFormData(prev => {
@@ -176,6 +190,38 @@ const AdminServices = () => {
   }
   const removeDocument = (idx) => {
     setFormData(prev => ({ ...prev, documents: (prev.documents || []).filter((_, i) => i !== idx) }))
+  }
+
+  const addAlternative = (docIdx) => {
+    setFormData(prev => {
+      const docs = [...(prev.documents || [])]
+      const current = docs[docIdx] || {}
+      const alts = [...(current.alternatives || [])]
+      alts.push({ name: '', notes: '', templateId: '', imageUrl: '' })
+      docs[docIdx] = { ...current, alternatives: alts }
+      return { ...prev, documents: docs }
+    })
+  }
+
+  const updateAlternative = (docIdx, altIdx, patch) => {
+    setFormData(prev => {
+      const docs = [...(prev.documents || [])]
+      const current = docs[docIdx] || {}
+      const alts = [...(current.alternatives || [])]
+      alts[altIdx] = { ...alts[altIdx], ...patch }
+      docs[docIdx] = { ...current, alternatives: alts }
+      return { ...prev, documents: docs }
+    })
+  }
+
+  const removeAlternative = (docIdx, altIdx) => {
+    setFormData(prev => {
+      const docs = [...(prev.documents || [])]
+      const current = docs[docIdx] || {}
+      const alts = (current.alternatives || []).filter((_, i) => i !== altIdx)
+      docs[docIdx] = { ...current, alternatives: alts }
+      return { ...prev, documents: docs }
+    })
   }
 
   return (
@@ -416,6 +462,18 @@ const AdminServices = () => {
                             />
                           </div>
                           <div>
+                            <label className="block text-xs text-gray-600 mb-1">Requirement</label>
+                            <select
+                              value={d.requirement || 'mandatory'}
+                              onChange={(e) => updateDocument(idx, { requirement: e.target.value })}
+                              className="w-full px-3 py-2 border rounded"
+                            >
+                              <option value="mandatory">Mandatory</option>
+                              <option value="optional">Optional</option>
+                            </select>
+                            <div className="text-xs text-gray-500 mt-1">Controls whether this primary document is mandatory or optional.</div>
+                          </div>
+                          <div>
                             <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
                             <input
                               type="text"
@@ -523,6 +581,108 @@ const AdminServices = () => {
                             </button>
                           </div>
                         )}
+
+                        {/* Alternatives Section */}
+                        <div className="mt-4 border-t pt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-800">Alternatives</span>
+                            <button type="button" className="btn-secondary text-xs" onClick={() => addAlternative(idx)}>Add Alternative</button>
+                          </div>
+                          {(d.alternatives || []).length === 0 && (
+                            <div className="text-xs text-gray-500">No alternatives added.</div>
+                          )}
+                          <div className="space-y-3">
+                            {(d.alternatives || []).map((alt, aidx) => (
+                              <div key={aidx} className="rounded border p-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Alternative Name</label>
+                                    <input
+                                      type="text"
+                                      value={alt.name}
+                                      onChange={(e) => updateAlternative(idx, aidx, { name: e.target.value })}
+                                      className="w-full px-3 py-2 border rounded"
+                                      placeholder="e.g., Voter ID"
+                                      required
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
+                                    <input
+                                      type="text"
+                                      value={alt.notes || ''}
+                                      onChange={(e) => updateAlternative(idx, aidx, { notes: e.target.value })}
+                                      className="w-full px-3 py-2 border rounded"
+                                      placeholder="Any special instruction"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Use saved template</label>
+                                    <select
+                                      value={alt.templateId || ''}
+                                      onChange={(e) => updateAlternative(idx, aidx, { templateId: e.target.value, imageUrl: '' })}
+                                      className="w-full px-3 py-2 border rounded"
+                                    >
+                                      <option value="">None</option>
+                                      {templates.map(t => (
+                                        <option key={t._id} value={t._id}>{t.title}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Upload from your PC</label>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={async (e) => {
+                                        const file = e.target.files?.[0]
+                                        if (!file) return
+                                        const fd = new FormData()
+                                        fd.append('image', file)
+                                        try {
+                                          const res = await axios.post('/admin/document-templates/upload', fd, {
+                                            headers: { 'Content-Type': 'multipart/form-data' }
+                                          })
+                                          if (res.data?.success && res.data?.imageUrl) {
+                                            updateAlternative(idx, aidx, { imageUrl: res.data.imageUrl, templateId: '' })
+                                          } else {
+                                            alert('Upload failed')
+                                          }
+                                        } catch (err) {
+                                          console.error('Upload failed', err)
+                                          alert('Upload failed')
+                                        }
+                                      }}
+                                      className="w-full px-3 py-2 border rounded"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Or paste direct image URL</label>
+                                    <input
+                                      type="url"
+                                      value={alt.imageUrl || ''}
+                                      onChange={(e) => updateAlternative(idx, aidx, { imageUrl: e.target.value, templateId: '' })}
+                                      className="w-full px-3 py-2 border rounded"
+                                      placeholder="http://localhost:5000/uploads/..."
+                                    />
+                                  </div>
+                                </div>
+                                {(alt.imageUrl || (alt.templateId && templates.find(t => t._id === alt.templateId)?.imageUrl)) && (
+                                  <div className="mt-3">
+                                    <img
+                                      src={alt.imageUrl || templates.find(t => t._id === alt.templateId)?.imageUrl}
+                                      alt="preview"
+                                      className="w-40 h-auto rounded border"
+                                    />
+                                  </div>
+                                )}
+                                <div className="mt-2 text-right">
+                                  <button type="button" className="text-red-600 text-xs" onClick={() => removeAlternative(idx, aidx)}>Remove alternative</button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
                         <div className="mt-3 text-right">
                           <button type="button" className="text-red-600 text-sm" onClick={() => removeDocument(idx)}>Remove</button>

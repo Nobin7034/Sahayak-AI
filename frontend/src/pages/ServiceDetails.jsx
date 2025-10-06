@@ -102,12 +102,11 @@ const ServiceDetails = () => {
             <div className="card p-8">
               <div className="flex items-center space-x-2 mb-6">
                 <FileText className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-bold text-gray-900">Required Documents</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Documents</h2>
               </div>
               
               <p className="text-gray-600 mb-8">
-                Please ensure you have all the following documents ready before applying. 
-                Click on each document to see a demo image of what it should look like.
+                Primary documents marked Mandatory are required. If you don't have a primary document, you may provide one of its Alternatives where available.
               </p>
 
               <div className="space-y-6">
@@ -124,7 +123,9 @@ const ServiceDetails = () => {
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-2">
                               <h3 className="text-lg font-semibold text-gray-900">{d.name}</h3>
-                              <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Required</span>
+                              <span className={`text-xs px-2 py-1 rounded-full ${d.requirement === 'optional' ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700'}`}>
+                                {d.requirement === 'optional' ? 'Optional' : 'Mandatory'}
+                              </span>
                             </div>
                             {d.notes && <p className="text-gray-600 mb-4">{d.notes}</p>}
                             <div className="mt-2 flex items-center gap-3">
@@ -146,6 +147,47 @@ const ServiceDetails = () => {
                                 <span className="text-xs text-gray-400">No sample available</span>
                               )}
                             </div>
+
+                            {/* Alternatives */}
+                            {(d.alternatives && d.alternatives.length > 0) && (
+                              <div className="mt-5 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                <div className="text-sm font-medium text-gray-800 mb-2">Alternatives (any one)</div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {d.alternatives.map((a, aidx) => {
+                                    const aPreview = a.imageUrl || a?.template?.imageUrl
+                                    return (
+                                      <div key={aidx} className="border rounded p-3">
+                                        <div className="flex items-start justify-between">
+                                          <div>
+                                            <div className="font-semibold text-gray-900">{a.name}</div>
+                                            {a.notes && <div className="text-xs text-gray-600">{a.notes}</div>}
+                                          </div>
+                                          <button
+                                            type="button"
+                                            className="inline-flex items-center text-primary hover:text-blue-700 text-xs"
+                                            onClick={() => {
+                                              const url = aPreview
+                                              if (!url) return
+                                              setPreview({ open: true, title: a.name, url })
+                                            }}
+                                            disabled={!aPreview}
+                                          >
+                                            <Eye className="w-4 h-4 mr-1" />
+                                            View sample
+                                          </button>
+                                        </div>
+                                        {!aPreview && (
+                                          <div className="text-xs text-gray-400 mt-1">No sample available</div>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-3">
+                                  If the primary document is not available, you may provide any one of the alternatives above.
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -243,7 +285,7 @@ const ServiceDetails = () => {
               </button>
             </div>
             <div className="p-4">
-              <img src={preview.url} alt={preview.title} className="w-full h-auto rounded border" />
+              <img src={preview.url} alt={preview.title} className="max-h-[70vh] w-auto max-w-full object-contain rounded border mx-auto" />
               <div className="text-xs text-gray-500 mt-2">Sample document image</div>
             </div>
           </div>

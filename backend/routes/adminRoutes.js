@@ -211,6 +211,7 @@ router.get('/services', async (req, res) => {
     const services = await Service.find()
       .populate('createdBy', 'name email')
       .populate('documents.template')
+      .populate('documents.alternatives.template')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -239,7 +240,8 @@ router.post('/services', async (req, res) => {
 
     const populatedService = await Service.findById(service._id)
       .populate('createdBy', 'name email')
-      .populate('documents.template');
+      .populate('documents.template')
+      .populate('documents.alternatives.template');
 
     res.status(201).json({
       success: true,
@@ -264,7 +266,8 @@ router.put('/services/:id', async (req, res) => {
       req.body,
       { new: true }
     ).populate('createdBy', 'name email')
-     .populate('documents.template');
+     .populate('documents.template')
+     .populate('documents.alternatives.template');
 
     if (!service) {
       return res.status(404).json({

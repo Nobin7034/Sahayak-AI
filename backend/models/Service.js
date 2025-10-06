@@ -24,12 +24,22 @@ const serviceSchema = new mongoose.Schema({
   },
   // Backward compatible: keep simple list
   requiredDocuments: [{ type: String }],
-  // New richer structure for documents with optional reusable template reference
+  // New richer structure for documents with requirement levels and alternatives
   documents: [{
     name: { type: String, required: true },
+    // requirement can be 'mandatory' or 'optional'
+    requirement: { type: String, enum: ['mandatory', 'optional'], default: 'mandatory' },
+    notes: { type: String },
+    // Either use a reusable template or a direct image URL
     template: { type: mongoose.Schema.Types.ObjectId, ref: 'DocumentTemplate' },
-    imageUrl: { type: String }, // stored when not using a template
-    notes: { type: String }
+    imageUrl: { type: String },
+    // Alternatives for this primary document
+    alternatives: [{
+      name: { type: String, required: true },
+      notes: { type: String },
+      template: { type: mongoose.Schema.Types.ObjectId, ref: 'DocumentTemplate' },
+      imageUrl: { type: String }
+    }]
   }],
   isActive: {
     type: Boolean,
