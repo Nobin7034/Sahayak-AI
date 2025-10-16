@@ -18,10 +18,19 @@ const serviceSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  // Upfront amount payable to confirm booking (<= fee)
+  serviceCharge: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0
+  },
   processingTime: {
     type: String,
     required: true
   },
+  // Pre-Check Rules users must review before applying
+  preCheckRules: [{ type: String }],
   // Backward compatible: keep simple list
   requiredDocuments: [{ type: String }],
   // New richer structure for documents with requirement levels and alternatives

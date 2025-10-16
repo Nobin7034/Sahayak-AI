@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Search, Filter, Calendar, User, FileText, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Search, Filter, Calendar, User, FileText, Clock, CheckCircle, XCircle, IndianRupee, RotateCw } from 'lucide-react'
 import axios from 'axios'
 
 const AdminAppointments = () => {
@@ -47,6 +47,22 @@ const AdminAppointments = () => {
       setError('Failed to fetch appointments')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const triggerRefund = async (appointmentId) => {
+    if (!window.confirm('Issue refund for the service charge?')) return
+    try {
+      const res = await axios.post(`/admin/payments/refund/${appointmentId}`)
+      if (res.data?.success) {
+        // refresh list
+        fetchAppointments()
+        alert('Refund processed')
+      } else {
+        alert(res.data?.message || 'Refund failed')
+      }
+    } catch (e) {
+      alert(e.response?.data?.message || 'Refund failed')
     }
   }
 
@@ -173,6 +189,12 @@ const AdminAppointments = () => {
                   <span>Email: {appointment.user?.email}</span>
                   <span>Phone: {appointment.user?.phone || 'N/A'}</span>
                   <span>Fee: ₹{appointment.service?.fee}</span>
+                  {appointment.payment && (
+                    <span className="flex items-center gap-1">
+                      <IndianRupee className="h-4 w-4" />
+                      Paid: ₹{appointment.payment.amount || 0} ({appointment.payment.status})
+                    </span>
+                  )}
                   <span>Booked: {new Date(appointment.createdAt).toLocaleDateString()}</span>
                 </div>
 
@@ -223,6 +245,15 @@ const AdminAppointments = () => {
                       >
                         Cancel
                       </button>
+                      {appointment.payment?.status === 'paid' && (
+                        <button
+                          onClick={() => triggerRefund(appointment._id)}
+                          className="px-3 py-1 bg-yellow-600 text-white text-sm rounded-md hover:bg-yellow-700 flex items-center gap-1"
+                          title="Refund service charge"
+                        >
+                          <RotateCw className="h-4 w-4" /> Refund
+                        </button>
+                      )}
                     </>
                   )}
 

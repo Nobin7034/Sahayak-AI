@@ -2,6 +2,7 @@ import express from 'express';
 import Appointment from '../models/Appointment.js';
 import Service from '../models/Service.js';
 import { userAuth } from '../middleware/auth.js';
+import Holiday from '../models/Holiday.js';
 
 const router = express.Router();
 
@@ -57,10 +58,34 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check if appointment slot is already taken
+    // Block Sundays, second Saturdays and manual holidays
+    const dateObj = new Date(appointmentDate);
+    const day = dateObj.getDay(); // 0=Sun, 6=Sat
+    if (day === 0) {
+      return res.status(400).json({ success: false, message: 'Bookings are not available on Sundays.' });
+    }
+    // second Saturday check
+    if (day === 6) {
+      const d = new Date(dateObj);
+      d.setDate(1);
+      const firstSatOffset = (6 - d.getDay() + 7) % 7;
+      const firstSat = 1 + firstSatOffset;
+      const secondSat = firstSat + 7;
+      if (dateObj.getDate() === secondSat) {
+        return res.status(400).json({ success: false, message: 'Bookings are not available on second Saturdays.' });
+      }
+    }
+    // manual holiday
+    const start = new Date(dateObj); start.setHours(0,0,0,0);
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    const manualHoliday = await Holiday.findOne({ date: { $gte: start, $lt: end } });
+    if (manualHoliday) {
+      return res.status(400).json({ success: false, message: `Bookings are not available on this holiday: ${manualHoliday.reason || 'Holiday'}.` });
+    }
+
+    // Check if appointment slot is already taken (globally across all services)
     const existingAppointment = await Appointment.findOne({
-      service: serviceId,
-      appointmentDate: new Date(appointmentDate),
+      appointmentDate: dateObj,
       timeSlot,
       status: { $in: ['pending', 'confirmed'] }
     });
@@ -75,9 +100,11 @@ router.post('/', async (req, res) => {
     const appointment = new Appointment({
       user: req.user.userId,
       service: serviceId,
-      appointmentDate: new Date(appointmentDate),
+      appointmentDate: dateObj,
       timeSlot,
-      notes
+      notes,
+      // Auto-approve when slot free
+      status: 'confirmed'
     });
 
     await appointment.save();
@@ -117,12 +144,12 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // Check if appointment can be edited (more than 3 hours away and pending)
+    // Check if appointment can be edited (more than 3 hours away and not completed/cancelled)
     const now = new Date();
     const appointmentTime = new Date(appointment.appointmentDate);
     const timeDiff = appointmentTime.getTime() - now.getTime();
     const hoursDiff = timeDiff / (1000 * 60 * 60);
-    const canEdit = appointment.status === 'pending' && hoursDiff > 3;
+    const canEdit = ['pending', 'confirmed'].includes(appointment.status) && hoursDiff > 3;
 
     res.json({
       success: true,
@@ -150,7 +177,7 @@ router.put('/:id', async (req, res) => {
     const appointment = await Appointment.findOne({
       _id: id,
       user: req.user.userId,
-      status: 'pending'
+      status: { $in: ['pending', 'confirmed'] }
     });
 
     if (!appointment) {
@@ -173,6 +200,29 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    // Block Sundays, second Saturdays and manual holidays for the target date
+    if (appointmentDate) {
+      const d = new Date(appointmentDate);
+      if (d.getDay() === 0) {
+        return res.status(400).json({ success: false, message: 'Bookings are not available on Sundays.' });
+      }
+      if (d.getDay() === 6) {
+        const firstOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+        const firstSatOffset = (6 - firstOfMonth.getDay() + 7) % 7;
+        const firstSat = 1 + firstSatOffset;
+        const secondSat = firstSat + 7;
+        if (d.getDate() === secondSat) {
+          return res.status(400).json({ success: false, message: 'Bookings are not available on second Saturdays.' });
+        }
+      }
+      const start = new Date(d); start.setHours(0,0,0,0);
+      const end = new Date(start); end.setDate(end.getDate() + 1);
+      const manualHoliday = await Holiday.findOne({ date: { $gte: start, $lt: end } });
+      if (manualHoliday) {
+        return res.status(400).json({ success: false, message: `Bookings are not available on this holiday: ${manualHoliday.reason || 'Holiday'}.` });
+      }
+    }
+
     // Check if new slot is available (if date/time changed)
     if (appointmentDate || timeSlot) {
       const newDate = appointmentDate ? new Date(appointmentDate) : appointment.appointmentDate;
@@ -180,7 +230,6 @@ router.put('/:id', async (req, res) => {
 
       const existingAppointment = await Appointment.findOne({
         _id: { $ne: id },
-        service: appointment.service,
         appointmentDate: newDate,
         timeSlot: newTimeSlot,
         status: { $in: ['pending', 'confirmed'] }
@@ -219,6 +268,109 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Reschedule an appointment (allow if appointment time has passed or within 3 hours)
+router.put('/:id/reschedule', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { appointmentDate, timeSlot, notes } = req.body;
+
+    if (!appointmentDate || !timeSlot) {
+      return res.status(400).json({
+        success: false,
+        message: 'New appointmentDate and timeSlot are required'
+      });
+    }
+
+    // Block Sundays, second Saturdays and manual holidays
+    const targetDate = new Date(appointmentDate);
+    if (targetDate.getDay() === 0) {
+      return res.status(400).json({ success: false, message: 'Bookings are not available on Sundays.' });
+    }
+    if (targetDate.getDay() === 6) {
+      const firstOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      const firstSatOffset = (6 - firstOfMonth.getDay() + 7) % 7;
+      const firstSat = 1 + firstSatOffset;
+      const secondSat = firstSat + 7;
+      if (targetDate.getDate() === secondSat) {
+        return res.status(400).json({ success: false, message: 'Bookings are not available on second Saturdays.' });
+      }
+    }
+    const startR = new Date(targetDate); startR.setHours(0,0,0,0);
+    const endR = new Date(startR); endR.setDate(endR.getDate() + 1);
+    const manualHolidayR = await Holiday.findOne({ date: { $gte: startR, $lt: endR } });
+    if (manualHolidayR) {
+      return res.status(400).json({ success: false, message: `Bookings are not available on this holiday: ${manualHolidayR.reason || 'Holiday'}.` });
+    }
+
+    const appointment = await Appointment.findOne({
+      _id: id,
+      user: req.user.userId,
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found or cannot be rescheduled'
+      });
+    }
+
+    // Ensure the original appointment is ended or within the restricted window
+    const now = new Date();
+    const originalTime = new Date(appointment.appointmentDate);
+    const timeDiffHours = (originalTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const isEnded = originalTime.getTime() < now.getTime();
+    const isWithinWindow = timeDiffHours <= 3; // same logic used for edit restriction
+
+    if (!isEnded && !isWithinWindow) {
+      // If it's not ended and not within restricted window, suggest using normal update
+      return res.status(400).json({
+        success: false,
+        message: 'Use standard update; appointment is editable (more than 3 hours away)'
+      });
+    }
+
+    // Check if new slot is available
+    const newDate = targetDate;
+    const conflict = await Appointment.findOne({
+      _id: { $ne: id },
+      appointmentDate: newDate,
+      timeSlot,
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    if (conflict) {
+      return res.status(400).json({
+        success: false,
+        message: 'This time slot is already booked'
+      });
+    }
+
+    // Apply new schedule; keep status pending
+    appointment.appointmentDate = newDate;
+    appointment.timeSlot = timeSlot;
+    if (notes !== undefined) appointment.notes = notes;
+
+    await appointment.save();
+
+    const populatedAppointment = await Appointment.findById(appointment._id)
+      .populate('service', 'name category fee processingTime');
+
+    return res.json({
+      success: true,
+      message: 'Appointment rescheduled successfully',
+      data: populatedAppointment
+    });
+  } catch (error) {
+    console.error('Reschedule appointment error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reschedule appointment',
+      error: error.message
+    });
+  }
+});
+
 // Cancel appointment
 router.delete('/:id', async (req, res) => {
   try {
@@ -234,6 +386,19 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Appointment not found or cannot be cancelled'
+      });
+    }
+
+    // Check if appointment can be cancelled (more than 3 hours away)
+    const now = new Date();
+    const appointmentTime = new Date(appointment.appointmentDate);
+    const timeDiff = appointmentTime.getTime() - now.getTime();
+    const hoursDiff = timeDiff / (1000 * 60 * 60);
+
+    if (hoursDiff <= 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointment cannot be cancelled within 3 hours of scheduled time'
       });
     }
 
@@ -258,7 +423,29 @@ router.delete('/:id', async (req, res) => {
 router.get('/slots/:serviceId/:date', async (req, res) => {
   try {
     const { serviceId, date } = req.params;
-    
+    const asDate = new Date(date);
+    // Sundays
+    if (asDate.getDay() === 0) {
+      return res.json({ success: true, data: { date, availableSlots: [], bookedSlots: [], isHoliday: true, reason: 'Sunday' } });
+    }
+    // second Saturday
+    if (asDate.getDay() === 6) {
+      const firstOfMonth = new Date(asDate.getFullYear(), asDate.getMonth(), 1);
+      const firstSatOffset = (6 - firstOfMonth.getDay() + 7) % 7;
+      const firstSat = 1 + firstSatOffset;
+      const secondSat = firstSat + 7;
+      if (asDate.getDate() === secondSat) {
+        return res.json({ success: true, data: { date, availableSlots: [], bookedSlots: [], isHoliday: true, reason: 'Second Saturday' } });
+      }
+    }
+    // manual holiday
+    const start = new Date(asDate); start.setHours(0,0,0,0);
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+    const manualHoliday = await Holiday.findOne({ date: { $gte: start, $lt: end } });
+    if (manualHoliday) {
+      return res.json({ success: true, data: { date, availableSlots: [], bookedSlots: [], isHoliday: true, reason: manualHoliday.reason || 'Holiday' } });
+    }
+
     // Define available time slots (you can make this configurable)
     const allTimeSlots = [
       '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
@@ -266,10 +453,9 @@ router.get('/slots/:serviceId/:date', async (req, res) => {
       '04:00 PM', '04:30 PM', '05:00 PM'
     ];
 
-    // Get booked slots for the date
+    // Get booked slots for the date (globally across all services)
     const bookedAppointments = await Appointment.find({
-      service: serviceId,
-      appointmentDate: new Date(date),
+      appointmentDate: asDate,
       status: { $in: ['pending', 'confirmed'] }
     }).select('timeSlot');
 

@@ -142,6 +142,16 @@ const Services = () => {
                         {service.fee === 0 ? 'Free' : `₹${service.fee}`}
                       </span>
                     </div>
+
+                    {typeof service.serviceCharge === 'number' && service.serviceCharge > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center space-x-2">
+                          <IndianRupee className="w-4 h-4 text-blue-600" />
+                          <span className="text-gray-600">Service Charge:</span>
+                        </div>
+                        <span className="font-semibold text-blue-600">₹{service.serviceCharge}</span>
+                      </div>
+                    )}
                     
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center space-x-2">

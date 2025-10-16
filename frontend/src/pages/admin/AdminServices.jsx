@@ -14,7 +14,9 @@ const AdminServices = () => {
     description: '',
     category: '',
     fee: '',
+    serviceCharge: '',
     processingTime: '',
+    preCheckRules: '',
     requiredDocuments: '',
     documents: [], // [{ name, imageUrl, templateId, notes }]
     isActive: true
@@ -59,9 +61,22 @@ const AdminServices = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
+      // simple client-side validation
+      const feeNum = parseFloat(formData.fee || '0')
+      const chargeNum = parseFloat(formData.serviceCharge || '0')
+      if (!isNaN(feeNum) && !isNaN(chargeNum) && chargeNum > feeNum) {
+        alert('Service Charge cannot exceed total Fee')
+        return
+      }
       const serviceData = {
         ...formData,
         fee: parseFloat(formData.fee),
+        serviceCharge: parseFloat(formData.serviceCharge || '0'),
+        // Normalize preCheckRules from textarea (newline separated) to array
+        preCheckRules: (formData.preCheckRules || '')
+          .split('\n')
+          .map(r => r.trim())
+          .filter(r => r.length > 0),
         requiredDocuments: formData.requiredDocuments.split(',').map(doc => doc.trim()).filter(doc => doc),
         // Map UI documents to API shape
         documents: (formData.documents || []).map(d => ({
@@ -104,7 +119,9 @@ const AdminServices = () => {
       description: service.description,
       category: service.category,
       fee: service.fee.toString(),
+      serviceCharge: (service.serviceCharge ?? 0).toString(),
       processingTime: service.processingTime,
+      preCheckRules: (service.preCheckRules || []).join('\n'),
       requiredDocuments: (service.requiredDocuments || []).join(', '),
       documents: (service.documents || []).map(d => ({
         name: d.name,
@@ -145,6 +162,7 @@ const AdminServices = () => {
       category: '',
       fee: '',
       processingTime: '',
+      preCheckRules: '',
       requiredDocuments: '',
       isActive: true
     })
@@ -275,7 +293,8 @@ const AdminServices = () => {
                   <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
                     {service.category}
                   </span>
-                  <span className="font-medium">₹{service.fee}</span>
+                  <span className="font-medium">Fee: ₹{service.fee}</span>
+                  <span className="font-medium">Charge: ₹{service.serviceCharge || 0}</span>
                 </div>
               </div>
               <div className="flex items-center">
@@ -404,6 +423,21 @@ const AdminServices = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Service Charge (₹)
+                    </label>
+                    <input
+                      type="number"
+                      name="serviceCharge"
+                      value={formData.serviceCharge}
+                      onChange={handleChange}
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    <div className="text-xs text-gray-500 mt-1">Amount payable upfront to confirm booking. Remaining is paid after completion.</div>
+                  </div>
                 </div>
 
                 <div>
@@ -417,6 +451,21 @@ const AdminServices = () => {
                     onChange={handleChange}
                     required
                     placeholder="e.g., 7-10 days"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                {/* Pre-Check Rules */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pre-Check Rules (one per line)
+                  </label>
+                  <textarea
+                    name="preCheckRules"
+                    value={formData.preCheckRules}
+                    onChange={handleChange}
+                    rows={4}
+                    placeholder={"e.g.,\nName must match across all documents.\nDOB should be consistent across documents.\nDocuments must be valid and not expired.\nAddress proof must be from the same district."}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>

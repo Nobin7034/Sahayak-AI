@@ -9,6 +9,9 @@ import News from '../models/News.js';
 import Appointment from '../models/Appointment.js';
 import DocumentTemplate from '../models/DocumentTemplate.js';
 import { adminAuth } from '../middleware/auth.js';
+import Notification from '../models/Notification.js';
+import Holiday from '../models/Holiday.js';
+import paymentRoutes from './paymentRoutes.js';
 
 const router = express.Router();
 
@@ -496,6 +499,17 @@ router.patch('/appointments/:id/status', async (req, res) => {
       });
     }
 
+    // Notify user about status change
+    try {
+      await Notification.create({
+        user: appointment.user,
+        type: 'status',
+        title: 'Appointment Update',
+        message: `Your appointment status is now ${status}.`,
+        meta: { appointmentId: appointment._id, status }
+      });
+    } catch (_) {}
+
     res.json({
       success: true,
       message: 'Appointment status updated successfully',
@@ -508,6 +522,107 @@ router.patch('/appointments/:id/status', async (req, res) => {
       message: 'Failed to update appointment status',
       error: error.message
     });
+  }
+});
+
+// Payments admin actions (refund)
+router.use('/payments', paymentRoutes);
+
+// Admin broadcast notification to appointment holders or all users
+router.post('/broadcast/appointments', async (req, res) => {
+  try {
+    const { date, title, message, sendToAll } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ success: false, message: 'title and message are required' });
+    }
+
+    let recipientIds = [];
+
+    if (sendToAll) {
+      const users = await User.find({ role: 'user', isActive: true }).select('_id');
+      recipientIds = users.map(userDoc => String(userDoc._id));
+    } else {
+      if (!date) {
+        return res.status(400).json({ success: false, message: 'date is required unless sendToAll is true' });
+      }
+
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      // Find all appointments on the date
+      const appointments = await Appointment.find({
+        appointmentDate: { $gte: dayStart, $lt: dayEnd },
+        status: { $in: ['pending', 'confirmed'] }
+      }).select('user service');
+
+      if (appointments.length === 0) {
+        return res.json({ success: true, message: 'No appointments found for the specified date', data: { count: 0 } });
+      }
+
+      // Build unique user list
+      recipientIds = [...new Set(appointments.map(a => String(a.user)))];
+    }
+
+    if (recipientIds.length === 0) {
+      return res.json({ success: true, message: 'No recipients found for this broadcast', data: { recipients: 0 } });
+    }
+
+    // Create notifications in bulk
+    const docs = recipientIds.map(uid => ({
+      user: uid,
+      type: 'broadcast',
+      title,
+      message,
+      meta: sendToAll ? { scope: 'all-users' } : { scope: 'date', date }
+    }));
+    await Notification.insertMany(docs);
+
+    return res.json({ success: true, message: 'Broadcast sent', data: { recipients: recipientIds.length } });
+  } catch (error) {
+    console.error('Broadcast error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to send broadcast', error: error.message });
+  }
+});
+
+// Holidays management
+router.get('/holidays', async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    let query = {};
+    if (month && year) {
+      const start = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const end = new Date(parseInt(year), parseInt(month), 1);
+      query.date = { $gte: start, $lt: end };
+    }
+    const holidays = await Holiday.find(query).sort({ date: 1 });
+    return res.json({ success: true, data: holidays });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch holidays', error: error.message });
+  }
+});
+
+router.post('/holidays', async (req, res) => {
+  try {
+    const { date, reason } = req.body;
+    if (!date) return res.status(400).json({ success: false, message: 'date is required' });
+    const doc = await Holiday.create({ date, reason, createdBy: req.user.userId });
+    return res.status(201).json({ success: true, data: doc });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Holiday already exists for this date' });
+    }
+    return res.status(500).json({ success: false, message: 'Failed to create holiday', error: error.message });
+  }
+});
+
+router.delete('/holidays/:id', async (req, res) => {
+  try {
+    await Holiday.findByIdAndDelete(req.params.id);
+    return res.json({ success: true, message: 'Holiday removed' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to delete holiday', error: error.message });
   }
 });
 

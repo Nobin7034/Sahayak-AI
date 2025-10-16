@@ -1,14 +1,43 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, User, LogOut } from 'lucide-react'
-import { useState } from 'react'
+import { Menu, X, User, LogOut, Bell } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import axios from 'axios'
 
 const Navbar = ({ showPublic = false }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isNotifOpen, setIsNotifOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
+  const [notifs, setNotifs] = useState([])
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user) return
+      try {
+        const res = await axios.get('/notifications')
+        if (res.data?.success) {
+          setUnread(res.data.data.unreadCount || 0)
+          setNotifs(res.data.data.items || [])
+        }
+      } catch (_) {}
+    }
+    load()
+  }, [user])
+
+  const toggleNotif = async () => {
+    const next = !isNotifOpen
+    setIsNotifOpen(next)
+    if (next && unread > 0) {
+      try {
+        await axios.post('/notifications/mark-read')
+        setUnread(0)
+      } catch (_) {}
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -45,6 +74,39 @@ const Navbar = ({ showPublic = false }) => {
                 <Link to="/news" className="text-gray-700 hover:text-primary transition-colors">
                   News
                 </Link>
+                {/* Notifications */}
+                <div className="relative">
+                  <button
+                    onClick={toggleNotif}
+                    className="relative text-gray-700 hover:text-primary transition-colors"
+                    aria-label="Notifications"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {unread > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] leading-none rounded-full px-1.5 py-0.5">
+                        {unread}
+                      </span>
+                    )}
+                  </button>
+                  {isNotifOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg z-50">
+                      <div className="px-3 py-2 border-b font-medium text-gray-800">Notifications</div>
+                      <div className="max-h-80 overflow-auto divide-y">
+                        {notifs.length === 0 ? (
+                          <div className="p-4 text-sm text-gray-500">No notifications</div>
+                        ) : (
+                          notifs.map((n, i) => (
+                            <div key={i} className="p-3 text-sm">
+                              <div className="font-semibold text-gray-900">{n.title}</div>
+                              <div className="text-gray-700">{n.message}</div>
+                              <div className="text-xs text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 
                 <div className="relative" onMouseEnter={() => setIsUserMenuOpen(true)} onMouseLeave={() => setIsUserMenuOpen(false)}>
                   <button

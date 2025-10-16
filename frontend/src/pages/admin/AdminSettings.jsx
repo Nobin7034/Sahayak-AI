@@ -19,9 +19,12 @@ const AdminSettings = () => {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
+  const [holidays, setHolidays] = useState([])
+  const [newHoliday, setNewHoliday] = useState({ date: '', reason: '' })
 
   useEffect(() => {
     fetchSettings()
+    fetchHolidays()
   }, [])
 
   const fetchSettings = async () => {
@@ -34,6 +37,46 @@ const AdminSettings = () => {
       console.error('Fetch settings error:', error)
       setMessage({ type: 'error', text: 'Failed to load settings' })
       setLoading(false)
+    }
+  }
+
+  const fetchHolidays = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const config = { headers: { 'Authorization': `Bearer ${token}` } }
+      const today = new Date()
+      const month = String(today.getMonth() + 1)
+      const year = String(today.getFullYear())
+      const res = await axios.get(`/admin/holidays?month=${month}&year=${year}`, config)
+      if (res.data?.success) setHolidays(res.data.data)
+    } catch (e) {}
+  }
+
+  const handleAddHoliday = async (e) => {
+    e.preventDefault()
+    try {
+      const token = localStorage.getItem('token')
+      const config = { headers: { 'Authorization': `Bearer ${token}` } }
+      const res = await axios.post('/admin/holidays', newHoliday, config)
+      if (res.data?.success) {
+        setNewHoliday({ date: '', reason: '' })
+        await fetchHolidays()
+      } else {
+        alert('Failed to add holiday')
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to add holiday')
+    }
+  }
+
+  const handleDeleteHoliday = async (id) => {
+    try {
+      const token = localStorage.getItem('token')
+      const config = { headers: { 'Authorization': `Bearer ${token}` } }
+      await axios.delete(`/admin/holidays/${id}`, config)
+      await fetchHolidays()
+    } catch (err) {
+      alert('Failed to delete holiday')
     }
   }
 
@@ -237,6 +280,44 @@ const AdminSettings = () => {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
+
+        {/* Holidays Management */}
+        <div className="card p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+            <Calendar className="w-5 h-5 mr-2 text-primary" />
+            Holidays Management
+          </h2>
+
+          <form onSubmit={handleAddHoliday} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input type="date" value={newHoliday.date} onChange={e => setNewHoliday(prev => ({ ...prev, date: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2" required />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+              <input type="text" value={newHoliday.reason} onChange={e => setNewHoliday(prev => ({ ...prev, reason: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="e.g., Public Holiday" />
+            </div>
+            <div className="md:col-span-3">
+              <button type="submit" className="btn-primary">Add Holiday</button>
+            </div>
+          </form>
+
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-3">This Month</h3>
+            <div className="space-y-2">
+              {holidays.length === 0 && <div className="text-sm text-gray-500">No holidays added for this month.</div>}
+              {holidays.map(h => (
+                <div key={h._id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{new Date(h.date).toLocaleDateString()}</div>
+                    <div className="text-xs text-gray-600">{h.reason || 'Holiday'}</div>
+                  </div>
+                  <button type="button" onClick={() => handleDeleteHoliday(h._id)} className="text-red-600 hover:text-red-700 text-sm">Remove</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">

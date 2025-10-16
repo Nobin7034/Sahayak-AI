@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Calendar, Clock, FileText, User, Phone, Mail, MapPin, ArrowLeft, Edit3, CheckCircle, AlertTriangle, Loader2, X } from 'lucide-react'
+import { Calendar, Clock, FileText, User, Phone, Mail, MapPin, ArrowLeft, Edit3, CheckCircle, AlertTriangle, Loader2, X, IndianRupee, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -26,6 +26,11 @@ const Appointments = () => {
   const [editForm, setEditForm] = useState({ appointmentDate: '', timeSlot: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
+  const [razorpayKey, setRazorpayKey] = useState('')
+  const [isPaying, setIsPaying] = useState(false)
+  const [rescheduleMode, setRescheduleMode] = useState(null) // appointmentId when rescheduling
+  const [holidayInfo, setHolidayInfo] = useState({ isHoliday: false, reason: '' })
+  const [deleting, setDeleting] = useState(null) // appointmentId when deleting
 
   useEffect(() => {
     if (serviceId) {
@@ -37,8 +42,30 @@ const Appointments = () => {
   }, [serviceId])
 
   useEffect(() => {
+    // load Razorpay key
+    const loadConfig = async () => {
+      try {
+        const res = await axios.get('/payments/config')
+        if (res.data?.success) setRazorpayKey(res.data.data.keyId)
+      } catch (_) {}
+    }
+    loadConfig()
+  }, [])
+
+  useEffect(() => {
     if (formData.appointmentDate && serviceId) {
       fetchAvailableSlots()
+      // check holiday info via slots response or a dedicated endpoint
+      ;(async () => {
+        try {
+          const res = await axios.get(`/appointments/slots/${serviceId}/${formData.appointmentDate}`)
+          if (res.data?.success) {
+            setHolidayInfo({ isHoliday: !!res.data.data.isHoliday, reason: res.data.data.reason || '' })
+          }
+        } catch (_) {
+          setHolidayInfo({ isHoliday: false, reason: '' })
+        }
+      })()
     }
   }, [formData.appointmentDate, serviceId])
 
@@ -92,6 +119,73 @@ const Appointments = () => {
     setSuccess('')
 
     try {
+      // If serviceCharge > 0, collect payment first
+      if (service && service.serviceCharge > 0) {
+        setIsPaying(true)
+        // 1) Create order
+        const orderRes = await axios.post('/payments/create-order', { serviceId })
+        if (!orderRes.data?.success) throw new Error('Failed to create order')
+        const order = orderRes.data.data.order
+
+        // 2) Ensure Razorpay script is loaded
+        const ensureScript = () => new Promise((resolve, reject) => {
+          if (window.Razorpay) return resolve()
+          const script = document.createElement('script')
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+          script.onload = () => resolve()
+          script.onerror = () => reject(new Error('Failed to load Razorpay'))
+          document.body.appendChild(script)
+        })
+        await ensureScript()
+
+        // 3) Open checkout
+        const options = {
+          key: razorpayKey,
+          amount: order.amount,
+          currency: order.currency,
+          name: 'Sahayak AI',
+          description: service.name,
+          order_id: order.id,
+          prefill: { name: user?.name, email: user?.email, contact: user?.phone },
+          notes: { serviceId },
+          handler: async function (response) {
+            try {
+              const verifyRes = await axios.post('/payments/verify-and-create-appointment', {
+                serviceId,
+                appointmentDate: formData.appointmentDate,
+                timeSlot: formData.timeSlot,
+                notes: formData.notes,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+              if (verifyRes.data?.success) {
+                setSuccess('Payment successful and appointment confirmed!')
+                setTimeout(() => navigate('/dashboard'), 1500)
+              } else {
+                setError(verifyRes.data?.message || 'Failed to confirm appointment')
+              }
+            } catch (err) {
+              setError(err.response?.data?.message || 'Payment verification failed')
+            } finally {
+              setIsPaying(false)
+              setLoading(false)
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setIsPaying(false)
+              setLoading(false)
+              setError('Payment cancelled')
+            }
+          }
+        }
+        const rzp = new window.Razorpay(options)
+        rzp.open()
+        return
+      }
+
+      // If no serviceCharge, just create appointment
       const response = await axios.post('/appointments', {
         serviceId,
         appointmentDate: formData.appointmentDate,
@@ -109,9 +203,9 @@ const Appointments = () => {
       }
     } catch (error) {
       console.error('Appointment booking error:', error)
-      setError(error.response?.data?.message || 'Failed to book appointment')
+      setError(error.response?.data?.message || error.message || 'Failed to book appointment')
     } finally {
-      setLoading(false)
+      if (!isPaying) setLoading(false)
     }
   }
 
@@ -135,14 +229,27 @@ const Appointments = () => {
     setMessage({ type: '', text: '' })
   }
 
+  // Enter reschedule mode for an ended appointment
+  const handleRescheduleAppointment = (appointment) => {
+    setRescheduleMode(appointment._id)
+    setEditingAppointment(appointment._id)
+    setEditForm({
+      appointmentDate: new Date().toISOString().split('T')[0],
+      timeSlot: '',
+      notes: appointment.notes || ''
+    })
+    setMessage({ type: '', text: '' })
+  }
+
   // Handle save appointment changes
   const handleSaveAppointment = async (e) => {
     e.preventDefault()
     try {
       setSaving(true)
       setMessage({ type: '', text: '' })
-      
-      const response = await axios.put(`/appointments/${editingAppointment}`, editForm)
+      const isReschedule = rescheduleMode === editingAppointment
+      const url = isReschedule ? `/appointments/${editingAppointment}/reschedule` : `/appointments/${editingAppointment}`
+      const response = await axios.put(url, editForm)
       
       if (response.data.success) {
         // Update the appointment in the list
@@ -150,6 +257,7 @@ const Appointments = () => {
           apt._id === editingAppointment ? response.data.data : apt
         ))
         setEditingAppointment(null)
+        setRescheduleMode(null)
         setMessage({ type: 'success', text: 'Appointment updated successfully!' })
       } else {
         setMessage({ type: 'error', text: response.data.message || 'Failed to update appointment' })
@@ -164,8 +272,33 @@ const Appointments = () => {
   // Handle cancel edit
   const handleCancelEdit = () => {
     setEditingAppointment(null)
+    setRescheduleMode(null)
     setEditForm({ appointmentDate: '', timeSlot: '', notes: '' })
     setMessage({ type: '', text: '' })
+  }
+
+  // Handle delete appointment
+  const handleDeleteAppointment = async (appointmentId) => {
+    if (!window.confirm('Are you sure you want to cancel this appointment? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setDeleting(appointmentId)
+      const response = await axios.delete(`/appointments/${appointmentId}`)
+      
+      if (response.data.success) {
+        // Remove the appointment from the list
+        setAppointments(prev => prev.filter(apt => apt._id !== appointmentId))
+        setMessage({ type: 'success', text: 'Appointment cancelled successfully!' })
+      } else {
+        setMessage({ type: 'error', text: response.data.message || 'Failed to cancel appointment' })
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to cancel appointment' })
+    } finally {
+      setDeleting(null)
+    }
   }
 
   // Get available time slots
@@ -326,7 +459,7 @@ const Appointments = () => {
                           <h3 className="text-lg font-semibold text-gray-900">{appointment.service?.name}</h3>
                           <p className="text-sm text-gray-600">{appointment.service?.category}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2">
                           <span className={`text-sm px-3 py-1 rounded-full font-medium ${
                             appointment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                             appointment.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
@@ -335,7 +468,7 @@ const Appointments = () => {
                           }`}>
                             {appointment.status}
                           </span>
-                          {appointment.canEdit ? (
+                        {appointment.canEdit ? (
                             <button
                               onClick={() => handleEditAppointment(appointment)}
                               className="text-primary hover:text-blue-700 p-1"
@@ -343,18 +476,78 @@ const Appointments = () => {
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
-                          ) : (
-                            <span className="text-xs text-gray-400">
-                              {appointment.status === 'pending' ? 'Cannot edit within 3 hours' : 'Cannot edit'}
-                            </span>
-                          )}
+                        ) : (
+                          (() => {
+                            const now = new Date()
+                            const aptDate = new Date(appointment.appointmentDate)
+                            const timeDiff = aptDate.getTime() - now.getTime()
+                            const hoursDiff = timeDiff / (1000 * 60 * 60)
+                            const isEnded = aptDate.getTime() < now.getTime()
+                            const canEdit = ['pending', 'confirmed'].includes(appointment.status) && hoursDiff > 3
+                            const canDelete = ['pending', 'confirmed'].includes(appointment.status) && hoursDiff > 3
+                            
+                            if (isEnded && ['pending','confirmed'].includes(appointment.status)) {
+                              return (
+                                <button
+                                  onClick={() => handleRescheduleAppointment(appointment)}
+                                  className="text-orange-600 hover:text-orange-700 text-sm px-3 py-1 border border-orange-300 rounded"
+                                  title="Reschedule appointment"
+                                >
+                                  Reschedule
+                                </button>
+                              )
+                            }
+                            
+                            if (canEdit) {
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleEditAppointment(appointment)}
+                                    className="text-primary hover:text-blue-700 p-1"
+                                    title="Edit appointment"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                  {canDelete && (
+                                    <button
+                                      onClick={() => handleDeleteAppointment(appointment._id)}
+                                      disabled={deleting === appointment._id}
+                                      className="text-red-600 hover:text-red-700 p-1 disabled:opacity-50"
+                                      title="Cancel appointment"
+                                    >
+                                      {deleting === appointment._id ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="w-4 h-4" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              )
+                            }
+                            
+                            return (
+                              <span className="text-xs text-gray-400">
+                                {hoursDiff <= 3 ? 'Cannot edit within 3 hours' : 'Cannot edit'}
+                              </span>
+                            )
+                          })()
+                        )}
                         </div>
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div className="flex items-center space-x-2">
                           <Calendar className="w-4 h-4 text-gray-500" />
-                          <span>{new Date(appointment.appointmentDate).toLocaleDateString()} at {appointment.timeSlot}</span>
+                          <span>
+                            {(() => {
+                              const now = new Date()
+                              const aptDate = new Date(appointment.appointmentDate)
+                              const ended = aptDate.getTime() < now.getTime()
+                              const dateText = `${aptDate.toLocaleDateString()} at ${appointment.timeSlot}`
+                              return ended ? `Date ended: ${dateText}` : dateText
+                            })()}
+                          </span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <MapPin className="w-4 h-4 text-gray-500" />
@@ -444,6 +637,18 @@ const Appointments = () => {
                       {service.fee === 0 ? 'Free' : `₹${service.fee}`}
                     </p>
                   </div>
+                  {typeof service.serviceCharge === 'number' && (
+                    <div>
+                      <span className="text-gray-500">Service Charge (Upfront):</span>
+                      <p className="font-medium">₹{service.serviceCharge}</p>
+                    </div>
+                  )}
+                  {typeof service.serviceCharge === 'number' && (
+                    <div>
+                      <span className="text-gray-500">Remaining on Completion:</span>
+                      <p className="font-medium">₹{Math.max((service.fee || 0) - (service.serviceCharge || 0), 0)}</p>
+                    </div>
+                  )}
                   <div>
                     <span className="text-gray-500">Processing Time:</span>
                     <p className="font-medium">{service.processingTime}</p>
@@ -524,6 +729,9 @@ const Appointments = () => {
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                   />
                 </div>
+                {formData.appointmentDate && holidayInfo.isHoliday && (
+                  <div className="text-sm text-red-600 mt-2">{holidayInfo.reason ? `${holidayInfo.reason} — no bookings allowed.` : 'This date is a holiday — no bookings allowed.'}</div>
+                )}
               </div>
 
               {/* Time Slot Selection */}
@@ -557,7 +765,7 @@ const Appointments = () => {
                     </div>
                   ) : (
                     <div className="text-center py-4 text-gray-500">
-                      No available slots for this date
+                      {holidayInfo.isHoliday ? `${holidayInfo.reason || 'Holiday'}. No slots available.` : 'No available slots for this date'}
                     </div>
                   )
                 ) : (
@@ -591,10 +799,10 @@ const Appointments = () => {
                 {loading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Booking Appointment...
+                    {isPaying ? 'Processing Payment...' : 'Booking Appointment...'}
                   </div>
                 ) : (
-                  'Book Appointment'
+                  service && service.serviceCharge > 0 ? `Pay ₹${service.serviceCharge} & Book` : 'Book Appointment'
                 )}
               </button>
             </form>

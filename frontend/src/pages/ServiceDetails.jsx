@@ -98,6 +98,32 @@ const ServiceDetails = () => {
               </div>
             </div>
 
+            {/* Pre-Check Rules */}
+            {service.preCheckRules && service.preCheckRules.length > 0 && (
+              <div className="card p-6 mb-8 border-l-4 border-yellow-400 bg-yellow-50">
+                <div className="flex items-center space-x-2 mb-3">
+                  <CheckCircle className="w-5 h-5 text-yellow-600" />
+                  <h2 className="text-xl font-bold text-gray-900">Pre-Check Rules</h2>
+                </div>
+                <ul className="list-disc ml-6 text-gray-800 space-y-1">
+                  {service.preCheckRules.map((rule, idx) => (
+                    <li key={idx}>{rule}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Upfront Service Charge Notice */}
+            {typeof service.serviceCharge === 'number' && service.serviceCharge > 0 && (
+              <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-2 mb-1">
+                  <CheckCircle className="w-5 h-5 text-blue-600" />
+                  <span className="font-semibold text-blue-900">Service Charge Payable Now</span>
+                </div>
+                <p className="text-blue-800 text-sm">Pay ₹{service.serviceCharge} now to confirm your booking. Remaining amount (₹{Math.max((service.fee||0) - (service.serviceCharge||0), 0)}) is payable after service completion.</p>
+              </div>
+            )}
+
             {/* Document Requirements */}
             <div className="card p-8">
               <div className="flex items-center space-x-2 mb-6">

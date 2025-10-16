@@ -20,6 +20,8 @@ const AdminDashboard = () => {
   const [recentAppointments, setRecentAppointments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [broadcast, setBroadcast] = useState({ date: '', title: '', message: '', sendToAll: false })
+  const [sending, setSending] = useState(false)
 
   useEffect(() => {
     console.log('AdminDashboard - Current user:', user)
@@ -101,6 +103,32 @@ const AdminDashboard = () => {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSendBroadcast = async (e) => {
+    e.preventDefault()
+    try {
+      setSending(true)
+      const token = localStorage.getItem('token')
+      const config = { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      const res = await axios.post('/admin/broadcast/appointments', {
+        date: broadcast.date,
+        title: broadcast.title,
+        message: broadcast.message,
+        sendToAll: broadcast.sendToAll
+      }, config)
+      if (res.data?.success) {
+        alert(`Broadcast sent to ${res.data?.data?.recipients || 0} users`)
+        setBroadcast({ date: '', title: '', message: '', sendToAll: false })
+      } else {
+        alert(res.data?.message || 'Failed to send broadcast')
+      }
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || 'Failed to send broadcast'
+      alert(errorMessage)
+    } finally {
+      setSending(false)
     }
   }
 
@@ -309,6 +337,69 @@ const AdminDashboard = () => {
               <p className="text-sm text-gray-600">Create and publish news</p>
             </a>
           </div>
+        </div>
+
+        {/* Broadcast to users by date */}
+        <div className="mt-10 card p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Broadcast to Users</h2>
+          <form onSubmit={handleSendBroadcast} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center md:col-span-3">
+              <input
+                id="sendToAll"
+                type="checkbox"
+                checked={broadcast.sendToAll}
+                onChange={e => setBroadcast(prev => ({ ...prev, sendToAll: e.target.checked }))}
+                className="h-4 w-4 text-primary border-gray-300 rounded"
+              />
+              <label htmlFor="sendToAll" className="ml-2 text-sm text-gray-700">
+                Send to all users
+              </label>
+            </div>
+
+            {!broadcast.sendToAll && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={broadcast.date}
+                  onChange={e => setBroadcast(prev => ({ ...prev, date: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  required={!broadcast.sendToAll}
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input
+                type="text"
+                value={broadcast.title}
+                onChange={e => setBroadcast(prev => ({ ...prev, title: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                placeholder="e.g., Important Notice"
+                required
+              />
+            </div>
+            <div className="md:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+              <textarea
+                value={broadcast.message}
+                onChange={e => setBroadcast(prev => ({ ...prev, message: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                rows={3}
+                placeholder="Describe the update you want to share"
+                required
+              />
+            </div>
+            <div className="md:col-span-3">
+              <button type="submit" disabled={sending} className="btn-primary disabled:opacity-50">
+                {sending ? 'Sending...' : broadcast.sendToAll ? 'Send Broadcast to All Users' : 'Send Broadcast to Appointments'}
+              </button>
+            </div>
+          </form>
+          <p className="text-xs text-gray-500 mt-3">
+            Use this to share important updates. Select a date to notify only users with appointments on that day, or send to everyone.
+          </p>
         </div>
       </div>
     </div>
