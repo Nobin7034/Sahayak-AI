@@ -38,8 +38,12 @@ import appointmentRoutes from './routes/appointmentRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 
-// Base route
+// Base route (dev info). In production we serve the frontend build instead.
 app.get('/', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.sendFile(path.join(__dirname, '..', 'frontend', 'dist', 'index.html'));
+    return;
+  }
   res.json({ 
     message: 'Akshaya Services Backend API',
     version: '1.0.0',
@@ -64,6 +68,21 @@ app.use('/api/news', newsRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
+
+// Serve frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const clientPath = path.join(__dirname, '..', 'frontend', 'dist');
+  app.use(express.static(clientPath));
+
+  // For any non-API route, send the React index.html
+  app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) {
+      res.status(404).json({ error: 'Not Found' });
+      return;
+    }
+    res.sendFile(path.join(clientPath, 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
