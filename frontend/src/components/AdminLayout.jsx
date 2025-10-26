@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Bell
+  Bell,
+  Brain
 } from 'lucide-react'
 
 const AdminLayout = ({ children }) => {
@@ -26,6 +27,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Services', href: '/admin/services', icon: FileText },
     { name: 'Appointments', href: '/admin/appointments', icon: Calendar },
     { name: 'News', href: '/admin/news', icon: Newspaper },
+    { name: 'AI/ML', href: '/admin/ml', icon: Brain },
     { name: 'Settings', href: '/admin/settings', icon: Settings },
   ]
 

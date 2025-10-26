@@ -2,15 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, Navigate, Link } from 'react-router-dom'
 import { ArrowLeft, Calendar, Share2, Bookmark } from 'lucide-react'
 import axios from 'axios'
-
-const withBaseUploads = (url) => {
-  if (!url) return ''
-  const norm = url.replace(/\\/g, '/');
-  if (norm.startsWith('http')) return norm
-  if (norm.startsWith('/uploads')) return `http://localhost:5000${norm}`
-  if (norm.startsWith('uploads')) return `http://localhost:5000/${norm}`
-  return norm
-}
+import { getImageUrl } from '../config/api'
 
 const NewsDetail = () => {
   const { id } = useParams()
@@ -60,7 +52,7 @@ const NewsDetail = () => {
         <article className="card overflow-hidden">
           {news.imageUrl && (
             <img
-              src={withBaseUploads(news.imageUrl)}
+              src={getImageUrl(news.imageUrl)}
               alt={news.imageAlt || news.title}
               className="w-full h-64 md:h-80 object-cover"
             />
@@ -137,7 +129,7 @@ const NewsDetail = () => {
                 >
                   {relatedNews.imageUrl && (
                     <img
-                      src={withBaseUploads(relatedNews.imageUrl)}
+                      src={getImageUrl(relatedNews.imageUrl)}
                       alt={relatedNews.imageAlt || relatedNews.title}
                       className="w-full h-48 object-cover"
                     />

@@ -1,18 +1,21 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Menu, X, User, LogOut, Bell } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useLanguage } from '../contexts/LanguageContext'
+import { Menu, X, User, LogOut, Bell, Languages } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 
 const Navbar = ({ showPublic = false }) => {
   const { user, logout } = useAuth()
+  const { language, toggleLanguage } = useLanguage()
   const navigate = useNavigate()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isNotifOpen, setIsNotifOpen] = useState(false)
   const [unread, setUnread] = useState(0)
   const [notifs, setNotifs] = useState([])
+  const userMenuRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
@@ -27,6 +30,23 @@ const Navbar = ({ showPublic = false }) => {
     }
     load()
   }, [user])
+
+  // Click outside handler for user menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false)
+      }
+    }
+
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isUserMenuOpen])
 
   const toggleNotif = async () => {
     const next = !isNotifOpen
@@ -108,29 +128,40 @@ const Navbar = ({ showPublic = false }) => {
                   )}
                 </div>
                 
-                <div className="relative" onMouseEnter={() => setIsUserMenuOpen(true)} onMouseLeave={() => setIsUserMenuOpen(false)}>
+                {/* Language Toggle Button */}
+                <button
+                  onClick={toggleLanguage}
+                  className="flex items-center space-x-1 text-gray-700 hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-gray-50"
+                  title={language === 'en' ? 'Switch to Malayalam' : 'മലയാളത്തിലേക്ക് മാറുക'}
+                >
+                  <Languages className="w-5 h-5" />
+                  <span className="text-sm font-medium">{language === 'en' ? 'EN' : 'മല'}</span>
+                </button>
+                
+                <div className="relative" ref={userMenuRef}>
                   <button
-                    className="flex items-center space-x-2 text-gray-700 hover:text-primary transition-colors"
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center space-x-2 text-gray-700 hover:text-primary transition-colors px-2 py-1 rounded-md hover:bg-gray-50"
                   >
                     <User className="w-4 h-4" />
                     <span className="text-sm">{user.name}</span>
                   </button>
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-40 bg-white border rounded-lg shadow-lg py-2 z-50">
+                    <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg py-2 z-50">
                       <Link
                         to="/profile"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                         onClick={() => setIsUserMenuOpen(false)}
-                        title="Profile"
                       >
-                        Profile
+                        <User className="w-4 h-4" />
+                        <span>Edit Profile</span>
                       </Link>
                       <button
                         onClick={() => { setIsUserMenuOpen(false); handleLogout() }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       >
                         <LogOut className="w-4 h-4" />
-                      Logout
+                        <span>Logout</span>
                       </button>
                     </div>
                   )}
@@ -200,6 +231,14 @@ const Navbar = ({ showPublic = false }) => {
                   >
                     Profile
                   </Link>
+                  {/* Language Toggle */}
+                  <button
+                    onClick={() => { toggleLanguage(); setIsMenuOpen(false); }}
+                    className="w-full flex items-center space-x-2 px-3 py-2 text-gray-700 hover:text-primary transition-colors"
+                  >
+                    <Languages className="w-4 h-4" />
+                    <span>{language === 'en' ? 'English / മലയാളം' : 'മലയാളം / English'}</span>
+                  </button>
                   <div className="px-3 py-2 border-t">
                     <div className="flex items-center space-x-2 mb-2">
                       <User className="w-4 h-4" />

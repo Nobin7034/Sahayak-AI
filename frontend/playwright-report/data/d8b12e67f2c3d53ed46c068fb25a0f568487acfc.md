@@ -1,0 +1,43 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img "Background" [ref=e6]
+    - generic [ref=e7]:
+      - paragraph [ref=e8]: A Wise Quote
+      - heading "Get Everything You Want" [level=1] [ref=e9]:
+        - text: Get Everything
+        - text: You Want
+      - paragraph [ref=e10]: Akshaya, an innovative project implemented in the State of Kerala aimed at bridging the digital divide, addresses the issues of ICT access, basic skill sets and availability of relevant content.
+  - generic [ref=e12]:
+    - generic [ref=e14]: Sahayak AI
+    - link "Home" [active] [ref=e16] [cursor=pointer]:
+      - /url: /
+      - img [ref=e17]
+      - text: Home
+    - heading "Welcome Back" [level=2] [ref=e19]
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: Email Address
+        - generic [ref=e23]:
+          - img [ref=e24]
+          - textbox "Email Address" [ref=e27]
+      - generic [ref=e28]:
+        - generic [ref=e29]: Password
+        - generic [ref=e30]:
+          - img [ref=e31]
+          - textbox "Password" [ref=e34]
+          - button [ref=e35] [cursor=pointer]:
+            - img [ref=e36]
+      - link "Forgot Password?" [ref=e40] [cursor=pointer]:
+        - /url: "#"
+      - button "Login" [ref=e41] [cursor=pointer]
+    - button "Google" [ref=e43] [cursor=pointer]:
+      - img [ref=e44]
+      - text: Google
+    - paragraph [ref=e49]:
+      - text: Don't have an account?
+      - link "Sign Up" [ref=e50] [cursor=pointer]:
+        - /url: /register
+```

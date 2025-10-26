@@ -37,6 +37,7 @@ import newsRoutes from './routes/newsRoutes.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import mlRoutes from './routes/mlRoutes.js';
 
 // Base route (dev info). In production we serve the frontend build instead.
 app.get('/', (req, res) => {
@@ -53,6 +54,7 @@ app.get('/', (req, res) => {
       services: '/api/services',
       news: '/api/news',
       appointments: '/api/appointments',
+      ml: '/api/ml',
       test: '/api/test',
       uploads: '/uploads/*'
     }
@@ -68,6 +70,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/ml', mlRoutes);
 
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {

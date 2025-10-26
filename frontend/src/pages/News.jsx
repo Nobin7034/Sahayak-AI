@@ -2,15 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar, ArrowRight, Search } from 'lucide-react'
 import axios from 'axios'
-
-const withBaseUploads = (url) => {
-  if (!url) return ''
-  const norm = url.replace(/\\/g, '/'); // normalize backslashes
-  if (norm.startsWith('http')) return norm
-  if (norm.startsWith('/uploads')) return `http://localhost:5000${norm}`
-  if (norm.startsWith('uploads')) return `http://localhost:5000/${norm}`
-  return norm
-}
+import { getImageUrl } from '../config/api'
 
 const News = () => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -73,7 +65,7 @@ const News = () => {
                 <div className="md:w-1/3">
                   {news.imageUrl && (
                     <img
-                      src={withBaseUploads(news.imageUrl)}
+                      src={getImageUrl(news.imageUrl)}
                       alt={news.imageAlt || news.title}
                       className="w-full h-64 md:h-full object-cover"
                     />

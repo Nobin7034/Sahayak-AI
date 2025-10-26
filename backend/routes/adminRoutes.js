@@ -73,7 +73,8 @@ router.post('/document-templates', async (req, res) => {
 router.post('/document-templates/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No image uploaded' });
-    const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
     res.status(201).json({ success: true, imageUrl });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to upload image', error: error.message });
@@ -343,7 +344,8 @@ router.get('/news', async (req, res) => {
 
 router.post('/news', upload.single('image'), async (req, res) => {
   try {
-    const imageUrl = req.file ? `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}` : undefined;
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const imageUrl = req.file ? `${baseUrl}/uploads/${req.file.filename}` : undefined;
 
     const newsData = {
       ...req.body,
@@ -378,7 +380,8 @@ router.put('/news/:id', upload.single('image'), async (req, res) => {
 
     const update = { ...req.body };
     if (req.file) {
-      update.imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
+      update.imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
     }
 
     const news = await News.findByIdAndUpdate(

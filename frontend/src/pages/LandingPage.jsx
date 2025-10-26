@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, MapPin, Phone, Star, Calendar, FileText, Shield, Users } from 'lucide-react'
+import { ArrowRight, MapPin, Phone, Star, Calendar, FileText, Shield, Users, Languages } from 'lucide-react'
 import axios from 'axios'
 import { akshayaCenters } from '../data/mockData'
+import { getImageUrl } from '../config/api'
+import { useLanguage } from '../contexts/LanguageContext'
+import { t } from '../data/translations'
 
 const LandingPage = () => {
+  const { language, toggleLanguage } = useLanguage()
   const [latest, setLatest] = useState([])
   useEffect(() => {
     const load = async () => {
@@ -19,28 +23,42 @@ const LandingPage = () => {
   }, [])
   return (
     <div className="min-h-screen">
+      {/* Language Toggle Button */}
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          onClick={toggleLanguage}
+          className="flex items-center space-x-2 bg-white shadow-lg hover:shadow-xl transition-all duration-300 px-4 py-2 rounded-full border border-gray-200 hover:border-primary group"
+          title={language === 'en' ? 'Switch to Malayalam / മലയാളത്തിലേക്ക് മാറുക' : 'Switch to English / ഇംഗ്ലീഷിലേക്ക് മാറുക'}
+        >
+          <Languages className="w-5 h-5 text-gray-600 group-hover:text-primary transition-colors" />
+          <span className="text-sm font-semibold text-gray-700 group-hover:text-primary transition-colors">
+            {language === 'en' ? 'English' : 'മലയാളം'}
+          </span>
+        </button>
+      </div>
+
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-primary to-secondary text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Kerala Government Services Made Simple
+              {t('landing.heroTitle', language)}
             </h1>
             <p className="text-xl md:text-2xl mb-8 text-blue-100">
-              Access all Akshaya center services online. Book appointments, apply for certificates, and track your applications.
+              {t('landing.heroSubtitle', language)}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/register"
                 className="bg-white text-primary px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-flex items-center justify-center"
               >
-                Get Started <ArrowRight className="ml-2 w-5 h-5" />
+                {t('landing.getStarted', language)} <ArrowRight className="ml-2 w-5 h-5" />
               </Link>
               <Link
                 to="/login"
                 className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-primary transition-colors"
               >
-                Login
+                {t('landing.login', language)}
               </Link>
             </div>
           </div>
@@ -51,8 +69,8 @@ const LandingPage = () => {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose Akshaya Services?</h2>
-            <p className="text-lg text-gray-600">Experience government services like never before</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">{t('landing.whyChooseAkshaya', language)}</h2>
+            <p className="text-lg text-gray-600">{t('landing.experience', language)}</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -60,32 +78,32 @@ const LandingPage = () => {
               <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Calendar className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Easy Appointments</h3>
-              <p className="text-gray-600">Book appointments online and avoid long queues</p>
+              <h3 className="text-xl font-semibold mb-2">{t('landing.easyAppointments', language)}</h3>
+              <p className="text-gray-600">{t('landing.easyAppointmentsDesc', language)}</p>
             </div>
             
             <div className="text-center">
               <div className="bg-secondary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FileText className="w-8 h-8 text-secondary" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Document Guidance</h3>
-              <p className="text-gray-600">Know exactly what documents you need with sample images</p>
+              <h3 className="text-xl font-semibold mb-2">{t('landing.documentGuidance', language)}</h3>
+              <p className="text-gray-600">{t('landing.documentGuidanceDesc', language)}</p>
             </div>
             
             <div className="text-center">
               <div className="bg-accent/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Shield className="w-8 h-8 text-accent" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Secure & Reliable</h3>
-              <p className="text-gray-600">Government-grade security for all your transactions</p>
+              <h3 className="text-xl font-semibold mb-2">{t('landing.secureReliable', language)}</h3>
+              <p className="text-gray-600">{t('landing.secureReliableDesc', language)}</p>
             </div>
             
             <div className="text-center">
               <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Users className="w-8 h-8 text-purple-600" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">24/7 Support</h3>
-              <p className="text-gray-600">Get help whenever you need it from our support team</p>
+              <h3 className="text-xl font-semibold mb-2">{t('landing.support247', language)}</h3>
+              <p className="text-gray-600">{t('landing.support247Desc', language)}</p>
             </div>
           </div>
         </div>
@@ -96,14 +114,14 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center mb-12">
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">Latest Government News</h2>
-              <p className="text-lg text-gray-600">Stay updated with the latest announcements and updates</p>
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">{t('landing.latestNews', language)}</h2>
+              <p className="text-lg text-gray-600">{t('landing.stayUpdated', language)}</p>
             </div>
             <Link
               to="/news"
               className="hidden md:inline-flex items-center text-primary hover:text-blue-700 font-semibold"
             >
-              View All News <ArrowRight className="ml-2 w-5 h-5" />
+              {t('landing.viewAllNews', language)} <ArrowRight className="ml-2 w-5 h-5" />
             </Link>
           </div>
 
@@ -112,9 +130,7 @@ const LandingPage = () => {
               <article key={news._id} className="card overflow-hidden">
                 {news.imageUrl && (
                   <img
-                    src={(news.imageUrl || '').replace(/\\/g, '/').startsWith('/uploads')
-                      ? `http://localhost:5000${(news.imageUrl || '').replace(/\\/g, '/')}`
-                      : (news.imageUrl || '').replace(/\\/g, '/')}
+                    src={getImageUrl(news.imageUrl)}
                     alt={news.imageAlt || news.title}
                     className="w-full h-48 object-cover"
                   />
@@ -127,7 +143,7 @@ const LandingPage = () => {
                     to={`/news/${news._id}`}
                     className="text-primary hover:text-blue-700 font-semibold inline-flex items-center"
                   >
-                    Read More <ArrowRight className="ml-2 w-4 h-4" />
+                    {t('landing.readMore', language)} <ArrowRight className="ml-2 w-4 h-4" />
                   </Link>
                 </div>
               </article>
@@ -139,7 +155,7 @@ const LandingPage = () => {
               to="/news"
               className="inline-flex items-center text-primary hover:text-blue-700 font-semibold"
             >
-              View All News <ArrowRight className="ml-2 w-5 h-5" />
+              {t('landing.viewAllNews', language)} <ArrowRight className="ml-2 w-5 h-5" />
             </Link>
           </div>
         </div>
@@ -149,8 +165,8 @@ const LandingPage = () => {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Find Akshaya Centers Near You</h2>
-            <p className="text-lg text-gray-600">Locate the nearest Akshaya center for in-person services</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">{t('landing.findCenters', language)}</h2>
+            <p className="text-lg text-gray-600">{t('landing.locateNearest', language)}</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -176,7 +192,7 @@ const LandingPage = () => {
                 </div>
 
                 <div className="mb-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">Services Available:</h4>
+                  <h4 className="font-semibold text-gray-900 mb-2">{t('landing.servicesAvailable', language)}</h4>
                   <div className="flex flex-wrap gap-1">
                     {center.services.map((service, index) => (
                       <span
@@ -190,7 +206,7 @@ const LandingPage = () => {
                 </div>
 
                 <div className="text-sm text-gray-600">
-                  <strong>Hours:</strong> {center.hours}
+                  <strong>{t('landing.hours', language)}</strong> {center.hours}
                 </div>
               </div>
             ))}
@@ -201,15 +217,15 @@ const LandingPage = () => {
       {/* CTA Section */}
       <section className="bg-gray-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
+          <h2 className="text-3xl font-bold mb-4">{t('landing.readyToStart', language)}</h2>
           <p className="text-xl text-gray-300 mb-8">
-            Join thousands of satisfied users who have simplified their government service experience
+            {t('landing.joinUsers', language)}
           </p>
           <Link
             to="/register"
             className="btn-primary text-lg px-8 py-3"
           >
-            Create Your Account Today
+            {t('landing.createAccount', language)}
           </Link>
         </div>
       </section>

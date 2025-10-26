@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Search, Edit, Trash2, Eye, ToggleLeft, ToggleRight } from 'lucide-react'
 import axios from 'axios'
+import { getImageUrl } from '../../config/api'
 
 const AdminServices = () => {
   const [services, setServices] = useState([])
@@ -581,7 +582,7 @@ const AdminServices = () => {
                               value={d.imageUrl}
                               onChange={(e) => updateDocument(idx, { imageUrl: e.target.value, templateId: '' })}
                               className="w-full px-3 py-2 border rounded"
-                              placeholder="http://localhost:5000/uploads/..."
+                              placeholder="Image URL (e.g., /uploads/filename.jpg)"
                             />
                             <div className="text-xs text-gray-500 mt-1">Paste any accessible image URL. If you uploaded above, it already set the URL.</div>
                           </div>
@@ -590,7 +591,7 @@ const AdminServices = () => {
                         {(d.imageUrl || (d.templateId && templates.find(t => t._id === d.templateId)?.imageUrl)) && (
                           <div className="mt-3">
                             <img
-                              src={d.imageUrl || templates.find(t => t._id === d.templateId)?.imageUrl}
+                              src={getImageUrl(d.imageUrl || templates.find(t => t._id === d.templateId)?.imageUrl)}
                               alt="preview"
                               className="w-48 h-auto rounded border"
                             />
@@ -712,14 +713,14 @@ const AdminServices = () => {
                                       value={alt.imageUrl || ''}
                                       onChange={(e) => updateAlternative(idx, aidx, { imageUrl: e.target.value, templateId: '' })}
                                       className="w-full px-3 py-2 border rounded"
-                                      placeholder="http://localhost:5000/uploads/..."
+                                      placeholder="Image URL (e.g., /uploads/filename.jpg)"
                                     />
                                   </div>
                                 </div>
                                 {(alt.imageUrl || (alt.templateId && templates.find(t => t._id === alt.templateId)?.imageUrl)) && (
                                   <div className="mt-3">
                                     <img
-                                      src={alt.imageUrl || templates.find(t => t._id === alt.templateId)?.imageUrl}
+                                      src={getImageUrl(alt.imageUrl || templates.find(t => t._id === alt.templateId)?.imageUrl)}
                                       alt="preview"
                                       className="w-40 h-auto rounded border"
                                     />

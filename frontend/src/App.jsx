@@ -22,6 +22,7 @@ import AdminServices from './pages/admin/AdminServices'
 import AdminNews from './pages/admin/AdminNews'
 import AdminAppointments from './pages/admin/AdminAppointments'
 import AdminSettings from './pages/admin/AdminSettings'
+import MLAdminDashboard from './components/MLAdminDashboard'
 
 function App() {
   return (
@@ -152,6 +153,13 @@ function App() {
             <AdminProtectedRoute>
               <AdminLayout>
                 <AdminSettings />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          } />
+          <Route path="/admin/ml" element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <MLAdminDashboard />
               </AdminLayout>
             </AdminProtectedRoute>
           } />

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
+import { t } from "../data/translations";
 import { Mail, Phone, Lock, Eye, EyeOff, User, ArrowLeft } from "lucide-react";
 import axios from 'axios'
 
@@ -19,6 +21,7 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
+  const { language } = useLanguage();
   const navigate = useNavigate();
 
   // Strict validation rules
@@ -187,11 +190,11 @@ const Register = () => {
           {/* Back to Home */}
           <div className="mb-4">
             <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-black">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
+              <ArrowLeft className="h-4 w-4 mr-2" /> {t('common.home', language)}
             </Link>
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-            Create an account
+            {t('register.title', language)}
           </h2>
 
           {errors.general && (
@@ -376,19 +379,19 @@ const Register = () => {
               disabled={loading}
               className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
             >
-              {loading ? "Creating Account..." : "Create an Account"}
+              {loading ? t('register.loading', language) : t('register.registerButton', language)}
             </button>
           </form>
 
 
 
           <p className="mt-6 text-center text-sm text-gray-600">
-            Already have an account?{" "}
+            {t('register.alreadyHaveAccount', language)}{" "}
             <Link
               to="/login"
               className="font-medium text-primary hover:text-blue-500"
             >
-              Log in
+              {t('register.signIn', language)}
             </Link>
           </p>
         </div>

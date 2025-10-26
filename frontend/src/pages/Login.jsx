@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
+import { t } from "../data/translations";
 import { Mail, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import axios from "axios";
 
@@ -8,7 +10,6 @@ const Login = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    role: "user",
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -16,6 +17,7 @@ const Login = () => {
   const [error, setError] = useState("");
 
   const { login, googleSignIn } = useAuth();
+  const { language } = useLanguage();
   const navigate = useNavigate();
 
   // Handle input changes
@@ -23,22 +25,22 @@ const Login = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handle normal login (email/password)
+  // Handle normal login (email/password) with automatic role detection
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      const result = await login(formData.email, formData.password, formData.role);
+      const result = await login(formData.email, formData.password);
 
       if (result.success) {
         localStorage.setItem("token", result.token);
         localStorage.setItem("user", JSON.stringify(result.user));
         axios.defaults.headers.common["Authorization"] = `Bearer ${result.token}`;
 
-        const destination =
-          formData.role === "admin" ? "/admin/dashboard" : "/dashboard";
+        // Automatically redirect based on user role
+        const destination = result.user.role === "admin" ? "/admin/dashboard" : "/dashboard";
         navigate(destination);
       } else {
         setError(result.error || "Login failed");
@@ -70,8 +72,8 @@ const Login = () => {
       if (result.success) {
         console.log("✅ Firebase Google login success");
 
-        const destination =
-          formData.role === "admin" ? "/admin/dashboard" : "/dashboard";
+        // Automatically redirect based on user role
+        const destination = result.user.role === "admin" ? "/admin/dashboard" : "/dashboard";
         navigate(destination);
       } else {
         console.error("❌ Firebase Google login failed:", result.error);
@@ -116,17 +118,15 @@ const Login = () => {
           {/* Back to Home */}
           <div className="mb-4">
             <Link to="/" className="inline-flex items-center text-sm text-gray-600 hover:text-black">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
+              <ArrowLeft className="h-4 w-4 mr-2" /> {t('common.home', language)}
             </Link>
           </div>
 
           {/* Title */}
           <h2 className="text-2xl font-bold text-gray-900 mb-1 text-center">
-            Welcome Back
+            {t('login.title', language)}
           </h2>
-          <p className="text-sm text-gray-500 mb-8 text-center">
-            Enter your email and password to access your account
-          </p>
+          
 
           {/* Error Message */}
           {error && (
@@ -143,7 +143,7 @@ const Login = () => {
                 htmlFor="email"
                 className="block text-xs font-medium text-gray-700 mb-1"
               >
-                Email
+                {t('login.email', language)}
               </label>
               <div className="relative">
                 <Mail className="h-4 w-4 text-gray-400 absolute top-2.5 left-3" />
@@ -155,7 +155,7 @@ const Login = () => {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full pl-9 pr-3 py-2 rounded-md border border-gray-200 bg-gray-50 focus:ring-1 focus:ring-black focus:border-black text-sm"
-                  placeholder="Enter your email"
+                  placeholder={t('login.email', language)}
                 />
               </div>
             </div>
@@ -166,7 +166,7 @@ const Login = () => {
                 htmlFor="password"
                 className="block text-xs font-medium text-gray-700 mb-1"
               >
-                Password
+                {t('login.password', language)}
               </label>
               <div className="relative">
                 <Lock className="h-4 w-4 text-gray-400 absolute top-2.5 left-3" />
@@ -178,7 +178,7 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleChange}
                   className="w-full pl-9 pr-9 py-2 rounded-md border border-gray-200 bg-gray-50 focus:ring-1 focus:ring-black focus:border-black text-sm"
-                  placeholder="Enter your password"
+                  placeholder={t('login.password', language)}
                 />
                 <button
                   type="button"
@@ -194,41 +194,11 @@ const Login = () => {
               </div>
             </div>
 
-            {/* Role Selection */}
-            <div>
-              <span className="block text-xs font-medium text-gray-700 mb-1">
-                Select Role
-              </span>
-              <div className="flex gap-6 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="role"
-                    value="user"
-                    checked={formData.role === "user"}
-                    onChange={handleChange}
-                    className="text-black focus:ring-black"
-                  />
-                  User
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="role"
-                    value="admin"
-                    checked={formData.role === "admin"}
-                    onChange={handleChange}
-                    className="text-black focus:ring-black"
-                  />
-                  Admin
-                </label>
-              </div>
-            </div>
 
             {/* Forgot Password */}
             <div className="flex items-center justify-end text-sm">
               <a href="#" className="text-gray-600 hover:text-black">
-                Forgot Password
+                {t('login.forgotPassword', language)}
               </a>
             </div>
 
@@ -238,7 +208,7 @@ const Login = () => {
               disabled={loading}
               className="w-full py-2 rounded-md bg-black text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading ? t('login.loading', language) : t('login.loginButton', language)}
             </button>
           </form>
 
@@ -267,15 +237,15 @@ const Login = () => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              {loading ? "Signing in..." : "Sign in with Google"}
+              {loading ? t('login.loading', language) : t('login.google', language)}
             </button>
           </div>
 
           {/* Footer */}
           <p className="mt-6 text-center text-sm text-gray-500">
-            Don’t have an account?{" "}
+            {t('login.noAccount', language)}{" "}
             <Link to="/register" className="text-black font-medium">
-              Sign Up
+              {t('login.signUp', language)}
             </Link>
           </p>
         </div>

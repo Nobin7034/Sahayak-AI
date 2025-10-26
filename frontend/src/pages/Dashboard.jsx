@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
+import { t } from '../data/translations'
 import axios from 'axios'
+import MLRecommendations from '../components/MLRecommendations'
 import { 
   Calendar, 
   FileText, 
@@ -19,6 +22,7 @@ import {
 
 const Dashboard = () => {
   const { user } = useAuth()
+  const { language } = useLanguage()
   const [appointments, setAppointments] = useState([])
   const [stats, setStats] = useState({
     completed: 0,
@@ -158,10 +162,10 @@ const Dashboard = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {user?.name}!
+            {t('dashboard.title', language, { name: user?.name })}
           </h1>
           <p className="text-lg text-gray-600">
-            Here's an overview of your government service applications and appointments
+            {t('dashboard.subtitle', language)}
           </p>
         </div>
 
@@ -195,7 +199,7 @@ const Dashboard = () => {
                   </div>
                   <div className="ml-4">
                     <p className="text-2xl font-bold text-gray-900">{stats.completed}</p>
-                    <p className="text-gray-600">Completed Applications</p>
+                    <p className="text-gray-600">{t('dashboard.completedApplications', language)}</p>
                   </div>
                 </div>
               </div>
@@ -207,7 +211,7 @@ const Dashboard = () => {
                   </div>
                   <div className="ml-4">
                     <p className="text-2xl font-bold text-gray-900">{stats.inProgress}</p>
-                    <p className="text-gray-600">In Progress</p>
+                    <p className="text-gray-600">{t('dashboard.inProgress', language)}</p>
                   </div>
                 </div>
               </div>
@@ -219,7 +223,7 @@ const Dashboard = () => {
                   </div>
                   <div className="ml-4">
                     <p className="text-2xl font-bold text-gray-900">{stats.upcoming}</p>
-                    <p className="text-gray-600">Upcoming Appointments</p>
+                    <p className="text-gray-600">{t('dashboard.upcomingAppointments', language)}</p>
                   </div>
                 </div>
               </div>
@@ -228,12 +232,12 @@ const Dashboard = () => {
             {/* Recent Appointments (renamed from Applications) */}
             <div className="card p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">Recent Appointments</h2>
+                <h2 className="text-xl font-bold text-gray-900">{t('dashboard.recentAppointments', language)}</h2>
                 <Link
                   to="/services"
                   className="text-primary hover:text-blue-700 font-medium"
                 >
-                  Book New Appointment
+                  {t('dashboard.bookNewAppointment', language)}
                 </Link>
               </div>
 
@@ -495,6 +499,9 @@ const Dashboard = () => {
                 </Link>
               </div>
             </div>
+
+            {/* AI Recommendations */}
+            <MLRecommendations userId={user?._id} limit={3} />
 
             {/* Important Notice */}
             <div className="card p-6 bg-yellow-50 border-yellow-200">
