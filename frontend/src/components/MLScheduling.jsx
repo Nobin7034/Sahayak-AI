@@ -32,12 +32,28 @@ const MLScheduling = ({ serviceId, serviceName, onTimeSlotSelect }) => {
       if (response.success) {
         setPredictions(response.data.predictions);
         setBestTimeSlot(response.data.bestTimeSlot);
+        
+        // Show info message if using fallback
+        if (response.data.fallbackUsed) {
+          console.log('ℹ️ Using heuristic scheduling:', response.data.message);
+        }
       } else {
         setError(response.message || 'Failed to get schedule predictions');
       }
     } catch (error) {
       console.error('Schedule prediction error:', error);
-      setError('Failed to get schedule predictions');
+      
+      // Check if error response has detailed information
+      const errorMessage = error.response?.data?.message || error.message;
+      const errorHint = error.response?.data?.hint;
+      
+      if (error.response?.status === 503 || errorMessage.includes('not trained')) {
+        setError('AI scheduling is currently learning from your appointment history. This feature will be available once we have enough data (at least 10 completed appointments).');
+      } else if (errorMessage.includes('Service not found')) {
+        setError('Service not found. Please select a valid service.');
+      } else {
+        setError(errorHint || errorMessage || 'Failed to get schedule predictions. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }
@@ -120,9 +136,23 @@ const MLScheduling = ({ serviceId, serviceName, onTimeSlotSelect }) => {
       )}
 
       {error && (
-        <div className="flex items-center space-x-2 text-red-600 py-4">
-          <AlertTriangle className="h-5 w-5" />
-          <span>{error}</span>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-medium text-yellow-900 mb-1">
+                AI Scheduling Unavailable
+              </h4>
+              <p className="text-sm text-yellow-800">
+                {error}
+              </p>
+              {error.includes('learning from your appointment history') && (
+                <p className="text-xs text-yellow-700 mt-2">
+                  💡 The AI will automatically train once you have more completed appointments. In the meantime, please select any available time slot.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -198,7 +228,10 @@ const MLScheduling = ({ serviceId, serviceName, onTimeSlotSelect }) => {
 
       <div className="mt-4 pt-4 border-t border-gray-200">
         <p className="text-xs text-gray-500 text-center">
-          Powered by Decision Tree algorithm analyzing historical appointment data
+          {predictions.length > 0 && predictions[0].source === 'heuristic' 
+            ? 'Smart scheduling recommendations • AI will improve with more data'
+            : 'Powered by AI Decision Tree analyzing historical patterns'
+          }
         </p>
       </div>
     </div>
@@ -206,3 +239,4 @@ const MLScheduling = ({ serviceId, serviceName, onTimeSlotSelect }) => {
 };
 
 export default MLScheduling;
+

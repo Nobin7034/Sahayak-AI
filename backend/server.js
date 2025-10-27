@@ -4,11 +4,28 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
+import mlService from './services/mlService.js';
 
 dotenv.config();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB and initialize ML models
+connectDB().then(async () => {
+  console.log('🤖 Initializing ML models...');
+  
+  // Auto-train ML models on startup in the background
+  setTimeout(async () => {
+    try {
+      const results = await mlService.retrainAllModels();
+      console.log('📊 ML Model Training Results:');
+      console.log('   - KNN:', results.knn ? '✅ Trained' : '⚠️ Pending (insufficient data)');
+      console.log('   - Bayesian:', results.bayes ? '✅ Trained' : '⚠️ Pending (insufficient data)');
+      console.log('   - Decision Tree:', results.decisionTree ? '✅ Trained' : '⚠️ Pending (insufficient data)');
+      console.log('💡 Models will auto-train when users access features if not yet trained.\n');
+    } catch (error) {
+      console.error('⚠️ Initial ML training failed, models will train on first use:', error.message);
+    }
+  }, 2000); // Wait 2 seconds after DB connection before training
+});
 
 const app = express();
 const PORT = process.env.PORT || 5000;

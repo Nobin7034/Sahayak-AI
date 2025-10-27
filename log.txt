@@ -1,0 +1,89 @@
+commit a6be64a61be797465d143555af4305acd7ebd1a8
+Author: nobin <nobin@gmail.com>
+Date:   Sun Oct 26 23:59:23 2025 +0530
+
+    integrated AI&ML and also some modification on overall website
+
+commit d970fbee5e2a9f976b54f90f7fc7b3d2db540a02
+Author: nobin <nobin@gmail.com>
+Date:   Tue Oct 21 14:27:48 2025 +0530
+
+    Serve React build in production with catch-all route
+
+commit 538075ed7c7961d60c7f39a2f006dbaea90dbda4
+Author: nobin <nobin@gmail.com>
+Date:   Tue Oct 21 14:22:37 2025 +0530
+
+    Move build dependencies to dependencies for Render deployment
+
+commit c3dd026cab1167a342870b5be3a11dbe14fea6cd
+Author: nobin <nobin@gmail.com>
+Date:   Thu Oct 16 13:49:22 2025 +0530
+
+    appointments and service pages were updated
+
+commit 8ff194ad43c2e12bfcb612fd408dc496612b7f07
+Author: nobin <nobin@gmail.com>
+Date:   Mon Oct 6 15:35:58 2025 +0530
+
+    admin services updated
+
+commit 12d2772e06064f0b123e0d18ebbe54aa5687009f
+Author: nobin <nobin@gmail.com>
+Date:   Fri Sep 19 07:50:32 2025 +0530
+
+    user dashboard & admin panel updated
+
+commit f5521e5f4f00c1a7181c83da0eb05a6ba8452580
+Author: nobin <nobin@gmail.com>
+Date:   Thu Sep 18 16:18:29 2025 +0530
+
+    google sign in updated
+
+commit de402ec130367727ea5a254c4b5463abd9500630
+Author: nobin <nobin@gmail.com>
+Date:   Wed Sep 17 10:49:53 2025 +0530
+
+    registration page changes updated
+
+commit 7736f145dbdd4c383cb5e6a693ced143c0270e26
+Author: nobin <nobin@gmail.com>
+Date:   Mon Sep 15 16:23:10 2025 +0530
+
+    updated user dashboard
+
+commit 4323fad94bc1c5dd2b3194d1f304601966d64d55
+Author: nobin <nobin@gmail.com>
+Date:   Mon Sep 15 13:23:20 2025 +0530
+
+    service and news updated
+
+commit 475d689ef16b6cc2129c269b9609fd3a6eec369f
+Author: nobin <nobin@gmail.com>
+Date:   Fri Sep 12 15:42:00 2025 +0530
+
+    admin page updated
+
+commit 4ad10ddd9160eec29915094b83d394cec6628418
+Author: nobin <nobin@gmail.com>
+Date:   Thu Sep 11 14:05:05 2025 +0530
+
+    admin dashboard updated
+
+commit 51716736cba1e9f249a1d24a33d2cd2f5d613eda
+Author: nobin <nobin@gmail.com>
+Date:   Tue Sep 9 22:53:52 2025 +0530
+
+    update message
+
+commit 1e7fc1a6ec640389653503097358b271ca6bf0d2
+Author: nobin <nobin@gmail.com>
+Date:   Tue Sep 9 22:33:12 2025 +0530
+
+    First commit
+
+commit 23b86d785095a7d3043f9e2e0d459c9e57f4e0e2
+Author: nobin <nobin@gmail.com>
+Date:   Sat Aug 16 15:23:19 2025 +0530
+
+    Initial commit

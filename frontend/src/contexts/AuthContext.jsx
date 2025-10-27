@@ -108,20 +108,11 @@ export const AuthProvider = ({ children }) => {
               const firebaseIdToken = await auth.currentUser.getIdToken(true)
 
               // Send Firebase ID token to backend for verification/login
-              // Try admin first, then user
-              let response;
-              try {
-                response = await axios.post('/auth/google', {
-                  token: firebaseIdToken,
-                  role: 'admin'
-                })
-              } catch (adminError) {
-                console.log('Admin Google login failed, trying user:', adminError.response?.data?.message)
-                response = await axios.post('/auth/google', {
-                  token: firebaseIdToken,
-                  role: 'user'
-                })
-              }
+              // Backend will handle role assignment (always 'user' for new accounts)
+              const response = await axios.post('/auth/google', {
+                token: firebaseIdToken
+                // No role parameter - backend assigns role automatically
+              })
 
               console.log('AuthContext - Auto-sync with backend response:', response.data)
 
@@ -319,20 +310,11 @@ export const AuthProvider = ({ children }) => {
       const idToken = await user.getIdToken(/* forceRefresh */ true)
 
       // Send Firebase ID token to backend for verification/login
-      // Try admin first, then user
-      let response;
-      try {
-        response = await axios.post('/auth/google', {
-          token: idToken,
-          role: 'admin'
-        })
-      } catch (adminError) {
-        console.log('Admin Google login failed, trying user:', adminError.response?.data?.message)
-        response = await axios.post('/auth/google', {
-          token: idToken,
-          role: 'user'
-        })
-      }
+      // Backend will handle role assignment (always 'user' for new accounts)
+      const response = await axios.post('/auth/google', {
+        token: idToken
+        // No role parameter - backend assigns role automatically
+      })
 
       console.log('Backend Google sign-in response:', response.data)
 

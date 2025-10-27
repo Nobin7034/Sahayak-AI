@@ -47,7 +47,7 @@ const generateToken = (user) => {
 // ---------------- REGISTER ----------------
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, phone, role = "user" } = req.body;
+    const { name, email, password, phone } = req.body;
 
     if (!name || !email || !password) {
       return res
@@ -69,7 +69,7 @@ router.post("/register", async (req, res) => {
       email,
       password: hashedPassword,
       phone,
-      role,
+      role: "user", // Always create new users with 'user' role
       provider: "local",
     });
 
@@ -182,13 +182,14 @@ router.post("/google", async (req, res) => {
 
     let user = await User.findOne({ email });
     if (!user) {
+      // Always create new Google users with 'user' role
       user = await User.create({
         name: name || email.split("@")[0],
         email,
         googleId: uid,
         provider: "google",
         avatar: picture,
-        role: req.body.role || "user",
+        role: "user", // Security: Always default to 'user' role
       });
     } else if (!user.googleId) {
       user.googleId = uid;

@@ -162,3 +162,4 @@ const MLRecommendations = ({ userId, limit = 5 }) => {
 };
 
 export default MLRecommendations;
+

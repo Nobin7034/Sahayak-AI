@@ -144,14 +144,21 @@ router.get('/users', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+    const roleFilter = req.query.role; // Optional filter by role
 
-    const users = await User.find({ role: 'user' })
+    // Build query - show all users (both admin and user roles)
+    let query = {};
+    if (roleFilter && ['user', 'admin'].includes(roleFilter)) {
+      query.role = roleFilter;
+    }
+
+    const users = await User.find(query)
       .select('-password')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const totalUsers = await User.countDocuments({ role: 'user' });
+    const totalUsers = await User.countDocuments(query);
 
     res.json({
       success: true,
@@ -204,6 +211,56 @@ router.patch('/users/:id/status', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update user status',
+      error: error.message
+    });
+  }
+});
+
+// Change user role (admin only)
+router.patch('/users/:id/role', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    // Validate role
+    if (!role || !['user', 'admin'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role. Must be "user" or "admin"'
+      });
+    }
+
+    // Prevent admin from demoting themselves
+    if (id === req.user.userId && role === 'user') {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot demote yourself from admin'
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { role },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `User role updated to ${role} successfully`,
+      user
+    });
+  } catch (error) {
+    console.error('Update user role error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update user role',
       error: error.message
     });
   }

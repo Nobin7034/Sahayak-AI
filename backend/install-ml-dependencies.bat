@@ -21,3 +21,4 @@ echo - Decision Tree for appointment scheduling optimization
 echo.
 echo You can now start the server and access ML features at /api/ml
 pause
+
