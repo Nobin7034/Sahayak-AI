@@ -22,26 +22,31 @@ const seedAdmin = async () => {
     await connectDB();
 
     // Check if admin already exists
-    const existingAdmin = await User.findOne({ email: 'admin@akshaya.gov.in' });
+    const existingAdmin = await User.findOne({ email: 'nobinrajeev333@gmail.com' });
     if (existingAdmin) {
-      console.log('Admin user already exists');
+      console.log('✅ Admin user already exists');
+      console.log('📧 Email: nobinrajeev333@gmail.com');
+      console.log('🔑 Role:', existingAdmin.role);
       return;
     }
 
     // Create admin user
     const hashedPassword = await bcrypt.hash('admin123', 10);
     const admin = new User({
-      name: 'System Administrator',
-      email: 'admin@akshaya.gov.in',
+      name: 'Nobin Rajeev',
+      email: 'nobinrajeev333@gmail.com',
       password: hashedPassword,
       phone: '9876543210',
-      role: 'admin'
+      role: 'admin',
+      isActive: true,
+      provider: 'local'
     });
 
     await admin.save();
-    console.log('Admin user created successfully');
-    console.log('Email: admin@akshaya.gov.in');
-    console.log('Password: admin123');
+    console.log('✅ Admin user created successfully!');
+    console.log('📧 Email: nobinrajeev333@gmail.com');
+    console.log('🔑 Password: admin123');
+    console.log('👤 Role: admin');
 
     // Create sample services
     const sampleServices = [

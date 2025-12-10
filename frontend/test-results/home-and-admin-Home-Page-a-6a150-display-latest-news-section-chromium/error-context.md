@@ -1,0 +1,194 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link "A Akshaya Services" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e10]: A
+        - generic [ref=e11]: Akshaya Services
+      - generic [ref=e12]:
+        - link "Home" [ref=e13] [cursor=pointer]:
+          - /url: /
+        - generic [ref=e14]:
+          - link "Login" [ref=e15] [cursor=pointer]:
+            - /url: /login
+          - link "Register" [ref=e16] [cursor=pointer]:
+            - /url: /register
+  - generic [ref=e17]:
+    - button "English" [ref=e19] [cursor=pointer]:
+      - img [ref=e20]
+      - generic [ref=e24]: English
+    - generic [ref=e27]:
+      - heading "Kerala Government Services Made Simple" [level=1] [ref=e28]
+      - paragraph [ref=e29]: Access all Akshaya center services online. Book appointments, apply for certificates, and track your applications.
+      - generic [ref=e30]:
+        - link "Get Started" [ref=e31] [cursor=pointer]:
+          - /url: /register
+          - text: Get Started
+          - img [ref=e32]
+        - link "Login" [ref=e34] [cursor=pointer]:
+          - /url: /login
+    - generic [ref=e36]:
+      - generic [ref=e37]:
+        - heading "Why Choose Akshaya Services?" [level=2] [ref=e38]
+        - paragraph [ref=e39]: Experience government services like never before
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - img [ref=e43]
+          - heading "Easy Appointments" [level=3] [ref=e45]
+          - paragraph [ref=e46]: Book appointments online and avoid long queues
+        - generic [ref=e47]:
+          - img [ref=e49]
+          - heading "Document Guidance" [level=3] [ref=e52]
+          - paragraph [ref=e53]: Know exactly what documents you need with sample images
+        - generic [ref=e54]:
+          - img [ref=e56]
+          - heading "Secure & Reliable" [level=3] [ref=e58]
+          - paragraph [ref=e59]: Government-grade security for all your transactions
+        - generic [ref=e60]:
+          - img [ref=e62]
+          - heading "24/7 Support" [level=3] [ref=e67]
+          - paragraph [ref=e68]: Get help whenever you need it from our support team
+    - generic [ref=e70]:
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - heading "Latest Government News" [level=2] [ref=e73]
+          - paragraph [ref=e74]: Stay updated with the latest announcements and updates
+        - link "View All News" [ref=e75] [cursor=pointer]:
+          - /url: /news
+          - text: View All News
+          - img [ref=e76]
+      - article [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e81]: 15/11/2025
+          - heading "Test News" [level=3] [ref=e82]
+          - paragraph [ref=e83]: Test summary
+          - link "Read More" [ref=e84] [cursor=pointer]:
+            - /url: /news/1
+            - text: Read More
+            - img [ref=e85]
+    - generic [ref=e88]:
+      - generic [ref=e89]:
+        - heading "Find Akshaya Centers Near You" [level=2] [ref=e90]
+        - paragraph [ref=e91]: Locate the nearest Akshaya center for in-person services
+      - generic [ref=e92]:
+        - generic [ref=e93]:
+          - heading "Akshaya Center Thiruvananthapuram" [level=3] [ref=e94]
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - img [ref=e97]
+              - generic [ref=e100]: TC 25/1234, Medical College Road, Thiruvananthapuram
+            - generic [ref=e101]:
+              - img [ref=e102]
+              - generic [ref=e104]: +91 471-2345678
+            - generic [ref=e106]:
+              - img [ref=e107]
+              - generic [ref=e109]: "4.5"
+          - generic [ref=e110]:
+            - heading "Services Available:" [level=4] [ref=e111]
+            - generic [ref=e112]:
+              - generic [ref=e113]: All Government Services
+              - generic [ref=e114]: Digital Payments
+              - generic [ref=e115]: Document Verification
+          - generic [ref=e116]:
+            - strong [ref=e117]: "Hours:"
+            - text: 9:00 AM - 6:00 PM
+        - generic [ref=e118]:
+          - heading "Akshaya Center Kochi" [level=3] [ref=e119]
+          - generic [ref=e120]:
+            - generic [ref=e121]:
+              - img [ref=e122]
+              - generic [ref=e125]: NH 47, Kaloor, Kochi, Ernakulam
+            - generic [ref=e126]:
+              - img [ref=e127]
+              - generic [ref=e129]: +91 484-2345678
+            - generic [ref=e131]:
+              - img [ref=e132]
+              - generic [ref=e134]: "4.3"
+          - generic [ref=e135]:
+            - heading "Services Available:" [level=4] [ref=e136]
+            - generic [ref=e137]:
+              - generic [ref=e138]: Certificate Services
+              - generic [ref=e139]: Registration
+              - generic [ref=e140]: Online Applications
+          - generic [ref=e141]:
+            - strong [ref=e142]: "Hours:"
+            - text: 9:00 AM - 6:00 PM
+        - generic [ref=e143]:
+          - heading "Akshaya Center Kozhikode" [level=3] [ref=e144]
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - img [ref=e147]
+              - generic [ref=e150]: Mavoor Road, Kozhikode
+            - generic [ref=e151]:
+              - img [ref=e152]
+              - generic [ref=e154]: +91 495-2345678
+            - generic [ref=e156]:
+              - img [ref=e157]
+              - generic [ref=e159]: "4.6"
+          - generic [ref=e160]:
+            - heading "Services Available:" [level=4] [ref=e161]
+            - generic [ref=e162]:
+              - generic [ref=e163]: Civil Registration
+              - generic [ref=e164]: Revenue Services
+              - generic [ref=e165]: Digital Services
+          - generic [ref=e166]:
+            - strong [ref=e167]: "Hours:"
+            - text: 9:00 AM - 6:00 PM
+    - generic [ref=e169]:
+      - heading "Ready to Get Started?" [level=2] [ref=e170]
+      - paragraph [ref=e171]: Join thousands of satisfied users who have simplified their government service experience
+      - link "Create Your Account Today" [ref=e172] [cursor=pointer]:
+        - /url: /register
+  - contentinfo [ref=e173]:
+    - generic [ref=e174]:
+      - generic [ref=e175]:
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - generic [ref=e179]: A
+            - generic [ref=e180]: Akshaya Services
+          - paragraph [ref=e181]: Simplifying government services for the people of Kerala. Access all Akshaya center services online with ease and convenience.
+          - generic [ref=e182]:
+            - generic [ref=e183]:
+              - img [ref=e184]
+              - generic [ref=e187]: Kerala, India
+            - generic [ref=e188]:
+              - img [ref=e189]
+              - generic [ref=e191]: +91 9876543210
+            - generic [ref=e192]:
+              - img [ref=e193]
+              - generic [ref=e196]: info@akshayaservices.gov.in
+        - generic [ref=e197]:
+          - heading "Quick Links" [level=3] [ref=e198]
+          - list [ref=e199]:
+            - listitem [ref=e200]:
+              - link "Home" [ref=e201] [cursor=pointer]:
+                - /url: /
+            - listitem [ref=e202]:
+              - link "Services" [ref=e203] [cursor=pointer]:
+                - /url: /services
+            - listitem [ref=e204]:
+              - link "News" [ref=e205] [cursor=pointer]:
+                - /url: /news
+            - listitem [ref=e206]:
+              - link "Contact" [ref=e207] [cursor=pointer]:
+                - /url: /contact
+        - generic [ref=e208]:
+          - heading "Government Links" [level=3] [ref=e209]
+          - list [ref=e210]:
+            - listitem [ref=e211]:
+              - link "Kerala.gov.in" [ref=e212] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e213]:
+              - link "Digital India" [ref=e214] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e215]:
+              - link "CSC Portal" [ref=e216] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e217]:
+              - link "e-District" [ref=e218] [cursor=pointer]:
+                - /url: "#"
+      - paragraph [ref=e220]: © 2025 Akshaya Services. All rights reserved. Government of Kerala.
+```

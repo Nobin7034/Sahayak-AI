@@ -1,0 +1,81 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - navigation [ref=e4]:
+    - generic [ref=e6]:
+      - link "A Akshaya Services" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e10]: A
+        - generic [ref=e11]: Akshaya Services
+      - generic [ref=e12]:
+        - link "Home" [ref=e13] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Services" [ref=e14] [cursor=pointer]:
+          - /url: /services
+        - link "Appointments" [ref=e15] [cursor=pointer]:
+          - /url: /appointments
+        - link "News" [ref=e16] [cursor=pointer]:
+          - /url: /news
+        - button "Notifications" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+        - button "EN" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+          - generic [ref=e27]: EN
+        - button [ref=e29] [cursor=pointer]:
+          - img [ref=e30]
+  - generic [ref=e34]:
+    - img [ref=e35]
+    - heading "Something went wrong" [level=2] [ref=e37]
+    - paragraph [ref=e38]: Failed to load your dashboard data. Please try again later.
+    - button "Try Again" [ref=e39] [cursor=pointer]
+  - contentinfo [ref=e40]:
+    - generic [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]:
+            - generic [ref=e46]: A
+            - generic [ref=e47]: Akshaya Services
+          - paragraph [ref=e48]: Simplifying government services for the people of Kerala. Access all Akshaya center services online with ease and convenience.
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - img [ref=e51]
+              - generic [ref=e54]: Kerala, India
+            - generic [ref=e55]:
+              - img [ref=e56]
+              - generic [ref=e58]: +91 9876543210
+            - generic [ref=e59]:
+              - img [ref=e60]
+              - generic [ref=e63]: info@akshayaservices.gov.in
+        - generic [ref=e64]:
+          - heading "Quick Links" [level=3] [ref=e65]
+          - list [ref=e66]:
+            - listitem [ref=e67]:
+              - link "Home" [ref=e68] [cursor=pointer]:
+                - /url: /
+            - listitem [ref=e69]:
+              - link "Services" [ref=e70] [cursor=pointer]:
+                - /url: /services
+            - listitem [ref=e71]:
+              - link "News" [ref=e72] [cursor=pointer]:
+                - /url: /news
+            - listitem [ref=e73]:
+              - link "Contact" [ref=e74] [cursor=pointer]:
+                - /url: /contact
+        - generic [ref=e75]:
+          - heading "Government Links" [level=3] [ref=e76]
+          - list [ref=e77]:
+            - listitem [ref=e78]:
+              - link "Kerala.gov.in" [ref=e79] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e80]:
+              - link "Digital India" [ref=e81] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e82]:
+              - link "CSC Portal" [ref=e83] [cursor=pointer]:
+                - /url: "#"
+            - listitem [ref=e84]:
+              - link "e-District" [ref=e85] [cursor=pointer]:
+                - /url: "#"
+      - paragraph [ref=e87]: © 2025 Akshaya Services. All rights reserved. Government of Kerala.
+```

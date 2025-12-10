@@ -27,15 +27,21 @@ const MLScheduling = ({ serviceId, serviceName, onTimeSlotSelect }) => {
       setLoading(true);
       setError('');
       
+      if (!serviceId) {
+        setError('Service ID is required');
+        setLoading(false);
+        return;
+      }
+      
       const response = await mlService.getOptimalSchedule(serviceId, selectedDate);
       
       if (response.success) {
-        setPredictions(response.data.predictions);
+        setPredictions(response.data.predictions || []);
         setBestTimeSlot(response.data.bestTimeSlot);
         
         // Show info message if using fallback
         if (response.data.fallbackUsed) {
-          console.log('ℹ️ Using heuristic scheduling:', response.data.message);
+          console.log('ℹ️ Using default scheduling:', response.data.message);
         }
       } else {
         setError(response.message || 'Failed to get schedule predictions');
@@ -43,16 +49,24 @@ const MLScheduling = ({ serviceId, serviceName, onTimeSlotSelect }) => {
     } catch (error) {
       console.error('Schedule prediction error:', error);
       
-      // Check if error response has detailed information
-      const errorMessage = error.response?.data?.message || error.message;
-      const errorHint = error.response?.data?.hint;
-      
-      if (error.response?.status === 503 || errorMessage.includes('not trained')) {
-        setError('AI scheduling is currently learning from your appointment history. This feature will be available once we have enough data (at least 10 completed appointments).');
-      } else if (errorMessage.includes('Service not found')) {
-        setError('Service not found. Please select a valid service.');
+      // Even on error, try to show default slots
+      if (error.response?.status === 404) {
+        // Use fallback slots (already handled in mlService, but just in case)
+        setPredictions([
+          { hour: 9, successProbability: 0.85, recommended: true, source: 'default' },
+          { hour: 10, successProbability: 0.85, recommended: true, source: 'default' },
+          { hour: 11, successProbability: 0.80, recommended: true, source: 'default' }
+        ]);
+        setBestTimeSlot({ hour: 9, successProbability: 0.85, recommended: true, source: 'default' });
       } else {
-        setError(errorHint || errorMessage || 'Failed to get schedule predictions. Please try again later.');
+        const errorMessage = error.response?.data?.message || error.message;
+        if (error.response?.status === 503 || errorMessage.includes('not trained')) {
+          setError('AI scheduling is currently learning from your appointment history. This feature will be available once we have enough data (at least 10 completed appointments).');
+        } else if (errorMessage.includes('Service not found')) {
+          setError('Service not found. Please select a valid service.');
+        } else {
+          setError('Failed to get schedule predictions. Showing default time slots.');
+        }
       }
     } finally {
       setLoading(false);
