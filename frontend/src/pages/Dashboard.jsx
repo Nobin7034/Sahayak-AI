@@ -482,13 +482,13 @@ const Dashboard = () => {
                   to="/services"
                   className="block w-full px-4 py-2 bg-primary text-white rounded-lg hover:bg-blue-700 transition-colors text-center"
                 >
-                  Apply for Service
+                  Browse Services
                 </Link>
                 <Link
-                  to="/appointments"
-                  className="block w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-center"
+                  to="/centers"
+                  className="block w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-center"
                 >
-                  Book Appointment
+                  Find Nearby Centers
                 </Link>
                 <Link
                   to="/news"
@@ -496,6 +496,50 @@ const Dashboard = () => {
                 >
                   Read Latest News
                 </Link>
+              </div>
+            </div>
+
+            {/* Find Centers Feature */}
+            <div className="card p-6 bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+              <div className="flex items-start space-x-3">
+                <MapPin className="h-6 w-6 text-green-600 mt-1" />
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Find Akshaya Centers</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Locate nearby Akshaya centers with distance filtering. View centers on map or in list format with complete details including services, contact information, and working hours.
+                  </p>
+                  <div className="space-y-2">
+                    <Link
+                      to="/centers"
+                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      View All Centers
+                    </Link>
+                    <div className="text-xs text-gray-500">
+                      Filter by distance: 10km • 20km • 50km • 100km
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Center Finder Tips */}
+            <div className="card p-6 bg-blue-50 border-blue-200">
+              <div className="flex items-start space-x-3">
+                <MapPin className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-blue-900 mb-2">Find Centers Near You</h3>
+                  <p className="text-sm text-blue-800 mb-3">
+                    Use our center finder to locate Akshaya centers with customizable distance filters.
+                  </p>
+                  <div className="text-xs text-blue-700 space-y-1">
+                    <div>• Filter by distance: 10km, 20km, 50km, 100km</div>
+                    <div>• View centers on interactive map or list</div>
+                    <div>• See services offered at each center</div>
+                    <div>• Get directions and contact information</div>
+                  </div>
+                </div>
               </div>
             </div>
 

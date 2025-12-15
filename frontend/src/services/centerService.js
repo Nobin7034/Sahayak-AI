@@ -1,12 +1,22 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api.js';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = `${API_BASE_URL}/api`;
 
 class CenterService {
   constructor() {
     this.api = axios.create({
-      baseURL: API_BASE_URL,
+      baseURL: API_URL,
       timeout: 10000
+    });
+
+    // Add auth token to requests
+    this.api.interceptors.request.use((config) => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
     });
   }
 
@@ -79,8 +89,13 @@ class CenterService {
 
   // Check if center is currently open based on operating hours
   isCenterOpen(center) {
+    if (!center || !center.operatingHours) {
+      return false;
+    }
+
     const now = new Date();
-    const currentDay = now.toLocaleLowerCase().substring(0, 3); // mon, tue, etc.
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = days[now.getDay()];
     const currentTime = now.getHours() * 100 + now.getMinutes(); // HHMM format
 
     const daySchedule = center.operatingHours[currentDay];

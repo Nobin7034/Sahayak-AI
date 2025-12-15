@@ -19,7 +19,8 @@ const CenterInfoPanel = ({
   distance = null, 
   onBookAppointment, 
   onClose,
-  userLocation = null 
+  userLocation = null,
+  selectedService = null
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [availableServices, setAvailableServices] = useState([]);
@@ -35,7 +36,7 @@ const CenterInfoPanel = ({
   }, [center]);
 
   const loadCenterServices = async () => {
-    if (!center) return;
+    if (!center || !center._id) return;
     
     setLoading(true);
     try {
@@ -65,11 +66,16 @@ const CenterInfoPanel = ({
   const getOperatingStatus = () => {
     if (!center) return { status: 'unknown', text: 'Unknown' };
     
-    const isOpen = centerService.isCenterOpen(center);
-    return {
-      status: isOpen ? 'open' : 'closed',
-      text: isOpen ? 'Open Now' : 'Closed'
-    };
+    try {
+      const isOpen = centerService.isCenterOpen(center);
+      return {
+        status: isOpen ? 'open' : 'closed',
+        text: isOpen ? 'Open Now' : 'Closed'
+      };
+    } catch (error) {
+      console.error('Error checking center status:', error);
+      return { status: 'unknown', text: 'Status Unknown' };
+    }
   };
 
   const formatDistance = (dist) => {
@@ -81,7 +87,7 @@ const CenterInfoPanel = ({
   };
 
   const getTodayHours = () => {
-    if (!center || !center.operatingHours) return null;
+    if (!center || !center.operatingHours) return 'Hours not available';
     
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const today = days[new Date().getDay()];
@@ -95,13 +101,39 @@ const CenterInfoPanel = ({
   };
 
   const getDirectionsUrl = () => {
-    if (!center || !center.location) return '#';
+    if (!center || !center.location || !center.location.coordinates) return '#';
     
     const [lng, lat] = center.location.coordinates;
+    if (!lng || !lat) return '#';
+    
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   };
 
   if (!center) return null;
+
+  // Show loading state while center data is being fetched
+  if (loading) {
+    return (
+      <div className={`fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-xl z-50 
+                     transform transition-transform duration-300 ease-in-out
+                     ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="bg-blue-600 text-white p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Loading...</h2>
+            <button
+              onClick={handleClose}
+              className="p-1 hover:bg-blue-700 rounded-full transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   const operatingStatus = getOperatingStatus();
   const todayHours = getTodayHours();
@@ -115,11 +147,17 @@ const CenterInfoPanel = ({
       <div className="bg-blue-600 text-white p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h2 className="text-lg font-semibold mb-1">{center.name}</h2>
-            <div className="flex items-center text-blue-100 text-sm">
-              <MapPin className="h-4 w-4 mr-1" />
-              <span>{center.address.city}, {center.address.district}</span>
-            </div>
+            <h2 className="text-lg font-semibold mb-1">{center.name || 'Center Name'}</h2>
+            {center.address && (center.address.city || center.address.district) && (
+              <div className="flex items-center text-blue-100 text-sm">
+                <MapPin className="h-4 w-4 mr-1" />
+                <span>
+                  {center.address.city && center.address.city}
+                  {center.address.city && center.address.district && ', '}
+                  {center.address.district && center.address.district}
+                </span>
+              </div>
+            )}
             {distance !== null && (
               <div className="text-blue-100 text-sm mt-1">
                 <Navigation className="h-4 w-4 inline mr-1" />
@@ -171,78 +209,122 @@ const CenterInfoPanel = ({
         <div className="space-y-2">
           <h3 className="font-medium text-gray-900">Contact Information</h3>
           
-          <div className="flex items-center">
-            <Phone className="h-4 w-4 text-gray-400 mr-3" />
-            <a 
-              href={`tel:${center.contact.phone}`}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              {center.contact.phone}
-            </a>
-          </div>
+          {center.contact?.phone && (
+            <div className="flex items-center">
+              <Phone className="h-4 w-4 text-gray-400 mr-3" />
+              <a 
+                href={`tel:${center.contact.phone}`}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                {center.contact.phone}
+              </a>
+            </div>
+          )}
           
-          <div className="flex items-center">
-            <Mail className="h-4 w-4 text-gray-400 mr-3" />
-            <a 
-              href={`mailto:${center.contact.email}`}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              {center.contact.email}
-            </a>
-          </div>
+          {center.contact?.email && (
+            <div className="flex items-center">
+              <Mail className="h-4 w-4 text-gray-400 mr-3" />
+              <a 
+                href={`mailto:${center.contact.email}`}
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                {center.contact.email}
+              </a>
+            </div>
+          )}
+
+          {(!center.contact?.phone && !center.contact?.email) && (
+            <p className="text-sm text-gray-500">Contact information not available</p>
+          )}
         </div>
 
         {/* Address */}
         <div className="space-y-2">
           <h3 className="font-medium text-gray-900">Address</h3>
-          <div className="text-sm text-gray-600">
-            <p>{center.address.street}</p>
-            <p>{center.address.city}, {center.address.district}</p>
-            <p>{center.address.state} - {center.address.pincode}</p>
-          </div>
-          
-          <a
-            href={getDirectionsUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-          >
-            <ExternalLink className="h-4 w-4 mr-1" />
-            Get Directions
-          </a>
-        </div>
-
-        {/* Available Services */}
-        <div className="space-y-2">
-          <h3 className="font-medium text-gray-900">Available Services</h3>
-          
-          {loading ? (
-            <div className="text-sm text-gray-500">Loading services...</div>
-          ) : availableServices.length > 0 ? (
-            <div className="space-y-2">
-              {availableServices.slice(0, 5).map((service) => (
-                <div key={service._id} className="bg-gray-50 rounded-lg p-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900">{service.name}</h4>
-                      <p className="text-xs text-gray-600 mt-1">{service.category}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-green-600">₹{service.fees}</p>
-                      <p className="text-xs text-gray-500">{service.processingTime}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              
-              {availableServices.length > 5 && (
-                <p className="text-xs text-gray-500 text-center">
-                  +{availableServices.length - 5} more services available
-                </p>
-              )}
+          {center.address ? (
+            <div className="text-sm text-gray-600">
+              {center.address.street && <p>{center.address.street}</p>}
+              <p>
+                {center.address.city && center.address.city}
+                {center.address.city && center.address.district && ', '}
+                {center.address.district && center.address.district}
+              </p>
+              <p>
+                {center.address.state && center.address.state}
+                {center.address.state && center.address.pincode && ' - '}
+                {center.address.pincode && center.address.pincode}
+              </p>
             </div>
           ) : (
-            <p className="text-sm text-gray-500">No services information available</p>
+            <p className="text-sm text-gray-500">Address not available</p>
+          )}
+          
+          {center.location?.coordinates && (
+            <a
+              href={getDirectionsUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+            >
+              <ExternalLink className="h-4 w-4 mr-1" />
+              Get Directions
+            </a>
+          )}
+        </div>
+
+        {/* Selected Service or Available Services */}
+        <div className="space-y-2">
+          {selectedService ? (
+            <>
+              <h3 className="font-medium text-gray-900">Selected Service</h3>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-blue-900">{selectedService.name}</h4>
+                    <p className="text-xs text-blue-700 mt-1">{selectedService.category}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-green-600">
+                      {selectedService.fees === 0 ? 'Free' : `₹${selectedService.fees}`}
+                    </p>
+                    <p className="text-xs text-gray-500">{selectedService.processingTime}</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="font-medium text-gray-900">Available Services</h3>
+              
+              {loading ? (
+                <div className="text-sm text-gray-500">Loading services...</div>
+              ) : availableServices.length > 0 ? (
+                <div className="space-y-2">
+                  {availableServices.slice(0, 5).map((service) => (
+                    <div key={service._id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-gray-900">{service.name}</h4>
+                          <p className="text-xs text-gray-600 mt-1">{service.category}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-green-600">₹{service.fees}</p>
+                          <p className="text-xs text-gray-500">{service.processingTime}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {availableServices.length > 5 && (
+                    <p className="text-xs text-gray-500 text-center">
+                      +{availableServices.length - 5} more services available
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No services information available</p>
+              )}
+            </>
           )}
         </div>
 
@@ -273,15 +355,17 @@ const CenterInfoPanel = ({
       <div className="border-t bg-gray-50 p-4">
         <button
           onClick={handleBookAppointment}
-          disabled={operatingStatus.status === 'closed' || availableServices.length === 0}
+          disabled={operatingStatus.status === 'closed' || (!selectedService && availableServices.length === 0)}
           className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium
                    hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500
                    disabled:bg-gray-300 disabled:cursor-not-allowed
                    transition-colors duration-200"
         >
-          {availableServices.length === 0 
-            ? 'No Services Available' 
-            : 'Book Appointment'
+          {selectedService 
+            ? `Book ${selectedService.name}` 
+            : availableServices.length === 0 
+              ? 'No Services Available' 
+              : 'Book Appointment'
           }
         </button>
         

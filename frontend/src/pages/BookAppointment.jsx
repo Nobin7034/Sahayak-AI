@@ -17,7 +17,11 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../config/api.js';
 import centerService from '../services/centerService';
+
+// Configure axios defaults
+axios.defaults.baseURL = `${API_BASE_URL}/api`;
 
 const BookAppointment = () => {
   const [searchParams] = useSearchParams();

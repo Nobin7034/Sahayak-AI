@@ -49,7 +49,7 @@ const ServiceDetails = () => {
   }
 
   const handleBookAppointment = () => {
-    navigate(`/appointments?service=${service._id}`)
+    navigate(`/centers?service=${service._id}`)
   }
 
   return (

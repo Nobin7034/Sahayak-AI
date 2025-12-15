@@ -180,13 +180,22 @@ const Services = () => {
                     )}
                   </div>
 
-                  <Link
-                    to={`/service/${service._id}`}
-                    className="w-full btn-primary flex items-center justify-center"
-                  >
-                    View Details & Apply
-                    <ArrowRight className="ml-2 w-4 h-4" />
-                  </Link>
+                  <div className="space-y-2">
+                    <Link
+                      to={`/service/${service._id}`}
+                      className="w-full btn-secondary flex items-center justify-center"
+                    >
+                      View Details
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                    </Link>
+                    <Link
+                      to={`/centers?service=${service._id}`}
+                      className="w-full btn-primary flex items-center justify-center"
+                    >
+                      Select Center & Book
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             )

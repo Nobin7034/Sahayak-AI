@@ -2,6 +2,8 @@ import express from 'express';
 import Appointment from '../models/Appointment.js';
 import Service from '../models/Service.js';
 import AkshayaCenter from '../models/AkshayaCenter.js';
+import Staff from '../models/Staff.js';
+import Notification from '../models/Notification.js';
 import { userAuth } from '../middleware/auth.js';
 import Holiday from '../models/Holiday.js';
 
@@ -137,6 +139,31 @@ router.post('/', async (req, res) => {
     });
 
     await appointment.save();
+
+    // Notify staff at the selected center
+    try {
+      const centerStaff = await Staff.findByCenter(center, true);
+      const staffNotifications = centerStaff.map(staff => ({
+        user: staff.userId._id,
+        type: 'appointment',
+        title: 'New Appointment Booked',
+        message: `New appointment for ${serviceDoc.name} on ${dateObj.toLocaleDateString()} at ${timeSlot}`,
+        meta: {
+          appointmentId: appointment._id,
+          serviceId: service,
+          centerId: center,
+          appointmentDate: dateObj,
+          timeSlot
+        }
+      }));
+
+      if (staffNotifications.length > 0) {
+        await Notification.insertMany(staffNotifications);
+      }
+    } catch (notificationError) {
+      console.error('Failed to send staff notifications:', notificationError);
+      // Don't fail the appointment creation if notifications fail
+    }
 
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate('service', 'name category fees processingTime')

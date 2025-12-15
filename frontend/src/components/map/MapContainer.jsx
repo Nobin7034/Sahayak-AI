@@ -42,7 +42,7 @@ const MapContainer = ({
   }, [userLocation]);
 
   const handleMarkerClick = (center) => {
-    if (onCenterSelect) {
+    if (onCenterSelect && center._id) {
       onCenterSelect(center._id);
     }
   };
@@ -70,7 +70,11 @@ const MapContainer = ({
         )}
         
         {/* Akshaya center markers */}
-        {centers.map((center) => (
+        {centers.filter(center => 
+          center.location && 
+          center.location.coordinates && 
+          center.location.coordinates.length === 2
+        ).map((center) => (
           <Marker
             key={center._id}
             position={[center.location.coordinates[1], center.location.coordinates[0]]}
@@ -80,16 +84,21 @@ const MapContainer = ({
           >
             <Popup>
               <div className="p-2">
-                <h3 className="font-semibold text-lg">{center.name}</h3>
+                <h3 className="font-semibold text-lg">{center.name || 'Unnamed Center'}</h3>
                 <p className="text-sm text-gray-600 mb-2">
-                  {center.address.street}, {center.address.city}
+                  {center.address?.street && `${center.address.street}, `}
+                  {center.address?.city || 'Unknown City'}
                 </p>
-                <p className="text-sm">
-                  <strong>Phone:</strong> {center.contact.phone}
-                </p>
-                <p className="text-sm">
-                  <strong>Email:</strong> {center.contact.email}
-                </p>
+                {center.contact?.phone && (
+                  <p className="text-sm">
+                    <strong>Phone:</strong> {center.contact.phone}
+                  </p>
+                )}
+                {center.contact?.email && (
+                  <p className="text-sm">
+                    <strong>Email:</strong> {center.contact.email}
+                  </p>
+                )}
                 <div className="mt-2">
                   <span className={`px-2 py-1 rounded text-xs ${
                     center.status === 'active' 
