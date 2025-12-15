@@ -3,7 +3,6 @@ import { useParams, Navigate, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Clock, IndianRupee, FileText, Image, CheckCircle, Calendar, Loader2, Eye, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
-import MLScheduling from '../components/MLScheduling'
 
 const ServiceDetails = () => {
   const { id } = useParams()
@@ -293,18 +292,6 @@ const ServiceDetails = () => {
                   </p>
                 </div>
               </div>
-            </div>
-
-            {/* AI Scheduling Assistant */}
-            <div className="mt-6">
-              <MLScheduling 
-                serviceId={service._id} 
-                serviceName={service.name}
-                onTimeSlotSelect={(timeSlot) => {
-                  console.log('Selected time slot:', timeSlot);
-                  // You can add logic here to pre-fill the appointment form
-                }}
-              />
             </div>
           </div>
         </div>

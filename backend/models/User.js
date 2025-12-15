@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String },
 
   phone: { type: String },
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  role: { type: String, enum: ['user', 'staff', 'admin'], default: 'user' },
   lastLogin: { type: Date },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now }

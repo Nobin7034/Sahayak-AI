@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { t } from '../data/translations'
 import axios from 'axios'
-import MLRecommendations from '../components/MLRecommendations'
 import { 
   Calendar, 
   FileText, 
@@ -499,9 +498,6 @@ const Dashboard = () => {
                 </Link>
               </div>
             </div>
-
-            {/* AI Recommendations */}
-            <MLRecommendations userId={user?._id} limit={3} />
 
             {/* Important Notice */}
             <div className="card p-6 bg-yellow-50 border-yellow-200">

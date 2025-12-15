@@ -22,7 +22,15 @@ import AdminServices from './pages/admin/AdminServices'
 import AdminNews from './pages/admin/AdminNews'
 import AdminAppointments from './pages/admin/AdminAppointments'
 import AdminSettings from './pages/admin/AdminSettings'
-import MLAdminDashboard from './components/MLAdminDashboard'
+import AdminCenters from './pages/admin/AdminCenters'
+import CenterFinder from './pages/CenterFinder'
+import BookAppointment from './pages/BookAppointment'
+import StaffLogin from './pages/staff/StaffLogin'
+import StaffDashboard from './pages/staff/StaffDashboard'
+import StaffAppointments from './pages/staff/StaffAppointments'
+import StaffServices from './pages/staff/StaffServices'
+import StaffAnalytics from './pages/staff/StaffAnalytics'
+import StaffLayout from './components/StaffLayout'
 
 function App() {
   return (
@@ -76,6 +84,15 @@ function App() {
               </div>
             </ProtectedRoute>
           } />
+          <Route path="/appointments/book" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <BookAppointment />
+                <Footer />
+              </div>
+            </ProtectedRoute>
+          } />
           <Route path="/news" element={
             <ProtectedRoute>
               <div className="min-h-screen bg-gray-50">
@@ -108,6 +125,15 @@ function App() {
               <div className="min-h-screen bg-gray-50">
                 <Navbar />
                 <Profile />
+                <Footer />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/centers" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <CenterFinder />
                 <Footer />
               </div>
             </ProtectedRoute>
@@ -156,12 +182,47 @@ function App() {
               </AdminLayout>
             </AdminProtectedRoute>
           } />
-          <Route path="/admin/ml" element={
+          <Route path="/admin/centers" element={
             <AdminProtectedRoute>
               <AdminLayout>
-                <MLAdminDashboard />
+                <AdminCenters />
               </AdminLayout>
             </AdminProtectedRoute>
+          } />
+
+          {/* Staff Routes */}
+          <Route path="/staff/login" element={
+            <div className="min-h-screen bg-gray-50">
+              <StaffLogin />
+            </div>
+          } />
+          <Route path="/staff/dashboard" element={
+            <ProtectedRoute>
+              <StaffLayout>
+                <StaffDashboard />
+              </StaffLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/appointments" element={
+            <ProtectedRoute>
+              <StaffLayout>
+                <StaffAppointments />
+              </StaffLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/services" element={
+            <ProtectedRoute>
+              <StaffLayout>
+                <StaffServices />
+              </StaffLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/analytics" element={
+            <ProtectedRoute>
+              <StaffLayout>
+                <StaffAnalytics />
+              </StaffLayout>
+            </ProtectedRoute>
           } />
         </Routes>
       </Router>

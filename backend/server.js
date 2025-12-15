@@ -4,28 +4,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
-import mlService from './services/mlService.js';
 
 dotenv.config();
 
-// Connect to MongoDB and initialize ML models
-connectDB().then(async () => {
-  console.log('🤖 Initializing ML models...');
-  
-  // Auto-train ML models on startup in the background
-  setTimeout(async () => {
-    try {
-      const results = await mlService.retrainAllModels();
-      console.log('📊 ML Model Training Results:');
-      console.log('   - KNN:', results.knn ? '✅ Trained' : '⚠️ Pending (insufficient data)');
-      console.log('   - Bayesian:', results.bayes ? '✅ Trained' : '⚠️ Pending (insufficient data)');
-      console.log('   - Decision Tree:', results.decisionTree ? '✅ Trained' : '⚠️ Pending (insufficient data)');
-      console.log('💡 Models will auto-train when users access features if not yet trained.\n');
-    } catch (error) {
-      console.error('⚠️ Initial ML training failed, models will train on first use:', error.message);
-    }
-  }, 2000); // Wait 2 seconds after DB connection before training
-});
+// Connect to MongoDB
+connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -54,7 +37,9 @@ import newsRoutes from './routes/newsRoutes.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
-import mlRoutes from './routes/mlRoutes.js';
+import centerRoutes from './routes/centers.js';
+import geocodeRoutes from './routes/geocode.js';
+import staffRoutes from './routes/staffRoutes.js';
 
 // Base route (dev info). In production we serve the frontend build instead.
 app.get('/', (req, res) => {
@@ -71,7 +56,9 @@ app.get('/', (req, res) => {
       services: '/api/services',
       news: '/api/news',
       appointments: '/api/appointments',
-      ml: '/api/ml',
+      centers: '/api/centers',
+      geocode: '/api/geocode',
+      staff: '/api/staff',
       test: '/api/test',
       uploads: '/uploads/*'
     }
@@ -87,7 +74,9 @@ app.use('/api/news', newsRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/ml', mlRoutes);
+app.use('/api/centers', centerRoutes);
+app.use('/api/geocode', geocodeRoutes);
+app.use('/api/staff', staffRoutes);
 
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {

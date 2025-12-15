@@ -1,6 +1,6 @@
 # Sahayak AI
 
-A full-stack AI-powered service management platform with intelligent recommendations, appointment scheduling, and comprehensive admin dashboard.
+A full-stack service management platform with appointment scheduling and comprehensive admin dashboard.
 
 ## 🚀 Features
 
@@ -10,11 +10,6 @@ A full-stack AI-powered service management platform with intelligent recommendat
   - Firebase authentication
   - Google OAuth integration
   - User registration and login
-
-- **AI-Powered Services**
-  - ML-based service recommendations (KNN, Naive Bayes, Decision Tree)
-  - Intelligent appointment scheduling
-  - Personalized service suggestions
 
 - **Service Management**
   - Browse available services
@@ -43,11 +38,6 @@ A full-stack AI-powered service management platform with intelligent recommendat
   - News management
   - Appointment management
   - System settings
-
-- **ML Model Management**
-  - ML model training and monitoring
-  - Model performance analytics
-  - Recommendation system administration
 
 - **Content Management**
   - Create and manage services
@@ -78,11 +68,6 @@ A full-stack AI-powered service management platform with intelligent recommendat
 - **Razorpay** - Payment integration
 - **Nodemailer** - Email service
 - **RSS Parser** - RSS feed parsing
-
-### Machine Learning
-- **ml-knn** - K-Nearest Neighbors algorithm
-- **ml-naivebayes** - Naive Bayes classifier
-- **ml-cart** - Decision Tree algorithm
 
 ## 📋 Prerequisites
 
@@ -195,7 +180,7 @@ sahayak_ai/
 │   ├── models/          # MongoDB models
 │   ├── routes/          # API routes
 │   ├── scripts/         # Utility scripts (seeding, testing)
-│   ├── services/        # Business logic and ML services
+│   ├── services/        # Business logic
 │   ├── uploads/         # Uploaded files (avatars, news images)
 │   └── server.js        # Express server entry point
 │
@@ -256,11 +241,6 @@ npm run test:report
 - `PUT /api/appointments/:id` - Update appointment
 - `DELETE /api/appointments/:id` - Cancel appointment
 
-### ML Services
-- `POST /api/ml/recommend` - Get service recommendations
-- `POST /api/ml/schedule` - Get optimal scheduling suggestions
-- `GET /api/ml/stats` - Get ML model statistics (Admin)
-
 ### News
 - `GET /api/news` - Get all news
 - `GET /api/news/:id` - Get news details
@@ -282,16 +262,6 @@ npm run test:report
 - Input validation
 - File upload security
 
-## 🤖 Machine Learning
-
-The application uses three ML algorithms for intelligent recommendations:
-
-1. **K-Nearest Neighbors (KNN)** - Service recommendations based on similar users
-2. **Naive Bayes** - Probabilistic service recommendations
-3. **Decision Tree** - Rule-based service recommendations
-
-Models are automatically trained on startup and retrained periodically based on user interactions.
-
 ## 📄 License
 
 This project is private and proprietary.
@@ -307,4 +277,5 @@ For issues and questions, please create an issue in the repository or contact th
 ---
 
 **Note**: Make sure to configure all environment variables before running the application. Refer to the setup guides in the `frontend` directory for Firebase and Google OAuth configuration.
+
 

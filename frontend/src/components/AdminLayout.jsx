@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   Bell,
-  Brain
+  Brain,
+  MapPin
 } from 'lucide-react'
 
 const AdminLayout = ({ children }) => {
@@ -24,6 +25,7 @@ const AdminLayout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Users', href: '/admin/users', icon: Users },
+    { name: 'Centers', href: '/admin/centers', icon: MapPin },
     { name: 'Services', href: '/admin/services', icon: FileText },
     { name: 'Appointments', href: '/admin/appointments', icon: Calendar },
     { name: 'News', href: '/admin/news', icon: Newspaper },

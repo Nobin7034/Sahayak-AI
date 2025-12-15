@@ -11,6 +11,11 @@ const appointmentSchema = new mongoose.Schema({
     ref: 'Service',
     required: true
   },
+  center: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AkshayaCenter',
+    required: true
+  },
   appointmentDate: {
     type: Date,
     required: true
@@ -57,6 +62,12 @@ const appointmentSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// Create indexes for efficient staff queries
+appointmentSchema.index({ center: 1, appointmentDate: 1 });
+appointmentSchema.index({ center: 1, status: 1 });
+appointmentSchema.index({ center: 1, appointmentDate: 1, status: 1 });
+appointmentSchema.index({ user: 1, appointmentDate: -1 });
 
 // Update the updatedAt field before saving
 appointmentSchema.pre('save', function(next) {

@@ -1,6 +1,7 @@
 import express from 'express';
 import Appointment from '../models/Appointment.js';
 import Service from '../models/Service.js';
+import AkshayaCenter from '../models/AkshayaCenter.js';
 import { userAuth } from '../middleware/auth.js';
 import Holiday from '../models/Holiday.js';
 
@@ -13,7 +14,8 @@ router.use(userAuth);
 router.get('/', async (req, res) => {
   try {
     const appointments = await Appointment.find({ user: req.user.userId })
-      .populate('service', 'name category fee processingTime')
+      .populate('service', 'name category fees processingTime')
+      .populate('center', 'name address contact')
       .sort({ createdAt: -1 });
 
     // Add canEdit flag to each appointment
@@ -47,14 +49,31 @@ router.get('/', async (req, res) => {
 // Create new appointment
 router.post('/', async (req, res) => {
   try {
-    const { serviceId, appointmentDate, timeSlot, notes } = req.body;
+    const { service, center, appointmentDate, timeSlot, notes, paymentId } = req.body;
 
     // Verify service exists and is active
-    const service = await Service.findById(serviceId);
-    if (!service || !service.isActive) {
+    const serviceDoc = await Service.findById(service);
+    if (!serviceDoc || !serviceDoc.isActive) {
       return res.status(404).json({
         success: false,
         message: 'Service not found or inactive'
+      });
+    }
+
+    // Verify center exists and is active
+    const centerDoc = await AkshayaCenter.findById(center);
+    if (!centerDoc || centerDoc.status !== 'active') {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found or inactive'
+      });
+    }
+
+    // Verify center offers the selected service
+    if (!centerDoc.services.includes(service)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected service is not available at this center'
       });
     }
 
@@ -83,8 +102,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, message: `Bookings are not available on this holiday: ${manualHoliday.reason || 'Holiday'}.` });
     }
 
-    // Check if appointment slot is already taken (globally across all services)
+    // Check if appointment slot is already taken at the specific center
     const existingAppointment = await Appointment.findOne({
+      center: center,
       appointmentDate: dateObj,
       timeSlot,
       status: { $in: ['pending', 'confirmed'] }
@@ -99,18 +119,28 @@ router.post('/', async (req, res) => {
 
     const appointment = new Appointment({
       user: req.user.userId,
-      service: serviceId,
+      service: service,
+      center: center,
       appointmentDate: dateObj,
       timeSlot,
       notes,
       // Auto-approve when slot free
-      status: 'confirmed'
+      status: 'confirmed',
+      // Set payment info if provided
+      ...(paymentId && {
+        payment: {
+          status: 'paid',
+          amount: serviceDoc.fees,
+          paymentId: paymentId
+        }
+      })
     });
 
     await appointment.save();
 
     const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate('service', 'name category fee processingTime');
+      .populate('service', 'name category fees processingTime')
+      .populate('center', 'name address contact');
 
     res.status(201).json({
       success: true,
@@ -419,10 +449,11 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Get available time slots for a service on a specific date
+// Get available time slots for a service on a specific date at a specific center
 router.get('/slots/:serviceId/:date', async (req, res) => {
   try {
     const { serviceId, date } = req.params;
+    const { center } = req.query;
     const asDate = new Date(date);
     // Sundays
     if (asDate.getDay() === 0) {
@@ -453,11 +484,17 @@ router.get('/slots/:serviceId/:date', async (req, res) => {
       '04:00 PM', '04:30 PM', '05:00 PM'
     ];
 
-    // Get booked slots for the date (globally across all services)
-    const bookedAppointments = await Appointment.find({
+    // Get booked slots for the date at the specific center (if provided)
+    const query = {
       appointmentDate: asDate,
       status: { $in: ['pending', 'confirmed'] }
-    }).select('timeSlot');
+    };
+    
+    if (center) {
+      query.center = center;
+    }
+    
+    const bookedAppointments = await Appointment.find(query).select('timeSlot');
 
     const bookedSlots = bookedAppointments.map(apt => apt.timeSlot);
     const availableSlots = allTimeSlots.filter(slot => !bookedSlots.includes(slot));

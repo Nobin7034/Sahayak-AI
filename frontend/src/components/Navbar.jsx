@@ -88,6 +88,9 @@ const Navbar = ({ showPublic = false }) => {
                 <Link to="/services" className="text-gray-700 hover:text-primary transition-colors">
                   Services
                 </Link>
+                <Link to="/centers" className="text-gray-700 hover:text-primary transition-colors">
+                  Find Centers
+                </Link>
                 <Link to="/appointments" className="text-gray-700 hover:text-primary transition-colors">
                   Appointments
                 </Link>
@@ -209,6 +212,13 @@ const Navbar = ({ showPublic = false }) => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Services
+                  </Link>
+                  <Link
+                    to="/centers"
+                    className="block px-3 py-2 text-gray-700 hover:text-primary transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Find Centers
                   </Link>
                   <Link
                     to="/appointments"
