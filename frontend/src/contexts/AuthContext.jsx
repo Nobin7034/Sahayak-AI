@@ -259,31 +259,54 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      // Combine firstName and lastName into name for backend
-      const registrationData = {
-        ...userData,
-        name: `${userData.firstName} ${userData.lastName}`.trim()
+      let registrationData = { ...userData }
+      let endpoint = '/auth/register'
+      
+      if (userData.accountType === 'staff') {
+        // For staff registration, use separate endpoint and clean data
+        endpoint = '/auth/staff-register'
+        registrationData = {
+          password: userData.password,
+          centerName: userData.centerName,
+          centerAddress: userData.centerAddress,
+          centerContact: userData.centerContact,
+          centerLocation: userData.centerLocation
+        }
+      } else if (userData.accountType === 'user' && userData.firstName && userData.lastName) {
+        // For user registration, combine firstName and lastName into name
+        registrationData.name = `${userData.firstName} ${userData.lastName}`.trim()
+        // Remove firstName and lastName as backend doesn't expect them
+        delete registrationData.firstName
+        delete registrationData.lastName
       }
       
-      // Remove firstName and lastName as backend doesn't expect them
-      delete registrationData.firstName
-      delete registrationData.lastName
+
       
-      console.log('Registration data being sent:', registrationData)
-      
-      const response = await axios.post('/auth/register', registrationData)
+      const response = await axios.post(endpoint, registrationData)
 
       if (response.data.success) {
-        const { token, user } = response.data
+        const { token, user, requiresApproval } = response.data
         
-        // Store token and user data
-        localStorage.setItem('token', token)
-        localStorage.setItem('user', JSON.stringify(user))
+        // For staff registration requiring approval, don't store token/user yet
+        if (requiresApproval) {
+          return { 
+            success: true, 
+            requiresApproval: true,
+            message: response.data.message 
+          }
+        }
         
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        // For regular user registration, store token and user data
+        if (token && user) {
+          localStorage.setItem('token', token)
+          localStorage.setItem('user', JSON.stringify(user))
+          
+          // Set axios default header
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+          
+          setUser(user)
+        }
         
-        setUser(user)
         return { success: true }
       } else {
         return { success: false, error: response.data.message }

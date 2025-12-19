@@ -48,7 +48,7 @@ const MapContainer = ({
   };
 
   return (
-    <div className="w-full h-96 md:h-[500px] rounded-lg overflow-hidden shadow-lg">
+    <div className="w-full h-full rounded-lg overflow-hidden shadow-lg">
       <LeafletMapContainer
         center={mapCenter}
         zoom={zoom}

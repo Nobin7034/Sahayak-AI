@@ -229,21 +229,17 @@ const AdminCenters = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Akshaya Centers</h1>
           <p className="text-gray-600">Manage Akshaya service centers</p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Center
-        </button>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            <strong>Note:</strong> Centers are now registered by staff during their registration process. 
+            Use the Staff Management section to approve pending staff applications and activate their centers.
+          </p>
+        </div>
       </div>
 
       {/* Filters */}

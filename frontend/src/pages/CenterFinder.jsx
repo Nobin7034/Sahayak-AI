@@ -361,23 +361,44 @@ const CenterFinder = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {viewMode === 'map' ? (
           /* Map View */
-          <div className="relative">
-            <MapContainer
-              centers={filteredCenters}
-              userLocation={userLocation}
-              selectedCenter={selectedCenter?._id}
-              onCenterSelect={handleCenterSelect}
-            />
+          <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-280px)] min-h-[500px]">
+            {/* Map Container */}
+            <div className={`${selectedCenter ? 'lg:w-2/3' : 'w-full'} transition-all duration-300 h-full`}>
+              <MapContainer
+                centers={filteredCenters}
+                userLocation={userLocation}
+                selectedCenter={selectedCenter?._id}
+                onCenterSelect={handleCenterSelect}
+              />
+            </div>
             
-            {/* Center Info Panel */}
-            <CenterInfoPanel
-              center={selectedCenter}
-              distance={selectedCenter?.distance}
-              onBookAppointment={handleBookAppointment}
-              onClose={handleClosePanel}
-              userLocation={userLocation}
-              selectedService={selectedService}
-            />
+            {/* Center Info Panel - Desktop Side Panel */}
+            {selectedCenter && (
+              <div className="hidden lg:block lg:w-1/3">
+                <CenterInfoPanel
+                  center={selectedCenter}
+                  distance={selectedCenter?.distance}
+                  onBookAppointment={handleBookAppointment}
+                  onClose={handleClosePanel}
+                  userLocation={userLocation}
+                  selectedService={selectedService}
+                  isDesktopSidePanel={true}
+                />
+              </div>
+            )}
+            
+            {/* Mobile Overlay Panel */}
+            <div className="lg:hidden">
+              <CenterInfoPanel
+                center={selectedCenter}
+                distance={selectedCenter?.distance}
+                onBookAppointment={handleBookAppointment}
+                onClose={handleClosePanel}
+                userLocation={userLocation}
+                selectedService={selectedService}
+                isDesktopSidePanel={false}
+              />
+            </div>
           </div>
         ) : (
           /* List View */

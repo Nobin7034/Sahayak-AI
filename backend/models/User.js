@@ -20,6 +20,29 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'staff', 'admin'], default: 'user' },
   lastLogin: { type: Date },
   isActive: { type: Boolean, default: true },
+  
+  // Staff approval fields
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: function() {
+      return this.role === 'staff' ? 'pending' : 'approved';
+    }
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  reviewedAt: {
+    type: Date,
+    default: null
+  },
+  reviewNotes: {
+    type: String,
+    default: ''
+  },
+  
   createdAt: { type: Date, default: Date.now }
 });
 

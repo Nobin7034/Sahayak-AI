@@ -104,7 +104,14 @@ const akshayaCenterSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['active', 'inactive', 'maintenance'],
-    default: 'active'
+    default: 'inactive' // Default to inactive until staff is approved
+  },
+  
+  // Staff reference - the staff member who registered this center
+  registeredBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   capacity: {
     maxAppointmentsPerDay: {

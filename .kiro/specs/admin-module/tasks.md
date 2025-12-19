@@ -22,12 +22,12 @@
   - **Property 2: Input validation consistency**
   - **Validates: Requirements 1.2, 2.2, 3.2, 3.5**
 
-- [ ] 3. Build center management system
-  - Create AdminController methods for center CRUD operations
-  - Implement center creation with automatic geocoding integration
-  - Build center status management (active, inactive, maintenance)
-  - Add center capacity validation and operational hours management
-  - Create center deactivation workflow with appointment handling
+- [ ] 3. Build center monitoring and oversight system
+  - Create AdminController methods for center viewing and monitoring operations
+  - Implement center status monitoring and performance metrics display
+  - Build center maintenance status management for administrative interventions
+  - Add center performance analytics and reporting capabilities
+  - Create communication tools for coordinating with center staff
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
 - [ ]* 3.1 Write property test for geocoding automation
@@ -38,13 +38,13 @@
   - **Property 3: Cascading update consistency**
   - **Validates: Requirements 1.4, 2.4, 3.4**
 
-- [ ] 4. Implement staff management and assignment system
-  - Create staff assignment and transfer functionality
+- [ ] 4. Implement staff approval and management system
+  - Create staff registration review and approval functionality
   - Build staff permission management with audit logging
-  - Implement center capacity validation for staff assignments
-  - Add staff deactivation with historical data preservation
-  - Create staff performance tracking and reporting
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+  - Implement staff account activation/deactivation workflows
+  - Add staff performance tracking and reporting
+  - Create staff reassignment capabilities between centers
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 11.1, 11.2, 11.3, 11.4, 11.5_
 
 - [ ]* 4.1 Write property test for audit trail completeness
   - **Property 4: Audit trail completeness**
@@ -53,6 +53,10 @@
 - [ ]* 4.2 Write property test for status management consistency
   - **Property 6: Status management consistency**
   - **Validates: Requirements 1.5, 2.5**
+
+- [ ]* 4.3 Write property test for staff registration approval workflow
+  - **Property 31: Staff registration approval workflow**
+  - **Validates: Requirements 11.1, 11.3**
 
 - [ ] 5. Build global service management system
   - Create service CRUD operations with global distribution
@@ -216,11 +220,11 @@
 
 - [ ] 13. Create admin dashboard and user interface
   - Build main admin dashboard with real-time metrics and quick actions
-  - Create responsive admin interface components for all management functions
-  - Implement data visualization components for analytics and reporting
+  - Create staff registration approval interface with center details review
+  - Implement center monitoring and oversight interface components
   - Add admin navigation and role-based interface customization
   - Create admin help system and documentation integration
-  - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1_
+  - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1, 11.1, 11.2_
 
 - [ ] 14. Implement admin API routes and middleware
   - Create comprehensive admin API endpoints for all management functions

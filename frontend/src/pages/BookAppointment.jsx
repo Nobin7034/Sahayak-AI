@@ -17,11 +17,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE_URL } from '../config/api.js';
 import centerService from '../services/centerService';
-
-// Configure axios defaults
-axios.defaults.baseURL = `${API_BASE_URL}/api`;
 
 const BookAppointment = () => {
   const [searchParams] = useSearchParams();
@@ -84,7 +80,7 @@ const BookAppointment = () => {
 
   const loadRazorpayConfig = async () => {
     try {
-      const res = await axios.get('/api/payments/config');
+      const res = await axios.get('/payments/config');
       if (res.data?.success) {
         setRazorpayKey(res.data.data.keyId);
       }
@@ -95,7 +91,7 @@ const BookAppointment = () => {
 
   const loadServiceDetails = async () => {
     try {
-      const response = await axios.get(`/api/services/${formData.serviceId}`);
+      const response = await axios.get(`/services/${formData.serviceId}`);
       if (response.data.success) {
         setService(response.data.data);
       }
@@ -132,7 +128,7 @@ const BookAppointment = () => {
   const fetchAvailableSlots = async () => {
     try {
       const response = await axios.get(
-        `/api/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
+        `/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
       );
       if (response.data.success) {
         setAvailableSlots(response.data.data.availableSlots || []);
@@ -146,7 +142,7 @@ const BookAppointment = () => {
   const checkHolidayInfo = async () => {
     try {
       const response = await axios.get(
-        `/api/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
+        `/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
       );
       if (response.data?.success) {
         setHolidayInfo({
@@ -209,7 +205,7 @@ const BookAppointment = () => {
     setIsPaying(true);
     
     // Create payment order
-    const orderRes = await axios.post('/api/payments/create-order', {
+    const orderRes = await axios.post('/payments/create-order', {
       serviceId: formData.serviceId,
       centerId: formData.centerId
     });
@@ -273,7 +269,7 @@ const BookAppointment = () => {
   };
 
   const verifyPaymentAndCreateAppointment = async (paymentResponse) => {
-    const verifyRes = await axios.post('/api/payments/verify', {
+    const verifyRes = await axios.post('/payments/verify', {
       razorpay_order_id: paymentResponse.razorpay_order_id,
       razorpay_payment_id: paymentResponse.razorpay_payment_id,
       razorpay_signature: paymentResponse.razorpay_signature
@@ -296,7 +292,7 @@ const BookAppointment = () => {
       paymentId
     };
 
-    const response = await axios.post('/api/appointments', appointmentData);
+    const response = await axios.post('/appointments', appointmentData);
     
     if (response.data.success) {
       setSuccess('Appointment booked successfully!');

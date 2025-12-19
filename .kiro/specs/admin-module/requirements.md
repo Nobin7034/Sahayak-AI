@@ -19,27 +19,27 @@ The Admin Module provides comprehensive administrative control over the entire S
 
 ### Requirement 1
 
-**User Story:** As a system administrator, I want to manage all Akshaya centers on the platform, so that I can maintain accurate location data and operational status across the network.
+**User Story:** As a system administrator, I want to view and monitor all Akshaya centers on the platform, so that I can maintain oversight of location data and operational status across the network.
 
 #### Acceptance Criteria
 
 1. WHEN an administrator accesses center management, THE Sahayak_System SHALL display all centers with their current status, location, and operational details
-2. WHEN creating a new center, THE Sahayak_System SHALL require complete address information and automatically geocode the location using mapping services
-3. WHEN updating center information, THE Sahayak_System SHALL validate address changes and update geocoding coordinates accordingly
-4. WHEN deactivating a center, THE Sahayak_System SHALL handle existing appointments gracefully and notify affected users and staff
-5. WHERE centers have operational issues, THE Sahayak_System SHALL allow administrators to set maintenance status and provide public notices
+2. WHEN viewing center information, THE Sahayak_System SHALL show center details including address, contact information, and associated staff members
+3. WHEN monitoring center status, THE Sahayak_System SHALL display real-time operational status and performance metrics for each center
+4. WHEN centers require administrative intervention, THE Sahayak_System SHALL allow administrators to set maintenance status and provide public notices
+5. WHERE centers have operational issues, THE Sahayak_System SHALL provide tools for administrators to communicate with center staff and coordinate resolution
 
 ### Requirement 2
 
-**User Story:** As a system administrator, I want to manage staff assignments and permissions across all centers, so that I can ensure proper staffing and access control throughout the network.
+**User Story:** As a system administrator, I want to manage staff account approvals and permissions across all centers, so that I can ensure proper access control and staff oversight throughout the network.
 
 #### Acceptance Criteria
 
-1. WHEN viewing staff management, THE Sahayak_System SHALL display all staff members with their current center assignments and permission levels
-2. WHEN assigning staff to centers, THE Sahayak_System SHALL validate center capacity and prevent conflicts with existing assignments
-3. WHEN updating staff permissions, THE Sahayak_System SHALL apply changes immediately and log all permission modifications for audit purposes
-4. WHEN transferring staff between centers, THE Sahayak_System SHALL handle the transition smoothly and update all related appointments and responsibilities
-5. WHERE staff members are inactive, THE Sahayak_System SHALL allow administrators to deactivate accounts while preserving historical data
+1. WHEN viewing staff management, THE Sahayak_System SHALL display all staff members including pending registrations with their center details and current status
+2. WHEN reviewing staff registrations, THE Sahayak_System SHALL provide complete information about the staff member and their associated Akshaya center for approval decisions
+3. WHEN approving staff accounts, THE Sahayak_System SHALL activate both the staff account and their associated Akshaya center simultaneously
+4. WHEN updating staff permissions, THE Sahayak_System SHALL apply changes immediately and log all permission modifications for audit purposes
+5. WHERE staff accounts require action, THE Sahayak_System SHALL allow administrators to approve, reject, activate, deactivate, or reassign staff members while preserving historical data
 
 ### Requirement 3
 
@@ -136,3 +136,15 @@ The Admin Module provides comprehensive administrative control over the entire S
 3. WHEN updating integration settings, THE Sahayak_System SHALL validate configurations and test connections before applying changes
 4. WHEN external services fail, THE Sahayak_System SHALL provide fallback mechanisms and alert administrators about service disruptions
 5. WHERE new integrations are required, THE Sahayak_System SHALL provide standardized integration frameworks and documentation for rapid deployment
+
+### Requirement 11
+
+**User Story:** As a system administrator, I want to oversee the staff-driven center registration process, so that I can ensure quality control and proper validation of new Akshaya centers joining the network.
+
+#### Acceptance Criteria
+
+1. WHEN staff members register with center details, THE Sahayak_System SHALL create inactive staff accounts and associated center records pending administrative approval
+2. WHEN reviewing staff registrations, THE Sahayak_System SHALL display complete center information including name, address, contact details, and geographic location for validation
+3. WHEN approving staff registrations, THE Sahayak_System SHALL activate the staff account and make the associated Akshaya center visible and available to users for service selection
+4. WHEN rejecting staff registrations, THE Sahayak_System SHALL provide feedback mechanisms and allow resubmission with corrections
+5. WHERE staff registration data requires modification, THE Sahayak_System SHALL allow administrators to request corrections before final approval

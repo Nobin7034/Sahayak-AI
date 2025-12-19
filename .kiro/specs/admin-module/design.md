@@ -2,9 +2,15 @@
 
 ## Overview
 
-The Admin Module serves as the central command center for the Sahayak AI platform, providing system administrators with comprehensive control over all aspects of the system. This module integrates with existing user and staff modules while extending functionality to provide global oversight, analytics, and configuration management.
+The Admin Module serves as the central command center for the Sahayak AI platform, providing system administrators with oversight and management capabilities across the entire system. This module focuses on staff account management, system monitoring, and platform-wide configuration rather than direct center creation.
 
-The design follows a hierarchical permission model where system administrators have elevated privileges beyond regular staff members, enabling them to manage multiple centers, configure system-wide settings, and access global analytics across the entire platform.
+The design follows a staff-driven center registration model where Akshaya centers are registered by staff members during their registration process, and administrators serve as approvers and overseers. System administrators have elevated privileges for managing staff approvals, configuring system-wide settings, and accessing global analytics across the entire platform.
+
+Key workflow changes:
+- **Staff-Driven Registration**: Staff members register their own Akshaya centers during account creation
+- **Admin Approval Process**: Administrators review and approve staff registrations, which activates both the staff account and associated center
+- **Monitoring Focus**: Administrators monitor and oversee centers rather than directly creating or managing them
+- **Quality Control**: Administrative oversight ensures proper validation and quality control of new centers joining the network
 
 ## Architecture
 
@@ -40,17 +46,20 @@ The admin module follows a layered architecture pattern:
 #### AdminController
 ```javascript
 class AdminController {
-  // Center management operations
+  // Center monitoring operations (read-only)
   async getAllCenters(filters, pagination)
-  async createCenter(centerData)
-  async updateCenter(centerId, updates)
-  async deactivateCenter(centerId, reason)
+  async getCenterDetails(centerId)
+  async getCenterPerformanceMetrics(centerId, timeRange)
+  async setCenterMaintenanceStatus(centerId, status, reason)
   
   // Staff management operations
   async getAllStaff(filters, pagination)
-  async assignStaffToCenter(staffId, centerId)
+  async getPendingStaffRegistrations()
+  async approveStaffRegistration(staffId, approvalData)
+  async rejectStaffRegistration(staffId, reason)
   async updateStaffPermissions(staffId, permissions)
-  async transferStaff(staffId, fromCenterId, toCenterId)
+  async deactivateStaff(staffId, reason)
+  async reactivateStaff(staffId)
   
   // Service management operations
   async getGlobalServices()
@@ -348,6 +357,10 @@ After analyzing all acceptance criteria, several properties can be consolidated 
 **Property 30: Security flagging accuracy**
 *For any* suspicious activity detection, the system should accurately flag accounts for review and provide appropriate security analysis tools
 **Validates: Requirements 4.5**
+
+**Property 31: Staff registration approval workflow**
+*For any* staff registration with center details, when an administrator approves the registration, both the staff account and associated Akshaya center should be activated simultaneously and become available to users
+**Validates: Requirements 11.1, 11.3**
 
 ## Error Handling
 
