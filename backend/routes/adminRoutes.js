@@ -146,9 +146,9 @@ router.get('/users', async (req, res) => {
     const skip = (page - 1) * limit;
     const roleFilter = req.query.role; // Optional filter by role
 
-    // Build query - show all users (both admin and user roles)
+    // Build query - show all users (user, staff, and admin roles)
     let query = {};
-    if (roleFilter && ['user', 'admin'].includes(roleFilter)) {
+    if (roleFilter && ['user', 'staff', 'admin'].includes(roleFilter)) {
       query.role = roleFilter;
     }
 
