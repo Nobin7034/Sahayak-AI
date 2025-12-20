@@ -115,7 +115,7 @@ const Register = () => {
       case "centerContact.phone":
         if (formData.accountType === 'staff') {
           if (!value.trim()) return "Center phone is required";
-          if (!/^\+91[0-9]{10}$/.test(value)) return "Enter a valid phone number (+919876543210)";
+          if (!/^[6-9][0-9]{9}$/.test(value)) return "Enter a valid 10-digit phone number starting with 6, 7, 8, or 9";
         }
         break;
       case "centerContact.email":
@@ -869,8 +869,9 @@ const Register = () => {
                             name="centerContact.phone"
                             value={formData.centerContact.phone}
                             onChange={handleChange}
-                            placeholder="+919876543210"
-                            pattern="^\+91[0-9]{10}$"
+                            placeholder="9876543210"
+                            pattern="^[6-9][0-9]{9}$"
+                            maxLength="10"
                             className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
                               errors['centerContact.phone'] ? "border-red-500" : "border-gray-300"
                             }`}
@@ -880,6 +881,9 @@ const Register = () => {
                         {errors['centerContact.phone'] && (
                           <p className="text-red-500 text-sm mt-1">{errors['centerContact.phone']}</p>
                         )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Enter 10-digit mobile number (e.g., 9876543210)
+                        </p>
                       </div>
 
                       {/* Step Navigation */}

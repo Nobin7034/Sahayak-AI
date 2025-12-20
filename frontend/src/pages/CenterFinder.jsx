@@ -358,12 +358,12 @@ const CenterFinder = () => {
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="flex-1">
         {viewMode === 'map' ? (
           /* Map View */
-          <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-280px)] min-h-[500px]">
+          <div className="flex h-[calc(100vh-280px)] min-h-[600px]">
             {/* Map Container */}
-            <div className={`${selectedCenter ? 'lg:w-2/3' : 'w-full'} transition-all duration-300 h-full`}>
+            <div className={`transition-all duration-300 ${selectedCenter ? 'w-2/3' : 'w-full'}`}>
               <MapContainer
                 centers={filteredCenters}
                 userLocation={userLocation}
@@ -372,9 +372,9 @@ const CenterFinder = () => {
               />
             </div>
             
-            {/* Center Info Panel - Desktop Side Panel */}
+            {/* Center Info Panel - Right Side */}
             {selectedCenter && (
-              <div className="hidden lg:block lg:w-1/3">
+              <div className="w-1/3 border-l bg-white">
                 <CenterInfoPanel
                   center={selectedCenter}
                   distance={selectedCenter?.distance}
@@ -386,23 +386,11 @@ const CenterFinder = () => {
                 />
               </div>
             )}
-            
-            {/* Mobile Overlay Panel */}
-            <div className="lg:hidden">
-              <CenterInfoPanel
-                center={selectedCenter}
-                distance={selectedCenter?.distance}
-                onBookAppointment={handleBookAppointment}
-                onClose={handleClosePanel}
-                userLocation={userLocation}
-                selectedService={selectedService}
-                isDesktopSidePanel={false}
-              />
-            </div>
           </div>
         ) : (
           /* List View */
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredCenters.map((center) => (
               <div
                 key={center._id}
@@ -465,6 +453,7 @@ const CenterFinder = () => {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )}
 

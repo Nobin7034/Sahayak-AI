@@ -404,9 +404,59 @@ router.put("/me", authenticate, async (req, res) => {
     }
 
     const { name, phone, avatar } = req.body;
-    if (typeof name === 'string' && name.trim()) user.name = name.trim();
-    if (typeof phone === 'string') user.phone = phone.trim();
-    if (typeof avatar === 'string') user.avatar = avatar.trim();
+    
+    // Validate name
+    if (typeof name === 'string' && name.trim()) {
+      user.name = name.trim();
+    }
+    
+    // Validate phone number
+    if (typeof phone === 'string') {
+      const trimmedPhone = phone.trim();
+      
+      if (trimmedPhone) {
+        // Phone validation function
+        const validateIndianPhone = (phoneNumber) => {
+          // Remove all non-digit characters
+          const cleanPhone = phoneNumber.replace(/\D/g, '');
+          
+          // Check if it's a valid Indian mobile number
+          // Indian mobile numbers: 10 digits starting with 6, 7, 8, or 9
+          // Or with country code: +91 followed by 10 digits
+          const indianMobileRegex = /^[6-9]\d{9}$/;
+          const indianMobileWithCountryCode = /^(\+91|91)?[6-9]\d{9}$/;
+          
+          if (cleanPhone.length === 10 && indianMobileRegex.test(cleanPhone)) {
+            return { valid: true, formatted: `+91${cleanPhone}` };
+          } else if (cleanPhone.length === 12 && cleanPhone.startsWith('91') && indianMobileWithCountryCode.test(cleanPhone)) {
+            return { valid: true, formatted: `+${cleanPhone}` };
+          } else if (cleanPhone.length === 13 && cleanPhone.startsWith('91') && indianMobileWithCountryCode.test('+' + cleanPhone)) {
+            return { valid: true, formatted: `+${cleanPhone}` };
+          } else if (phoneNumber.startsWith('+91') && phoneNumber.length === 14 && indianMobileWithCountryCode.test(phoneNumber)) {
+            return { valid: true, formatted: phoneNumber };
+          } else {
+            return { valid: false, formatted: null };
+          }
+        };
+        
+        const phoneValidation = validateIndianPhone(trimmedPhone);
+        if (!phoneValidation.valid) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Please enter a valid Indian mobile number (10 digits starting with 6, 7, 8, or 9)" 
+          });
+        }
+        
+        user.phone = phoneValidation.formatted;
+      } else {
+        user.phone = ''; // Allow empty phone
+      }
+    }
+    
+    // Validate avatar
+    if (typeof avatar === 'string') {
+      user.avatar = avatar.trim();
+    }
 
     await user.save();
 
@@ -422,7 +472,7 @@ router.put("/me", authenticate, async (req, res) => {
       createdAt: user.createdAt
     };
 
-    res.json({ success: true, message: 'Profile updated', user: sanitized });
+    res.json({ success: true, message: 'Profile updated successfully', user: sanitized });
   } catch (error) {
     console.error('❌ Update user error:', error);
     res.status(500).json({ success: false, message: 'Update failed', error: error.message });
@@ -486,6 +536,17 @@ router.post("/staff-register", async (req, res) => {
       });
     }
 
+    // Validate phone number format (10 digits starting with 6-9)
+    if (!centerContact.phone || !/^[6-9][0-9]{9}$/.test(centerContact.phone)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Please enter a valid 10-digit phone number starting with 6, 7, 8, or 9" 
+      });
+    }
+
+    // Format phone number with country code for storage
+    const formattedPhone = `+91${centerContact.phone}`;
+
     // Check if email already exists
     const existingUser = await User.findOne({ email: centerContact.email });
     if (existingUser) {
@@ -503,7 +564,7 @@ router.post("/staff-register", async (req, res) => {
       name: centerName, // Use center name as staff name
       email: centerContact.email,
       password: hashedPassword,
-      phone: centerContact.phone,
+      phone: formattedPhone,
       role: 'staff',
       provider: 'local',
       isActive: false, // Inactive until approved
@@ -522,7 +583,10 @@ router.post("/staff-register", async (req, res) => {
           parseFloat(centerLocation.latitude)
         ]
       },
-      contact: centerContact,
+      contact: {
+        ...centerContact,
+        phone: formattedPhone
+      },
       status: 'inactive', // Inactive until staff is approved
       registeredBy: staffUser._id
     });

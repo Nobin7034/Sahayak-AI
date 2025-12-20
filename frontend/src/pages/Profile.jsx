@@ -25,6 +25,68 @@ const Profile = () => {
   const [message, setMessage] = useState({ type: '', text: '' })
   const [selectedFile, setSelectedFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [phoneError, setPhoneError] = useState('')
+
+  // Phone validation function
+  const validatePhone = (phone) => {
+    if (!phone) return '' // Phone is optional
+    
+    // Remove all non-digit characters
+    const cleanPhone = phone.replace(/\D/g, '')
+    
+    // Check if it's a valid Indian mobile number
+    // Indian mobile numbers: 10 digits starting with 6, 7, 8, or 9
+    // Or with country code: +91 followed by 10 digits
+    const indianMobileRegex = /^[6-9]\d{9}$/
+    const indianMobileWithCountryCode = /^(\+91|91)?[6-9]\d{9}$/
+    
+    if (cleanPhone.length === 10 && indianMobileRegex.test(cleanPhone)) {
+      return '' // Valid 10-digit number
+    } else if (cleanPhone.length === 12 && cleanPhone.startsWith('91') && indianMobileWithCountryCode.test(cleanPhone)) {
+      return '' // Valid with country code
+    } else if (cleanPhone.length === 13 && cleanPhone.startsWith('91') && indianMobileWithCountryCode.test('+' + cleanPhone)) {
+      return '' // Valid with +91
+    } else if (phone.startsWith('+91') && phone.length === 14 && indianMobileWithCountryCode.test(phone)) {
+      return '' // Valid with +91 prefix
+    } else {
+      return 'Please enter a valid Indian mobile number (10 digits starting with 6, 7, 8, or 9)'
+    }
+  }
+
+  // Format phone number for display
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return ''
+    
+    // Remove all non-digit characters
+    const cleanPhone = phone.replace(/\D/g, '')
+    
+    // If it's 10 digits, add +91 prefix
+    if (cleanPhone.length === 10 && /^[6-9]/.test(cleanPhone)) {
+      return `+91${cleanPhone}`
+    }
+    
+    // If it's 12 digits starting with 91, add + prefix
+    if (cleanPhone.length === 12 && cleanPhone.startsWith('91')) {
+      return `+${cleanPhone}`
+    }
+    
+    // If it already has +91, return as is
+    if (phone.startsWith('+91')) {
+      return phone
+    }
+    
+    return phone
+  }
+
+  // Handle phone input change
+  const handlePhoneChange = (e) => {
+    const value = e.target.value
+    setForm({ ...form, phone: value })
+    
+    // Validate phone number
+    const error = validatePhone(value)
+    setPhoneError(error)
+  }
 
   // Fetch fresh user details
   useEffect(() => {
@@ -39,6 +101,7 @@ const Profile = () => {
             phone: res.data.user.phone || '',
             avatar: res.data.user.avatar || ''
           })
+          setPhoneError('') // Clear any phone errors
         }
       } catch (e) {
         console.error('Failed to load profile', e)
@@ -54,12 +117,33 @@ const Profile = () => {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault()
+    
+    // Validate phone number before submission
+    const phoneValidationError = validatePhone(form.phone)
+    if (phoneValidationError) {
+      setPhoneError(phoneValidationError)
+      setMessage({ type: 'error', text: 'Please fix the phone number error before saving.' })
+      return
+    }
+    
     try {
       setSaving(true)
       setMessage({ type: '', text: '' })
-      const res = await axios.put('/auth/me', form)
+      setPhoneError('')
+      
+      // Format phone number before sending
+      const formattedData = {
+        ...form,
+        phone: form.phone ? formatPhoneNumber(form.phone) : ''
+      }
+      
+      const res = await axios.put('/auth/me', formattedData)
       if (res.data.success) {
         setUser(res.data.user)
+        setForm({
+          ...form,
+          phone: res.data.user.phone || ''
+        })
         // Also refresh localStorage user if present
         try {
           const stored = localStorage.getItem('user')
@@ -409,18 +493,35 @@ const Profile = () => {
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-gray-600">Phone</label>
+                    <label className="text-sm text-gray-600">Phone Number</label>
                     <input
                       type="tel"
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
+                      className={`mt-1 w-full border rounded-lg px-3 py-2 ${
+                        phoneError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                      } focus:outline-none focus:ring-2`}
                       value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      placeholder="Your phone number"
+                      onChange={handlePhoneChange}
+                      placeholder="+91XXXXXXXXXX or 10-digit number"
                     />
+                    {phoneError && (
+                      <p className="mt-1 text-sm text-red-600 flex items-center">
+                        <AlertTriangle className="w-4 h-4 mr-1" />
+                        {phoneError}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter a valid Indian mobile number (10 digits starting with 6, 7, 8, or 9)
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button type="submit" disabled={saving} className="btn-primary inline-flex items-center">
+                  <button 
+                    type="submit" 
+                    disabled={saving || phoneError} 
+                    className={`btn-primary inline-flex items-center ${
+                      phoneError ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
                     <Save className="w-4 h-4 mr-2" /> {saving ? 'Saving...' : 'Save Changes'}
                   </button>
                   <button type="button" onClick={() => setTab('overview')} className="px-4 py-2 border rounded-lg inline-flex items-center">

@@ -144,9 +144,9 @@ const CenterInfoPanel = ({
   // Desktop side panel layout
   if (isDesktopSidePanel) {
     return (
-      <div className="w-full h-full bg-white rounded-lg shadow-lg border overflow-hidden">
+      <div className="w-full h-full bg-white flex flex-col">
         {/* Header */}
-        <div className="bg-blue-600 text-white p-4">
+        <div className="bg-blue-600 text-white p-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h2 className="text-lg font-semibold mb-1">{center.name || 'Center Name'}</h2>
@@ -177,7 +177,7 @@ const CenterInfoPanel = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 h-[calc(100%-120px)]">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Status and Hours */}
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -260,14 +260,24 @@ const CenterInfoPanel = ({
           {/* Available Services */}
           <div className="space-y-2">
             <h3 className="font-medium text-gray-900">Available Services</h3>
-            {availableServices.length > 0 ? (
-              <div className="space-y-1">
+            {loading ? (
+              <div className="text-sm text-gray-500">Loading services...</div>
+            ) : availableServices.length > 0 ? (
+              <div className="space-y-2">
                 {availableServices.slice(0, 5).map((service) => (
-                  <div key={service._id} className="text-sm text-gray-600 flex items-center justify-between">
-                    <span>{service.name}</span>
-                    <span className="text-xs text-gray-500">
-                      {service.fees === 0 ? 'Free' : `₹${service.fees}`}
-                    </span>
+                  <div key={service._id} className="bg-gray-50 rounded-lg p-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">{service.name}</h4>
+                        <p className="text-xs text-gray-600 mt-1">{service.category}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-green-600">
+                          {service.fees === 0 || service.fees === undefined ? 'Free' : `₹${service.fees}`}
+                        </p>
+                        <p className="text-xs text-gray-500">{service.processingTime}</p>
+                      </div>
+                    </div>
                   </div>
                 ))}
                 {availableServices.length > 5 && (
@@ -277,7 +287,7 @@ const CenterInfoPanel = ({
                 )}
               </div>
             ) : (
-              <p className="text-sm text-gray-500">No services information available</p>
+              <p className="text-sm text-gray-500">Loading services...</p>
             )}
           </div>
 
@@ -300,17 +310,17 @@ const CenterInfoPanel = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t bg-gray-50 p-4">
+        <div className="border-t bg-gray-50 p-4 flex-shrink-0">
           <button
             onClick={handleBookAppointment}
-            disabled={!availableServices.length}
+            disabled={operatingStatus.status === 'closed'}
             className={`w-full py-3 px-4 rounded-lg font-medium transition-colors duration-200 ${
-              availableServices.length > 0
+              operatingStatus.status !== 'closed'
                 ? 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {availableServices.length > 0 ? 'Book Appointment' : 'No Services Available'}
+            {operatingStatus.status === 'closed' ? 'Center Closed' : 'Book Appointment'}
           </button>
         </div>
       </div>
@@ -535,18 +545,14 @@ const CenterInfoPanel = ({
       <div className="border-t bg-gray-50 p-4">
         <button
           onClick={handleBookAppointment}
-          disabled={operatingStatus.status === 'closed' || (!selectedService && availableServices.length === 0)}
-          className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium
-                   hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500
-                   disabled:bg-gray-300 disabled:cursor-not-allowed
-                   transition-colors duration-200"
+          disabled={operatingStatus.status === 'closed'}
+          className={`w-full py-3 px-4 rounded-lg font-medium transition-colors duration-200 ${
+            operatingStatus.status !== 'closed'
+              ? 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
-          {selectedService 
-            ? `Book ${selectedService.name}` 
-            : availableServices.length === 0 
-              ? 'No Services Available' 
-              : 'Book Appointment'
-          }
+          {operatingStatus.status === 'closed' ? 'Center Closed' : 'Book Appointment'}
         </button>
         
         {operatingStatus.status === 'closed' && (
