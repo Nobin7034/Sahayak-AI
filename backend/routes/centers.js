@@ -41,7 +41,7 @@ async function geocodeAddress(address) {
   }
 }
 
-// GET /api/centers - Get all centers
+// GET /api/centers - Get all centers (public endpoint shows only active)
 router.get('/', async (req, res) => {
   try {
     const centers = await AkshayaCenter.find({ status: 'active' })
@@ -55,6 +55,29 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching centers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching centers',
+      error: error.message
+    });
+  }
+});
+
+// GET /api/centers/admin/all - Get all centers for admin (including inactive)
+router.get('/admin/all', async (req, res) => {
+  try {
+    const centers = await AkshayaCenter.find({})
+      .populate('services', 'name category fees processingTime')
+      .populate('registeredBy', 'name email role')
+      .sort({ name: 1 });
+    
+    res.json({
+      success: true,
+      centers,
+      total: centers.length
+    });
+  } catch (error) {
+    console.error('Error fetching all centers:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching centers',
@@ -314,7 +337,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/centers/:id - Delete center (Admin only)
+// DELETE /api/centers/:id - Soft delete center (Admin only)
 router.delete('/:id', async (req, res) => {
   try {
     const center = await AkshayaCenter.findById(req.params.id);
@@ -328,17 +351,78 @@ router.delete('/:id', async (req, res) => {
 
     // Soft delete by setting status to inactive
     center.status = 'inactive';
+    center.updatedAt = new Date();
     await center.save();
+
+    // Also update the associated staff user status if exists
+    const User = (await import('../models/User.js')).default;
+    if (center.registeredBy) {
+      await User.findByIdAndUpdate(center.registeredBy, { 
+        isActive: false,
+        updatedAt: new Date()
+      });
+    }
 
     res.json({
       success: true,
-      message: 'Center deleted successfully'
+      message: 'Center marked as inactive successfully'
     });
   } catch (error) {
-    console.error('Error deleting center:', error);
+    console.error('Error deactivating center:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting center',
+      message: 'Error deactivating center',
+      error: error.message
+    });
+  }
+});
+
+// DELETE /api/centers/:id/permanent - Permanently delete center (Admin only)
+router.delete('/:id/permanent', async (req, res) => {
+  try {
+    const center = await AkshayaCenter.findById(req.params.id);
+    
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Only allow permanent deletion of inactive centers
+    if (center.status !== 'inactive') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only inactive centers can be permanently deleted. Please deactivate the center first.'
+      });
+    }
+
+    // Delete associated staff records first
+    const { default: Staff } = await import('../models/Staff.js');
+    await Staff.deleteMany({ center: center._id });
+
+    // Delete associated appointments if any
+    const { default: Appointment } = await import('../models/Appointment.js');
+    await Appointment.deleteMany({ center: center._id });
+
+    // Delete the associated staff user if exists
+    const User = (await import('../models/User.js')).default;
+    if (center.registeredBy) {
+      await User.findByIdAndDelete(center.registeredBy);
+    }
+
+    // Finally delete the center
+    await AkshayaCenter.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Center permanently deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error permanently deleting center:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error permanently deleting center',
       error: error.message
     });
   }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer as LeafletMapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer as LeafletMapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -16,7 +16,8 @@ const MapContainer = ({
   userLocation = null, 
   selectedCenter = null, 
   onCenterSelect, 
-  onLocationChange 
+  onLocationChange,
+  searchRadius = 10 // Default 10km radius
 }) => {
   const [mapCenter, setMapCenter] = useState([10.8505, 76.2711]); // Default Kerala location
   const [zoom, setZoom] = useState(8);
@@ -28,7 +29,7 @@ const MapContainer = ({
         (position) => {
           const { latitude, longitude } = position.coords;
           setMapCenter([latitude, longitude]);
-          setZoom(12);
+          setZoom(14); // Higher zoom for local area view
         },
         (error) => {
           console.log('Geolocation error:', error);
@@ -37,7 +38,7 @@ const MapContainer = ({
       );
     } else if (userLocation) {
       setMapCenter([userLocation.lat, userLocation.lng]);
-      setZoom(12);
+      setZoom(14); // Higher zoom for local area view
     }
   }, [userLocation]);
 
@@ -64,9 +65,24 @@ const MapContainer = ({
         
         {/* User location marker */}
         {userLocation && (
-          <Marker position={[userLocation.lat, userLocation.lng]}>
-            <Popup>Your Location</Popup>
-          </Marker>
+          <>
+            <Marker position={[userLocation.lat, userLocation.lng]}>
+              <Popup>Your Location</Popup>
+            </Marker>
+            
+            {/* Search radius circle */}
+            <Circle
+              center={[userLocation.lat, userLocation.lng]}
+              radius={searchRadius * 1000} // Convert km to meters
+              pathOptions={{
+                color: '#3B82F6',
+                fillColor: '#3B82F6',
+                fillOpacity: 0.1,
+                weight: 2,
+                dashArray: '5, 5'
+              }}
+            />
+          </>
         )}
         
         {/* Akshaya center markers */}

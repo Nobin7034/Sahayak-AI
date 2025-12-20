@@ -268,10 +268,10 @@ router.get('/check-email', async (req, res) => {
   }
 });
 
-// ---------------- LOGIN ----------------
+// ---------------- LOGIN (AUTO ROLE DETECTION) ----------------
 router.post("/login", async (req, res) => {
   try {
-    const { email, password, role = "user" } = req.body;
+    const { email, password, role } = req.body;
 
     if (!email || !password) {
       return res
@@ -279,22 +279,76 @@ router.post("/login", async (req, res) => {
         .json({ success: false, message: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email, role, isActive: true });
+    // If role is specified, use the old behavior for backward compatibility
+    if (role) {
+      const user = await User.findOne({ 
+        email, 
+        role, 
+        isActive: true,
+        ...(role === 'staff' && { approvalStatus: 'approved' })
+      });
+      if (!user) {
+        return res.status(401).json({ success: false, message: "Invalid credentials" });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ success: false, message: "Invalid credentials" });
+      }
+
+      user.lastLogin = new Date();
+      await user.save();
+
+      const token = generateToken(user);
+      return res.json({ success: true, message: "Login successful", token, user });
+    }
+
+    // Auto role detection: Find user by email first, then validate
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
+    // Check if password is valid
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({ success: false, message: "Account is inactive" });
+    }
+
+    // For staff users, check approval status
+    if (user.role === 'staff' && user.approvalStatus !== 'approved') {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Staff account is pending approval" 
+      });
+    }
+
+    // Update last login
     user.lastLogin = new Date();
     await user.save();
 
     const token = generateToken(user);
 
-    res.json({ success: true, message: "Login successful", token, user });
+    res.json({ 
+      success: true, 
+      message: "Login successful", 
+      token, 
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        avatar: user.avatar,
+        provider: user.provider,
+        lastLogin: user.lastLogin
+      }
+    });
   } catch (error) {
     console.error("❌ Login error:", error);
     res
@@ -606,6 +660,31 @@ router.post("/staff-register", async (req, res) => {
       ]
     });
 
+    // Create notification for all admins about new staff registration
+    try {
+      const adminUsers = await User.find({ role: 'admin', isActive: true }).select('_id');
+      const { default: Notification } = await import('../models/Notification.js');
+      
+      const notifications = adminUsers.map(admin => ({
+        user: admin._id,
+        type: 'staff_registration',
+        title: 'New Staff Registration',
+        message: `New staff registration from ${centerName}. Please review and approve.`,
+        meta: {
+          staffUserId: staffUser._id,
+          centerName: centerName,
+          centerEmail: centerContact.email
+        }
+      }));
+
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
+    } catch (notificationError) {
+      console.error('Failed to create admin notifications:', notificationError);
+      // Don't fail the registration if notification fails
+    }
+
     res.status(201).json({
       success: true,
       message: "Staff registration submitted successfully. Your account is pending admin approval.",
@@ -789,6 +868,25 @@ router.post('/admin/approve-staff/:userId', async (req, res) => {
     staffRecord.assignedBy = adminId;
     await staffRecord.save();
 
+    // Send approval notification to the staff member
+    try {
+      const { default: Notification } = await import('../models/Notification.js');
+      await Notification.create({
+        user: staffUser._id,
+        type: 'approval',
+        title: 'Staff Registration Approved',
+        message: `Congratulations! Your staff registration for ${center.name} has been approved. You can now login to your dashboard.`,
+        meta: {
+          centerName: center.name,
+          centerId: center._id,
+          approvedBy: adminId
+        }
+      });
+    } catch (notificationError) {
+      console.error('Failed to create approval notification:', notificationError);
+      // Don't fail the approval if notification fails
+    }
+
     res.json({
       success: true,
       message: 'Staff registration approved successfully',
@@ -837,6 +935,24 @@ router.post('/admin/reject-staff/:userId', async (req, res) => {
     staffUser.reviewedAt = new Date();
     staffUser.reviewNotes = reason;
     await staffUser.save();
+
+    // Send rejection notification to the staff member
+    try {
+      const { default: Notification } = await import('../models/Notification.js');
+      await Notification.create({
+        user: staffUser._id,
+        type: 'rejection',
+        title: 'Staff Registration Rejected',
+        message: `Your staff registration has been rejected. Reason: ${reason || 'No reason provided'}`,
+        meta: {
+          rejectedBy: adminId,
+          reason: reason
+        }
+      });
+    } catch (notificationError) {
+      console.error('Failed to create rejection notification:', notificationError);
+      // Don't fail the rejection if notification fails
+    }
 
     res.json({
       success: true,

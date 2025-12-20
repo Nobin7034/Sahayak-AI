@@ -9,7 +9,8 @@ import {
   Clock,
   Users,
   Search,
-  Filter
+  Filter,
+  AlertTriangle
 } from 'lucide-react';
 import centerService from '../../services/centerService';
 import geocodingService from '../../services/geocodingService';
@@ -58,8 +59,19 @@ const AdminCenters = () => {
   const loadCenters = async () => {
     try {
       setLoading(true);
-      const response = await centerService.getAllCenters();
-      setCenters(response.centers || []);
+      // Use admin endpoint to get all centers including inactive ones
+      const response = await fetch('/api/centers/admin/all', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to load centers');
+      }
+      
+      const data = await response.json();
+      setCenters(data.centers || []);
     } catch (error) {
       console.error('Error loading centers:', error);
       setError('Failed to load centers');
@@ -136,7 +148,7 @@ const AdminCenters = () => {
   };
 
   const handleDelete = async (centerId) => {
-    if (!confirm('Are you sure you want to delete this center?')) return;
+    if (!confirm('Are you sure you want to deactivate this center? This will also deactivate the associated staff member.')) return;
 
     try {
       const response = await fetch(`/api/centers/${centerId}`, {
@@ -147,13 +159,129 @@ const AdminCenters = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete center');
+        throw new Error('Failed to deactivate center');
       }
 
+      // Show success message
+      setError(''); // Clear any previous errors
+      loadCenters(); // Reload to show updated status
+    } catch (error) {
+      console.error('Error deactivating center:', error);
+      setError('Failed to deactivate center');
+    }
+  };
+
+  const handlePermanentDelete = async (centerId, centerName) => {
+    const confirmMessage = `⚠️ PERMANENT DELETE WARNING ⚠️
+
+This will PERMANENTLY DELETE the center "${centerName}" and ALL associated data including:
+- Center record
+- Staff user account
+- All appointments
+- All related data
+
+This action CANNOT be undone!
+
+Type "DELETE" to confirm permanent deletion:`;
+
+    const userInput = prompt(confirmMessage);
+    
+    if (userInput !== 'DELETE') {
+      return; // User cancelled or didn't type DELETE
+    }
+
+    try {
+      const response = await fetch(`/api/centers/${centerId}/permanent`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to permanently delete center');
+      }
+
+      // Show success message
+      setError(''); // Clear any previous errors
+      loadCenters(); // Reload to show updated list
+      alert('Center permanently deleted successfully');
+    } catch (error) {
+      console.error('Error permanently deleting center:', error);
+      setError('Failed to permanently delete center: ' + error.message);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const inactiveCenters = filteredCenters.filter(center => center.status === 'inactive');
+    
+    if (inactiveCenters.length === 0) {
+      alert('No inactive centers found to delete.');
+      return;
+    }
+
+    const confirmMessage = `⚠️ BULK PERMANENT DELETE WARNING ⚠️
+
+This will PERMANENTLY DELETE ${inactiveCenters.length} inactive centers and ALL associated data including:
+- All center records
+- All staff user accounts
+- All appointments
+- All related data
+
+This action CANNOT be undone!
+
+Centers to be deleted:
+${inactiveCenters.map(c => `- ${c.name}`).join('\n')}
+
+Type "DELETE ALL" to confirm bulk permanent deletion:`;
+
+    const userInput = prompt(confirmMessage);
+    
+    if (userInput !== 'DELETE ALL') {
+      return; // User cancelled or didn't type DELETE ALL
+    }
+
+    try {
+      setLoading(true);
+      let deletedCount = 0;
+      let errors = [];
+
+      // Delete each inactive center
+      for (const center of inactiveCenters) {
+        try {
+          const response = await fetch(`/api/centers/${center._id}/permanent`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          if (response.ok) {
+            deletedCount++;
+          } else {
+            const errorData = await response.json();
+            errors.push(`${center.name}: ${errorData.message}`);
+          }
+        } catch (error) {
+          errors.push(`${center.name}: ${error.message}`);
+        }
+      }
+
+      // Show results
+      if (deletedCount > 0) {
+        alert(`Successfully deleted ${deletedCount} centers.${errors.length > 0 ? `\n\nErrors:\n${errors.join('\n')}` : ''}`);
+      } else {
+        alert(`Failed to delete centers:\n${errors.join('\n')}`);
+      }
+
+      // Reload centers
       loadCenters();
     } catch (error) {
-      console.error('Error deleting center:', error);
-      setError('Failed to delete center');
+      console.error('Error in bulk delete:', error);
+      setError('Failed to perform bulk delete: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -240,6 +368,24 @@ const AdminCenters = () => {
             Use the Staff Management section to approve pending staff applications and activate their centers.
           </p>
         </div>
+        
+        {/* Show warning for inactive centers */}
+        {statusFilter === 'inactive' && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-2" />
+              <div>
+                <p className="text-sm text-red-800">
+                  <strong>Inactive Centers:</strong> These centers are deactivated and not visible to users. 
+                  You can permanently delete inactive centers by clicking the warning icon (⚠️). 
+                </p>
+                <p className="text-xs text-red-700 mt-1">
+                  <strong>Warning:</strong> Permanent deletion cannot be undone and will remove all associated data including staff accounts and appointments.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -269,6 +415,20 @@ const AdminCenters = () => {
               <option value="maintenance">Maintenance</option>
             </select>
           </div>
+          
+          {/* Bulk delete button for inactive centers */}
+          {statusFilter === 'inactive' && filteredCenters.length > 0 && (
+            <div className="sm:w-auto">
+              <button
+                onClick={() => handleBulkDelete()}
+                className="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center justify-center"
+                title="Permanently delete all inactive centers"
+              >
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Delete All Inactive
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -315,6 +475,12 @@ const AdminCenters = () => {
                 <Users className="h-4 w-4 mr-2" />
                 {center.capacity?.maxAppointmentsPerDay || 50} appointments/day
               </div>
+              {center.registeredBy && (
+                <div className="flex items-center">
+                  <Clock className="h-4 w-4 mr-2" />
+                  Staff: {center.registeredBy.name}
+                </div>
+              )}
               {center.metadata && (
                 <div className="flex items-center">
                   <Clock className="h-4 w-4 mr-2" />
@@ -331,13 +497,24 @@ const AdminCenters = () => {
               >
                 <Edit className="h-4 w-4" />
               </button>
-              <button
-                onClick={() => handleDelete(center._id)}
-                className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                title="Delete Center"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              
+              {center.status === 'active' ? (
+                <button
+                  onClick={() => handleDelete(center._id)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-md"
+                  title="Deactivate Center"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => handlePermanentDelete(center._id, center.name)}
+                  className="p-2 text-red-700 hover:bg-red-100 rounded-md border border-red-300"
+                  title="Permanently Delete Center (Cannot be undone!)"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         ))}

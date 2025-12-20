@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, MapPin, Phone, Star, Calendar, FileText, Shield, Users, Languages } from 'lucide-react'
 import axios from 'axios'
-import { akshayaCenters } from '../data/mockData'
+import centerService from '../services/centerService'
 import { getImageUrl } from '../config/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { t } from '../data/translations'
@@ -10,6 +10,9 @@ import { t } from '../data/translations'
 const LandingPage = () => {
   const { language, toggleLanguage } = useLanguage()
   const [latest, setLatest] = useState([])
+  const [centers, setCenters] = useState([])
+  const [loadingCenters, setLoadingCenters] = useState(true)
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -20,6 +23,22 @@ const LandingPage = () => {
       }
     }
     load()
+  }, [])
+
+  useEffect(() => {
+    const loadCenters = async () => {
+      try {
+        setLoadingCenters(true)
+        const response = await centerService.getAllCenters()
+        setCenters(response.centers || [])
+      } catch (error) {
+        console.error('Failed to load centers:', error)
+        setCenters([])
+      } finally {
+        setLoadingCenters(false)
+      }
+    }
+    loadCenters()
   }, [])
   return (
     <div className="min-h-screen">
@@ -170,47 +189,120 @@ const LandingPage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {akshayaCenters.map((center) => (
-              <div key={center.id} className="card p-6">
-                <h3 className="text-xl font-semibold mb-3 text-gray-900">{center.name}</h3>
-                
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-start space-x-2">
-                    <MapPin className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">{center.address}</span>
+            {loadingCenters ? (
+              // Loading skeleton
+              Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="card p-6 animate-pulse">
+                  <div className="h-6 bg-gray-200 rounded mb-3"></div>
+                  <div className="space-y-2 mb-4">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Phone className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-600">{center.phone}</span>
+                  <div className="h-16 bg-gray-200 rounded mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                </div>
+              ))
+            ) : centers.length > 0 ? (
+              centers.slice(0, 3).map((center) => (
+                <div key={center._id} className="card p-6">
+                  <h3 className="text-xl font-semibold mb-3 text-gray-900">{center.name}</h3>
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-start space-x-2">
+                      <MapPin className="w-4 h-4 text-gray-500 mt-1 flex-shrink-0" />
+                      <span className="text-sm text-gray-600">
+                        {center.address?.street && `${center.address.street}, `}
+                        {center.address?.city}, {center.address?.district}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Phone className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-gray-600">{center.contact?.phone || 'Phone not available'}</span>
+                    </div>
+                    {center.metadata?.rating > 0 && (
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
+                          <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                          <span className="text-sm font-semibold">{center.metadata.rating.toFixed(1)}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                      <span className="text-sm font-semibold">{center.rating}</span>
+
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">{t('landing.servicesAvailable', language)}</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {center.services && center.services.length > 0 ? (
+                        center.services.slice(0, 3).map((service, index) => (
+                          <span
+                            key={service._id || index}
+                            className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full"
+                          >
+                            {service.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                          Services available
+                        </span>
+                      )}
+                      {center.services && center.services.length > 3 && (
+                        <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                          +{center.services.length - 3} more
+                        </span>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                <div className="mb-4">
-                  <h4 className="font-semibold text-gray-900 mb-2">{t('landing.servicesAvailable', language)}</h4>
-                  <div className="flex flex-wrap gap-1">
-                    {center.services.map((service, index) => (
-                      <span
-                        key={index}
-                        className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full"
-                      >
-                        {service}
-                      </span>
-                    ))}
+                  <div className="text-sm text-gray-600 mb-4">
+                    <strong>{t('landing.hours', language)}</strong> 
+                    {center.operatingHours?.monday ? 
+                      ` ${center.operatingHours.monday.open} - ${center.operatingHours.monday.close}` : 
+                      ' 9:00 AM - 6:00 PM'
+                    }
                   </div>
-                </div>
 
-                <div className="text-sm text-gray-600">
-                  <strong>{t('landing.hours', language)}</strong> {center.hours}
+                  <Link
+                    to="/center-finder"
+                    className="inline-flex items-center text-primary hover:text-primary-dark text-sm font-medium"
+                  >
+                    View Details
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </Link>
                 </div>
+              ))
+            ) : (
+              // No centers available
+              <div className="col-span-full text-center py-12">
+                <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Centers Available</h3>
+                <p className="text-gray-600 mb-4">
+                  No Akshaya centers are currently registered in the system.
+                </p>
+                <Link
+                  to="/register"
+                  className="inline-flex items-center text-primary hover:text-primary-dark font-medium"
+                >
+                  Register as Staff
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Link>
               </div>
-            ))}
+            )}
           </div>
+
+          {/* View All Centers Link */}
+          {centers.length > 3 && (
+            <div className="text-center mt-8">
+              <Link
+                to="/center-finder"
+                className="inline-flex items-center bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                View All {centers.length} Centers
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 

@@ -646,6 +646,65 @@ router.post('/broadcast/appointments', async (req, res) => {
   }
 });
 
+// Get admin notifications (staff registrations, etc.)
+router.get('/notifications', async (req, res) => {
+  try {
+    const notifications = await Notification.find({ 
+      user: req.user.userId,
+      type: { $in: ['staff_registration', 'broadcast', 'system'] }
+    })
+    .sort({ createdAt: -1 })
+    .limit(50);
+
+    const unreadCount = await Notification.countDocuments({ 
+      user: req.user.userId, 
+      isRead: false,
+      type: { $in: ['staff_registration', 'broadcast', 'system'] }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        notifications,
+        unreadCount
+      }
+    });
+  } catch (error) {
+    console.error('Get admin notifications error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch notifications',
+      error: error.message
+    });
+  }
+});
+
+// Mark admin notifications as read
+router.post('/notifications/mark-read', async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { 
+        user: req.user.userId, 
+        isRead: false,
+        type: { $in: ['staff_registration', 'broadcast', 'system'] }
+      }, 
+      { $set: { isRead: true } }
+    );
+
+    res.json({
+      success: true,
+      message: 'Notifications marked as read'
+    });
+  } catch (error) {
+    console.error('Mark notifications read error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark notifications as read',
+      error: error.message
+    });
+  }
+});
+
 // Holidays management
 router.get('/holidays', async (req, res) => {
   try {

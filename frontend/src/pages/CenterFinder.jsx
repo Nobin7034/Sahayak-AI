@@ -20,7 +20,7 @@ const CenterFinder = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
-  const [searchRadius, setSearchRadius] = useState(50); // km
+  const [searchRadius, setSearchRadius] = useState(10); // km - Default to 10km for local view
 
   useEffect(() => {
     const loadData = async () => {
@@ -87,13 +87,23 @@ const CenterFinder = () => {
         (position) => {
           const { latitude, longitude } = position.coords;
           setUserLocation({ lat: latitude, lng: longitude });
-          loadNearbyCenters(latitude, longitude);
+          // Automatically load nearby centers within 10km
+          loadNearbyCenters(latitude, longitude, 10);
         },
         (error) => {
           console.log('Geolocation error:', error);
-          // Continue without user location
+          // Continue without user location - show all centers
+          setFilteredCenters(centers);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
         }
       );
+    } else {
+      // Geolocation not supported - show all centers
+      setFilteredCenters(centers);
     }
   };
 
@@ -305,6 +315,14 @@ const CenterFinder = () => {
               </button>
             </div>
           </div>
+          
+          {/* Location Detection Info */}
+          {userLocation && (
+            <div className="mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg p-2">
+              📍 Showing centers within {searchRadius || 'all'} km of your location. 
+              {searchRadius && ` Adjust the distance filter above to see more centers.`}
+            </div>
+          )}
         </div>
       </div>
 
@@ -369,6 +387,7 @@ const CenterFinder = () => {
                 userLocation={userLocation}
                 selectedCenter={selectedCenter?._id}
                 onCenterSelect={handleCenterSelect}
+                searchRadius={searchRadius}
               />
             </div>
             

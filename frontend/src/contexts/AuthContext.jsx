@@ -193,46 +193,19 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('Attempting login with automatic role detection:', { email })
       
-      // Try admin login first
-      try {
-        const adminResponse = await axios.post('/auth/login', {
-          email,
-          password,
-          role: 'admin'
-        })
-
-        if (adminResponse.data.success) {
-          const { token, user } = adminResponse.data
-          
-          console.log('AuthContext - Admin login successful:', user)
-          
-          // Store token and user data
-          localStorage.setItem('token', token)
-          localStorage.setItem('user', JSON.stringify(user))
-          
-          // Set axios default header
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-          
-          setUser(user)
-          return { success: true, token, user }
-        }
-      } catch (adminError) {
-        console.log('Admin login failed, trying user login:', adminError.response?.data?.message)
-      }
-
-      // Try user login
-      const userResponse = await axios.post('/auth/login', {
+      // Single login request - backend will auto-detect role
+      const response = await axios.post('/auth/login', {
         email,
-        password,
-        role: 'user'
+        password
+        // No role parameter - backend will auto-detect
       })
 
-      console.log('User login response:', userResponse.data)
+      console.log('Login response:', response.data)
 
-      if (userResponse.data.success) {
-        const { token, user } = userResponse.data
+      if (response.data.success) {
+        const { token, user } = response.data
         
-        console.log('AuthContext - User login successful:', user)
+        console.log('AuthContext - Login successful:', user)
         
         // Store token and user data
         localStorage.setItem('token', token)
@@ -244,8 +217,8 @@ export const AuthProvider = ({ children }) => {
         setUser(user)
         return { success: true, token, user }
       } else {
-        console.log('User login failed:', userResponse.data.message)
-        return { success: false, error: userResponse.data.message }
+        console.log('Login failed:', response.data.message)
+        return { success: false, error: response.data.message }
       }
     } catch (error) {
       console.error('Login error:', error)
@@ -387,6 +360,10 @@ export const AuthProvider = ({ children }) => {
     return user?.role === 'user'
   }
 
+  const isStaff = () => {
+    return user?.role === 'staff'
+  }
+
   const value = {
     user,
     login,
@@ -395,7 +372,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     loading,
     isAdmin,
-    isUser
+    isUser,
+    isStaff
   }
 
   return (
