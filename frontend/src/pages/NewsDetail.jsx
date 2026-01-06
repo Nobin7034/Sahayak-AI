@@ -18,7 +18,7 @@ const NewsDetail = () => {
           const item = res.data.data
           setNews(item)
           // fetch related by category
-          const relRes = await axios.get('/news', { params: { category: item.category, limit: 5 } })
+          const relRes = await axios.get('/api/news', { params: { category: item.category, limit: 5 } })
           if (relRes.data.success) {
             const list = relRes.data.data.news.filter(n => n._id !== item._id).slice(0, 2)
             setRelated(list)

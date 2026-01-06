@@ -43,7 +43,7 @@ const Dashboard = () => {
           setLoading(true)
           
           // Fetch user appointments
-          const appointmentsResponse = await axios.get('/appointments')
+          const appointmentsResponse = await axios.get('/api/appointments')
           
           if (appointmentsResponse.data.success) {
             const userAppointments = appointmentsResponse.data.data

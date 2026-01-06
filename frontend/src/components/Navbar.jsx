@@ -21,7 +21,7 @@ const Navbar = ({ showPublic = false }) => {
     const load = async () => {
       if (!user) return
       try {
-        const res = await axios.get('/notifications')
+        const res = await axios.get('/api/notifications')
         if (res.data?.success) {
           setUnread(res.data.data.unreadCount || 0)
           setNotifs(res.data.data.items || [])
@@ -53,7 +53,7 @@ const Navbar = ({ showPublic = false }) => {
     setIsNotifOpen(next)
     if (next && unread > 0) {
       try {
-        await axios.post('/notifications/mark-read')
+        await axios.post('/api/notifications/mark-read')
         setUnread(0)
       } catch (_) {}
     }

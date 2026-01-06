@@ -6,7 +6,7 @@ import { signInWithPopup, onAuthStateChanged, signOut as firebaseSignOut, Google
 const AuthContext = createContext()
 
 // Set up axios defaults
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 axios.defaults.baseURL = API_BASE_URL
 
 // Attach auth token to every request
@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }) => {
               console.log('AuthContext - Set authorization header')
 
               // Verify token is still valid
-              const response = await axios.get('/auth/me')
+              const response = await axios.get('/api/auth/me')
               console.log('AuthContext - Token verification response:', response.data)
 
               if (response.data.success) {
@@ -109,7 +109,7 @@ export const AuthProvider = ({ children }) => {
 
               // Send Firebase ID token to backend for verification/login
               // Backend will handle role assignment (always 'user' for new accounts)
-              const response = await axios.post('/auth/google', {
+              const response = await axios.post('/api/auth/google', {
                 token: firebaseIdToken
                 // No role parameter - backend assigns role automatically
               })
@@ -151,7 +151,7 @@ export const AuthProvider = ({ children }) => {
               console.log('AuthContext - Set authorization header')
 
               // Verify token is still valid
-              const response = await axios.get('/auth/me')
+              const response = await axios.get('/api/auth/me')
               console.log('AuthContext - Token verification response:', response.data)
 
               if (response.data.success) {
@@ -194,7 +194,7 @@ export const AuthProvider = ({ children }) => {
       console.log('Attempting login with automatic role detection:', { email })
       
       // Single login request - backend will auto-detect role
-      const response = await axios.post('/auth/login', {
+      const response = await axios.post('/api/auth/login', {
         email,
         password
         // No role parameter - backend will auto-detect
@@ -233,11 +233,11 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       let registrationData = { ...userData }
-      let endpoint = '/auth/register'
+      let endpoint = '/api/auth/register'
       
       if (userData.accountType === 'staff') {
         // For staff registration, use separate endpoint and clean data
-        endpoint = '/auth/staff-register'
+        endpoint = '/api/auth/staff-register'
         registrationData = {
           password: userData.password,
           centerName: userData.centerName,
@@ -307,7 +307,7 @@ export const AuthProvider = ({ children }) => {
 
       // Send Firebase ID token to backend for verification/login
       // Backend will handle role assignment (always 'user' for new accounts)
-      const response = await axios.post('/auth/google', {
+      const response = await axios.post('/api/auth/google', {
         token: idToken
         // No role parameter - backend assigns role automatically
       })

@@ -27,6 +27,7 @@ const BookAppointment = () => {
   const { user } = useAuth();
 
   const [service, setService] = useState(null);
+  const [services, setServices] = useState([]);
   const [center, setCenter] = useState(null);
   const [availableCenters, setAvailableCenters] = useState([]);
   const [formData, setFormData] = useState({
@@ -47,6 +48,7 @@ const BookAppointment = () => {
   useEffect(() => {
     loadInitialData();
     loadRazorpayConfig();
+    loadAllServices();
   }, []);
 
   useEffect(() => {
@@ -80,7 +82,7 @@ const BookAppointment = () => {
 
   const loadRazorpayConfig = async () => {
     try {
-      const res = await axios.get('/payments/config');
+      const res = await axios.get('/api/payments/config');
       if (res.data?.success) {
         setRazorpayKey(res.data.data.keyId);
       }
@@ -89,9 +91,20 @@ const BookAppointment = () => {
     }
   };
 
+  const loadAllServices = async () => {
+    try {
+      const response = await axios.get('/api/services');
+      if (response.data.success) {
+        setServices(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load services:', error);
+    }
+  };
+
   const loadServiceDetails = async () => {
     try {
-      const response = await axios.get(`/services/${formData.serviceId}`);
+      const response = await axios.get(`/api/services/${formData.serviceId}`);
       if (response.data.success) {
         setService(response.data.data);
       }
@@ -128,7 +141,7 @@ const BookAppointment = () => {
   const fetchAvailableSlots = async () => {
     try {
       const response = await axios.get(
-        `/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
+        `/api/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
       );
       if (response.data.success) {
         setAvailableSlots(response.data.data.availableSlots || []);
@@ -142,7 +155,7 @@ const BookAppointment = () => {
   const checkHolidayInfo = async () => {
     try {
       const response = await axios.get(
-        `/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
+        `/api/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
       );
       if (response.data?.success) {
         setHolidayInfo({
@@ -205,7 +218,7 @@ const BookAppointment = () => {
     setIsPaying(true);
     
     // Create payment order
-    const orderRes = await axios.post('/payments/create-order', {
+    const orderRes = await axios.post('/api/payments/create-order', {
       serviceId: formData.serviceId,
       centerId: formData.centerId
     });
@@ -269,7 +282,7 @@ const BookAppointment = () => {
   };
 
   const verifyPaymentAndCreateAppointment = async (paymentResponse) => {
-    const verifyRes = await axios.post('/payments/verify', {
+    const verifyRes = await axios.post('/api/payments/verify', {
       razorpay_order_id: paymentResponse.razorpay_order_id,
       razorpay_payment_id: paymentResponse.razorpay_payment_id,
       razorpay_signature: paymentResponse.razorpay_signature
@@ -292,7 +305,7 @@ const BookAppointment = () => {
       paymentId
     };
 
-    const response = await axios.post('/appointments', appointmentData);
+    const response = await axios.post('/api/appointments', appointmentData);
     
     if (response.data.success) {
       setSuccess('Appointment booked successfully!');
@@ -415,7 +428,11 @@ const BookAppointment = () => {
                   required
                 >
                   <option value="">Select a service</option>
-                  {/* This would be populated with available services */}
+                  {services.map((service) => (
+                    <option key={service._id} value={service._id}>
+                      {service.name} - ₹{service.fees}
+                    </option>
+                  ))}
                 </select>
               )}
             </div>

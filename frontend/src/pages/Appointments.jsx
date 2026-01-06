@@ -45,7 +45,7 @@ const Appointments = () => {
     // load Razorpay key
     const loadConfig = async () => {
       try {
-        const res = await axios.get('/payments/config')
+        const res = await axios.get('/api/payments/config')
         if (res.data?.success) setRazorpayKey(res.data.data.keyId)
       } catch (_) {}
     }
@@ -123,7 +123,7 @@ const Appointments = () => {
       if (service && service.serviceCharge > 0) {
         setIsPaying(true)
         // 1) Create order
-        const orderRes = await axios.post('/payments/create-order', { serviceId })
+        const orderRes = await axios.post('/api/payments/create-order', { serviceId })
         if (!orderRes.data?.success) throw new Error('Failed to create order')
         const order = orderRes.data.data.order
 
@@ -150,7 +150,7 @@ const Appointments = () => {
           notes: { serviceId },
           handler: async function (response) {
             try {
-              const verifyRes = await axios.post('/payments/verify-and-create-appointment', {
+              const verifyRes = await axios.post('/api/payments/verify-and-create-appointment', {
                 serviceId,
                 appointmentDate: formData.appointmentDate,
                 timeSlot: formData.timeSlot,

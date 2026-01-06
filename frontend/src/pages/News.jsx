@@ -14,8 +14,8 @@ const News = () => {
     const fetchNews = async () => {
       try {
         const [localRes, extRes] = await Promise.all([
-          axios.get('/news'),
-          axios.get('/news/external/kerala', { params: { source: 'rss', limit: 6 } })
+          axios.get('/api/news'),
+          axios.get('/api/news/external/kerala', { params: { source: 'rss', limit: 6 } })
         ])
         if (localRes.data.success) setItems(localRes.data.data.news)
         if (extRes.data.success) setExternal(extRes.data.data)

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { t } from "../data/translations";
-import { Mail, Phone, Lock, Eye, EyeOff, User, ArrowLeft, MapPin, Building, Navigation } from "lucide-react";
+import { Mail, Phone, Lock, Eye, EyeOff, User, ArrowLeft, Building, Navigation } from "lucide-react";
 import axios from 'axios';
 import StaffRegistrationMap from '../components/map/StaffRegistrationMap';
 
@@ -106,11 +106,8 @@ const Register = () => {
       case "centerAddress.district":
         if (formData.accountType === 'staff' && !value.trim()) return "District is required";
         break;
-      case "centerAddress.pincode":
-        if (formData.accountType === 'staff') {
-          if (!value.trim()) return "Pincode is required";
-          if (!/^[0-9]{6}$/.test(value)) return "Enter a valid 6-digit pincode";
-        }
+      case "centerAddress.state":
+        if (formData.accountType === 'staff' && !value.trim()) return "State is required";
         break;
       case "centerContact.phone":
         if (formData.accountType === 'staff') {
@@ -160,7 +157,7 @@ const Register = () => {
     // For staff registration, validate all required fields
     if (formData.accountType === 'staff') {
       ['password', 'confirmPassword', 'centerName', 'centerAddress.street', 'centerAddress.city', 
-       'centerAddress.district', 'centerAddress.pincode', 'centerContact.phone', 'centerContact.email',
+       'centerAddress.district', 'centerAddress.state', 'centerContact.phone', 'centerContact.email',
        'centerLocation.latitude', 'centerLocation.longitude'].forEach((field) => {
         const error = validateField(field, getNestedValue(formData, field));
         if (error) newErrors[field] = error;
@@ -258,12 +255,12 @@ const Register = () => {
         latitude: latitude.toString(),
         longitude: longitude.toString()
       },
-      // Auto-fill address fields if available from reverse geocoding
+      // Only auto-fill pincode, district, and state - leave street and city blank for manual entry
       ...(addressInfo && {
         centerAddress: {
           ...prev.centerAddress,
-          street: addressInfo.street || prev.centerAddress.street,
-          city: addressInfo.city || prev.centerAddress.city,
+          // street: keep existing value (don't auto-fill)
+          // city: keep existing value (don't auto-fill)
           district: addressInfo.district || prev.centerAddress.district,
           state: addressInfo.state || prev.centerAddress.state,
           pincode: addressInfo.pincode || prev.centerAddress.pincode
@@ -293,7 +290,7 @@ const Register = () => {
     if (step === 2) {
       // Validate only center details (not contact info) before moving to credentials step
       const centerFields = ['centerName', 'centerAddress.street', 'centerAddress.city', 
-                           'centerAddress.district', 'centerAddress.pincode',
+                           'centerAddress.district', 'centerAddress.state',
                            'centerLocation.latitude', 'centerLocation.longitude'];
       
       let stepErrors = {};
@@ -765,22 +762,21 @@ const Register = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
-                        Pincode *
+                        State *
                       </label>
                       <input
                         type="text"
-                        name="centerAddress.pincode"
-                        value={formData.centerAddress.pincode}
+                        name="centerAddress.state"
+                        value={formData.centerAddress.state}
                         onChange={handleChange}
-                        placeholder="6-digit pincode"
-                        pattern="[0-9]{6}"
+                        placeholder="State"
                         className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${
-                          errors['centerAddress.pincode'] ? "border-red-500" : "border-gray-300"
+                          errors['centerAddress.state'] ? "border-red-500" : "border-gray-300"
                         }`}
                         required
                       />
-                      {errors['centerAddress.pincode'] && (
-                        <p className="text-red-500 text-sm mt-1">{errors['centerAddress.pincode']}</p>
+                      {errors['centerAddress.state'] && (
+                        <p className="text-red-500 text-sm mt-1">{errors['centerAddress.state']}</p>
                       )}
                     </div>
                   </div>

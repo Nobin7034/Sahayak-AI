@@ -32,15 +32,45 @@ const Login = () => {
     setError("");
 
     try {
+      // First try regular login to detect user role
       const result = await login(formData.email, formData.password);
 
       if (result.success) {
+        // If user is staff, use staff login endpoint to get complete staff data
+        if (result.user.role === "staff") {
+          try {
+            const staffResponse = await axios.post('/api/staff/login', {
+              email: formData.email,
+              password: formData.password
+            });
+
+            if (staffResponse.data.success) {
+              // Store staff-specific data
+              localStorage.setItem("token", staffResponse.data.data.token);
+              localStorage.setItem("user", JSON.stringify(staffResponse.data.data.user));
+              localStorage.setItem("staff", JSON.stringify(staffResponse.data.data.staff));
+              axios.defaults.headers.common["Authorization"] = `Bearer ${staffResponse.data.data.token}`;
+              
+              navigate("/staff/dashboard");
+              return;
+            }
+          } catch (staffError) {
+            console.error("Staff login error:", staffError);
+            setError("Failed to load staff data. Please try again.");
+            return;
+          }
+        }
+
+        // For regular users and admins
         localStorage.setItem("token", result.token);
         localStorage.setItem("user", JSON.stringify(result.user));
         axios.defaults.headers.common["Authorization"] = `Bearer ${result.token}`;
 
         // Automatically redirect based on user role
-        const destination = result.user.role === "admin" ? "/admin/dashboard" : "/dashboard";
+        let destination = "/dashboard"; // default for regular users
+        if (result.user.role === "admin") {
+          destination = "/admin/dashboard";
+        }
         navigate(destination);
       } else {
         setError(result.error || "Login failed");
@@ -72,8 +102,33 @@ const Login = () => {
       if (result.success) {
         console.log("✅ Firebase Google login success");
 
+        // For staff users from Google login, we need to handle them differently
+        // since we don't have their password for the staff endpoint
+        if (result.user.role === "staff") {
+          // For Google-authenticated staff users, we'll need to create a special endpoint
+          // or modify the existing staff data retrieval. For now, let's try to get staff data
+          try {
+            const staffDataResponse = await axios.get('/api/staff/profile', {
+              headers: { 'Authorization': `Bearer ${result.token || localStorage.getItem('token')}` }
+            });
+            
+            if (staffDataResponse.data.success && staffDataResponse.data.data.staff) {
+              localStorage.setItem("staff", JSON.stringify(staffDataResponse.data.data.staff));
+            }
+          } catch (staffError) {
+            console.warn("Could not fetch staff data for Google login:", staffError);
+            // Continue anyway - the staff dashboard will handle missing staff data gracefully
+          }
+          
+          navigate("/staff/dashboard");
+          return;
+        }
+
         // Automatically redirect based on user role
-        const destination = result.user.role === "admin" ? "/admin/dashboard" : "/dashboard";
+        let destination = "/dashboard"; // default for regular users
+        if (result.user.role === "admin") {
+          destination = "/admin/dashboard";
+        }
         navigate(destination);
       } else {
         console.error("❌ Firebase Google login failed:", result.error);
@@ -126,6 +181,9 @@ const Login = () => {
           <h2 className="text-2xl font-bold text-gray-900 mb-1 text-center">
             {t('login.title', language)}
           </h2>
+          <p className="text-center text-sm text-gray-600 mb-4">
+            Sign in to access your dashboard
+          </p>
           
 
           {/* Error Message */}
@@ -248,6 +306,13 @@ const Login = () => {
               {t('login.signUp', language)}
             </Link>
           </p>
+          
+          {/* Universal Login Info */}
+          <div className="mt-4 text-center">
+            <p className="text-xs text-gray-500">
+              This login works for all users: Regular users, Staff members, and Administrators
+            </p>
+          </div>
         </div>
       </div>
     </div>

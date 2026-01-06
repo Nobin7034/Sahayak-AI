@@ -16,7 +16,7 @@ const LandingPage = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await axios.get('/news/latest/3')
+        const res = await axios.get('/api/news/latest/3')
         if (res.data.success) setLatest(res.data.data)
       } catch (e) {
         console.error('Failed to load latest news', e)

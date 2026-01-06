@@ -48,7 +48,7 @@ const AdminUsers = () => {
           response.data.data.users.map(async (staffMember) => {
             try {
               // Try to get center information
-              const centersResponse = await axios.get('/centers/admin/all')
+              const centersResponse = await axios.get('/api/centers/admin/all')
               if (centersResponse.data.success) {
                 const associatedCenter = centersResponse.data.centers.find(
                   center => center.registeredBy && center.registeredBy._id === staffMember._id

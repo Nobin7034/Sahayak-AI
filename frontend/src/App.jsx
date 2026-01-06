@@ -25,11 +25,11 @@ import AdminSettings from './pages/admin/AdminSettings'
 import AdminCenters from './pages/admin/AdminCenters'
 import CenterFinder from './pages/CenterFinder'
 import BookAppointment from './pages/BookAppointment'
-import StaffLogin from './pages/staff/StaffLogin'
 import StaffDashboard from './pages/staff/StaffDashboard'
 import StaffAppointments from './pages/staff/StaffAppointments'
 import StaffServices from './pages/staff/StaffServices'
 import StaffAnalytics from './pages/staff/StaffAnalytics'
+import StaffProfile from './pages/staff/StaffProfile'
 import StaffLayout from './components/StaffLayout'
 
 function App() {
@@ -191,11 +191,6 @@ function App() {
           } />
 
           {/* Staff Routes */}
-          <Route path="/staff/login" element={
-            <div className="min-h-screen bg-gray-50">
-              <StaffLogin />
-            </div>
-          } />
           <Route path="/staff/dashboard" element={
             <ProtectedRoute>
               <StaffLayout>
@@ -221,6 +216,13 @@ function App() {
             <ProtectedRoute>
               <StaffLayout>
                 <StaffAnalytics />
+              </StaffLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/profile" element={
+            <ProtectedRoute>
+              <StaffLayout>
+                <StaffProfile />
               </StaffLayout>
             </ProtectedRoute>
           } />
