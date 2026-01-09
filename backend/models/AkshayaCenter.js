@@ -188,7 +188,44 @@ akshayaCenterSchema.methods.timeStringToNumber = function(timeString) {
   return hours * 100 + minutes;
 };
 
-// Static method to find nearby centers
+// Static method to auto-assign all services to all centers
+akshayaCenterSchema.statics.autoAssignServicesToAllCenters = async function() {
+  try {
+    const Service = mongoose.model('Service');
+    const allServices = await Service.find({});
+    const serviceIds = allServices.map(service => service._id);
+    
+    const result = await this.updateMany(
+      { status: 'active' },
+      { $addToSet: { services: { $each: serviceIds } } }
+    );
+    
+    return {
+      servicesCount: serviceIds.length,
+      centersUpdated: result.modifiedCount
+    };
+  } catch (error) {
+    console.error('Error auto-assigning services to centers:', error);
+    throw error;
+  }
+};
+
+// Static method to assign a specific service to all centers
+akshayaCenterSchema.statics.assignServiceToAllCenters = async function(serviceId) {
+  try {
+    const result = await this.updateMany(
+      { status: 'active' },
+      { $addToSet: { services: serviceId } }
+    );
+    
+    return {
+      centersUpdated: result.modifiedCount
+    };
+  } catch (error) {
+    console.error('Error assigning service to centers:', error);
+    throw error;
+  }
+};
 akshayaCenterSchema.statics.findNearby = function(longitude, latitude, maxDistance = 50000) {
   return this.find({
     location: {
@@ -221,9 +258,23 @@ akshayaCenterSchema.methods.toRadians = function(degrees) {
   return degrees * (Math.PI/180);
 };
 
-// Pre-save middleware to update lastUpdated
-akshayaCenterSchema.pre('save', function(next) {
+// Pre-save middleware to update lastUpdated and auto-assign services for new centers
+akshayaCenterSchema.pre('save', async function(next) {
   this.metadata.lastUpdated = new Date();
+  
+  // If this is a new center (not an update), auto-assign all existing services
+  if (this.isNew && (!this.services || this.services.length === 0)) {
+    try {
+      const Service = mongoose.model('Service');
+      const allServices = await Service.find({});
+      this.services = allServices.map(service => service._id);
+      console.log(`Auto-assigned ${allServices.length} services to new center: ${this.name}`);
+    } catch (error) {
+      console.error('Error auto-assigning services to new center:', error);
+      // Don't fail the save operation, just log the error
+    }
+  }
+  
   next();
 });
 

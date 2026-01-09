@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Services from './pages/Services'
 import ServiceDetails from './pages/ServiceDetails'
+import ServiceApplication from './pages/ServiceApplication'
 import Appointments from './pages/Appointments'
 import News from './pages/News'
 import NewsDetail from './pages/NewsDetail'
@@ -71,6 +72,24 @@ function App() {
               <div className="min-h-screen bg-gray-50">
                 <Navbar />
                 <ServiceDetails />
+                <Footer />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/service/:id/apply" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <ServiceApplication />
+                <Footer />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/book-appointment" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <BookAppointment />
                 <Footer />
               </div>
             </ProtectedRoute>

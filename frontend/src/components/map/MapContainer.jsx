@@ -86,48 +86,66 @@ const MapContainer = ({
         )}
         
         {/* Akshaya center markers */}
-        {centers.filter(center => 
-          center.location && 
-          center.location.coordinates && 
-          center.location.coordinates.length === 2
-        ).map((center) => (
-          <Marker
-            key={center._id}
-            position={[center.location.coordinates[1], center.location.coordinates[0]]}
-            eventHandlers={{
-              click: () => handleMarkerClick(center)
-            }}
-          >
-            <Popup>
-              <div className="p-2">
-                <h3 className="font-semibold text-lg">{center.name || 'Unnamed Center'}</h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  {center.address?.street && `${center.address.street}, `}
-                  {center.address?.city || 'Unknown City'}
-                </p>
-                {center.contact?.phone && (
-                  <p className="text-sm">
-                    <strong>Phone:</strong> {center.contact.phone}
+        {centers.map((center) => {
+          // Validate center has proper location data
+          if (!center.location || !center.location.coordinates || center.location.coordinates.length !== 2) {
+            return null;
+          }
+
+          const [lng, lat] = center.location.coordinates;
+          
+          // Validate coordinates are valid numbers
+          if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return null;
+          }
+
+          return (
+            <Marker
+              key={center._id}
+              position={[lat, lng]}
+              eventHandlers={{
+                click: () => handleMarkerClick(center)
+              }}
+            >
+              <Popup>
+                <div className="p-2">
+                  <h3 className="font-semibold text-lg">{center.name || 'Unnamed Center'}</h3>
+                  <p className="text-sm text-gray-600 mb-2">
+                    {center.address?.street && `${center.address.street}, `}
+                    {center.address?.city || 'Unknown City'}
                   </p>
-                )}
-                {center.contact?.email && (
-                  <p className="text-sm">
-                    <strong>Email:</strong> {center.contact.email}
-                  </p>
-                )}
-                <div className="mt-2">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    center.status === 'active' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {center.status === 'active' ? 'Open' : 'Closed'}
-                  </span>
+                  {center.contact?.phone && (
+                    <p className="text-sm">
+                      <strong>Phone:</strong> {center.contact.phone}
+                    </p>
+                  )}
+                  {center.contact?.email && (
+                    <p className="text-sm">
+                      <strong>Email:</strong> {center.contact.email}
+                    </p>
+                  )}
+                  {center.distance && (
+                    <p className="text-sm text-blue-600 font-medium">
+                      <strong>Distance:</strong> {center.distance < 1 
+                        ? `${Math.round(center.distance * 1000)}m away`
+                        : `${center.distance.toFixed(1)}km away`
+                      }
+                    </p>
+                  )}
+                  <div className="mt-2">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      center.status === 'active' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {center.status === 'active' ? 'Open' : 'Closed'}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          );
+        }).filter(Boolean)}
       </LeafletMapContainer>
     </div>
   );

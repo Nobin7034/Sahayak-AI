@@ -118,22 +118,33 @@ class CenterService {
   // Filter centers by distance from a point
   filterCentersByDistance(centers, userLat, userLng, maxDistance) {
     return centers.filter(center => {
-      const distance = this.calculateDistance(
-        userLat, 
-        userLng, 
-        center.location.coordinates[1], 
-        center.location.coordinates[0]
-      );
-      return distance <= maxDistance;
+      // Check if center has valid location coordinates
+      if (!center.location || !center.location.coordinates || center.location.coordinates.length !== 2) {
+        console.warn(`Center ${center.name} has invalid location coordinates:`, center.location);
+        return false;
+      }
+      
+      try {
+        const distance = this.calculateDistance(
+          userLat, 
+          userLng, 
+          center.location.coordinates[1], // latitude
+          center.location.coordinates[0]  // longitude
+        );
+        return distance <= maxDistance;
+      } catch (error) {
+        console.error(`Error calculating distance for center ${center.name}:`, error);
+        return false;
+      }
     }).map(center => ({
       ...center,
       distance: this.calculateDistance(
         userLat, 
         userLng, 
-        center.location.coordinates[1], 
-        center.location.coordinates[0]
+        center.location.coordinates[1], // latitude
+        center.location.coordinates[0]  // longitude
       )
-    }));
+    })).sort((a, b) => a.distance - b.distance); // Sort by distance, closest first
   }
 }
 

@@ -182,17 +182,17 @@ const Services = () => {
 
                   <div className="space-y-2">
                     <Link
-                      to={`/service/${service._id}`}
-                      className="w-full btn-secondary flex items-center justify-center"
+                      to={`/service/${service._id}/apply`}
+                      className="w-full btn-primary flex items-center justify-center"
                     >
-                      View Details
+                      Start Application
                       <ArrowRight className="ml-2 w-4 h-4" />
                     </Link>
                     <Link
-                      to={`/centers?service=${service._id}`}
-                      className="w-full btn-primary flex items-center justify-center"
+                      to={`/service/${service._id}`}
+                      className="w-full btn-secondary flex items-center justify-center text-sm"
                     >
-                      Select Center & Book
+                      View Full Details
                       <ArrowRight className="ml-2 w-4 h-4" />
                     </Link>
                   </div>

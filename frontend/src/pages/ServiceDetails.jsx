@@ -19,7 +19,7 @@ const ServiceDetails = () => {
   const fetchService = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`/services/${id}`)
+      const response = await axios.get(`/api/services/${id}`)
       if (response.data.success) {
         setService(response.data.data)
       } else {

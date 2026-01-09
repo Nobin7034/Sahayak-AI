@@ -266,6 +266,10 @@ router.post('/', async (req, res) => {
     const fullAddress = `${address.street}, ${address.city}, ${address.district}, ${address.state}, ${address.pincode}`;
     const geocodeResult = await geocodeAddress(fullAddress);
 
+    // Get all existing services to auto-assign to the new center
+    const allServices = await Service.find({});
+    const serviceIds = allServices.map(service => service._id);
+
     const centerData = {
       name,
       address,
@@ -275,16 +279,19 @@ router.post('/', async (req, res) => {
       },
       contact,
       operatingHours: operatingHours || {},
-      services,
+      services: serviceIds, // Auto-assign all existing services
       capacity: capacity || {}
     };
 
     const center = new AkshayaCenter(centerData);
     await center.save();
 
+    // Populate services for response
+    await center.populate('services', 'name category fees processingTime');
+
     res.status(201).json({
       success: true,
-      message: 'Center created successfully',
+      message: `Center created successfully with ${serviceIds.length} services automatically assigned`,
       center
     });
   } catch (error) {
@@ -428,4 +435,23 @@ router.delete('/:id/permanent', async (req, res) => {
   }
 });
 
+// POST /api/centers/sync-services - Sync all services to all centers (Admin only)
+router.post('/sync-services', async (req, res) => {
+  try {
+    const result = await AkshayaCenter.autoAssignServicesToAllCenters();
+    
+    res.json({
+      success: true,
+      message: `Successfully synced ${result.servicesCount} services to ${result.centersUpdated} centers`,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error syncing services to centers:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error syncing services to centers',
+      error: error.message
+    });
+  }
+});
 export default router;

@@ -299,6 +299,20 @@ router.post('/services', async (req, res) => {
     const service = new Service(serviceData);
     await service.save();
 
+    // Auto-assign this new service to all existing active centers
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    const centers = await AkshayaCenter.find({ status: 'active' });
+    
+    let centersUpdated = 0;
+    for (const center of centers) {
+      // Check if service is not already assigned
+      if (!center.services.includes(service._id)) {
+        center.services.push(service._id);
+        await center.save();
+        centersUpdated++;
+      }
+    }
+
     const populatedService = await Service.findById(service._id)
       .populate('createdBy', 'name email')
       .populate('documents.template')
@@ -306,8 +320,9 @@ router.post('/services', async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Service created successfully',
-      data: populatedService
+      message: `Service created successfully and automatically assigned to ${centersUpdated} centers`,
+      data: populatedService,
+      centersUpdated
     });
   } catch (error) {
     console.error('Create service error:', error);
