@@ -34,7 +34,7 @@ const AdminNews = () => {
   const fetchNews = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('/admin/news')
+      const response = await axios.get('/api/admin/news')
       if (response.data.success) {
         setNews(response.data.data)
       } else {
@@ -61,11 +61,11 @@ const AdminNews = () => {
       if (imageFile) data.append('image', imageFile)
       let response
       if (editingNews) {
-        response = await axios.put(`/admin/news/${editingNews._id}`, data, {
+        response = await axios.put(`/api/admin/news/${editingNews._id}`, data, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
       } else {
-        response = await axios.post('/admin/news', data, {
+        response = await axios.post('/api/admin/news', data, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
       }
@@ -99,7 +99,7 @@ const AdminNews = () => {
   const handleDelete = async (newsId) => {
     if (window.confirm('Are you sure you want to delete this news item?')) {
       try {
-        const response = await axios.delete(`/admin/news/${newsId}`)
+        const response = await axios.delete(`/api/admin/news/${newsId}`)
         if (response.data.success) {
           fetchNews()
         }

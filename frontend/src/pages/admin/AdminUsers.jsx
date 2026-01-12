@@ -24,7 +24,7 @@ const AdminUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`/admin/users?page=${currentPage}&limit=10&role=user`)
+      const response = await axios.get(`/api/admin/users?page=${currentPage}&limit=10&role=user`)
       if (response.data.success) {
         setUsers(response.data.data.users)
         setPagination(response.data.data.pagination)
@@ -41,7 +41,7 @@ const AdminUsers = () => {
 
   const fetchStaff = async () => {
     try {
-      const response = await axios.get(`/admin/users?role=staff`)
+      const response = await axios.get(`/api/admin/users?role=staff`)
       if (response.data.success) {
         // Enhance staff data with center information
         const staffWithCenters = await Promise.all(
@@ -77,7 +77,7 @@ const AdminUsers = () => {
 
   const toggleUserStatus = async (userId, currentStatus) => {
     try {
-      const response = await axios.patch(`/admin/users/${userId}/status`, {
+      const response = await axios.patch(`/api/admin/users/${userId}/status`, {
         isActive: !currentStatus
       })
       
@@ -113,7 +113,7 @@ const AdminUsers = () => {
 
       console.log('Approving staff with admin ID:', adminId);
       
-      const response = await axios.post(`/auth/admin/approve-staff/${userId}`, {
+      const response = await axios.post(`/api/auth/admin/approve-staff/${userId}`, {
         adminId: adminId,
         notes: 'Approved via admin panel'
       })
@@ -146,7 +146,7 @@ const AdminUsers = () => {
 
       console.log('Rejecting staff with admin ID:', adminId);
       
-      const response = await axios.post(`/auth/admin/reject-staff/${userId}`, {
+      const response = await axios.post(`/api/auth/admin/reject-staff/${userId}`, {
         adminId: adminId,
         reason: reason
       })

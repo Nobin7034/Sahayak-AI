@@ -101,6 +101,10 @@ const akshayaCenterSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Service'
   }],
+  hiddenServices: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Service'
+  }],
   status: {
     type: String,
     enum: ['active', 'inactive', 'maintenance'],

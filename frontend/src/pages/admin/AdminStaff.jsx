@@ -59,8 +59,8 @@ const AdminStaff = () => {
     try {
       setProcessingApproval(true);
       const endpoint = approvalAction === 'approve' 
-        ? `/auth/admin/approve-staff/${selectedRegistration._id}`
-        : `/auth/admin/reject-staff/${selectedRegistration._id}`;
+        ? `/api/auth/admin/approve-staff/${selectedRegistration._id}`
+        : `/api/auth/admin/reject-staff/${selectedRegistration._id}`;
 
       const payload = {
         adminId: JSON.parse(localStorage.getItem('user'))?.id,

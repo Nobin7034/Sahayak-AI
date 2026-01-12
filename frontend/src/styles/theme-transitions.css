@@ -1,0 +1,82 @@
+/* Theme transition styles for smooth color changes */
+
+/* Apply transitions to all elements that change color with theme */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+  transition-duration: 250ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Prevent transitions on page load to avoid flash */
+.preload * {
+  transition: none !important;
+}
+
+/* Specific transitions for common elements */
+.theme-transition {
+  transition: background-color 250ms ease-in-out, 
+              color 250ms ease-in-out, 
+              border-color 250ms ease-in-out,
+              box-shadow 250ms ease-in-out;
+}
+
+/* Faster transitions for interactive elements */
+button, 
+input, 
+select, 
+textarea,
+.interactive {
+  transition-duration: 200ms;
+}
+
+/* Preserve other animations and transitions */
+.animate-spin,
+.animate-pulse,
+.animate-bounce,
+[class*="animate-"] {
+  transition: none;
+}
+
+/* Focus ring transitions */
+*:focus {
+  transition: box-shadow 150ms ease-in-out;
+}
+
+/* Hover state transitions */
+*:hover {
+  transition-duration: 150ms;
+}
+
+/* Theme-specific root styles */
+[data-staff-theme="light"] {
+  color-scheme: light;
+}
+
+[data-staff-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Scrollbar theming */
+[data-staff-theme="light"] ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+[data-staff-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+[data-staff-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+[data-staff-theme="dark"] ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+[data-staff-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+[data-staff-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}

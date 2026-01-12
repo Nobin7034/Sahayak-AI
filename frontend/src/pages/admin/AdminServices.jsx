@@ -33,7 +33,7 @@ const AdminServices = () => {
   useEffect(() => {
     const loadTemplates = async () => {
       try {
-        const res = await axios.get('/admin/document-templates')
+        const res = await axios.get('/api/admin/document-templates')
         if (res.data.success) setTemplates(res.data.data)
       } catch (e) {
         console.warn('Failed to load document templates', e)
@@ -45,7 +45,7 @@ const AdminServices = () => {
   const fetchServices = async () => {
     try {
       setLoading(true)
-      const response = await axios.get('/admin/services')
+      const response = await axios.get('/api/admin/services')
       if (response.data.success) {
         setServices(response.data.data)
       } else {
@@ -97,9 +97,9 @@ const AdminServices = () => {
 
       let response
       if (editingService) {
-        response = await axios.put(`/admin/services/${editingService._id}`, serviceData)
+        response = await axios.put(`/api/admin/services/${editingService._id}`, serviceData)
       } else {
-        response = await axios.post('/admin/services', serviceData)
+        response = await axios.post('/api/admin/services', serviceData)
       }
 
       if (response.data.success) {
@@ -145,7 +145,7 @@ const AdminServices = () => {
   const handleDelete = async (serviceId) => {
     if (window.confirm('Are you sure you want to delete this service?')) {
       try {
-        const response = await axios.delete(`/admin/services/${serviceId}`)
+        const response = await axios.delete(`/api/admin/services/${serviceId}`)
         if (response.data.success) {
           fetchServices()
         }
@@ -558,7 +558,7 @@ const AdminServices = () => {
                                 const fd = new FormData()
                                 fd.append('image', file)
                                 try {
-                                  const res = await axios.post('/admin/document-templates/upload', fd, {
+                                  const res = await axios.post('/api/admin/document-templates/upload', fd, {
                                     headers: { 'Content-Type': 'multipart/form-data' }
                                   })
                                   if (res.data?.success && res.data?.imageUrl) {
@@ -614,7 +614,7 @@ const AdminServices = () => {
                               onClick={async () => {
                                 try {
                                   const payload = { title: d._templateTitle || d.name || 'Document', imageUrl: d.imageUrl }
-                                  const res = await axios.post('/admin/document-templates', payload)
+                                  const res = await axios.post('/api/admin/document-templates', payload)
                                   if (res.data?.success && res.data?.data) {
                                     setTemplates(prev => [res.data.data, ...prev])
                                     updateDocument(idx, { templateId: res.data.data._id, imageUrl: '', _templateTitle: '' })
@@ -690,7 +690,7 @@ const AdminServices = () => {
                                         const fd = new FormData()
                                         fd.append('image', file)
                                         try {
-                                          const res = await axios.post('/admin/document-templates/upload', fd, {
+                                          const res = await axios.post('/api/admin/document-templates/upload', fd, {
                                             headers: { 'Content-Type': 'multipart/form-data' }
                                           })
                                           if (res.data?.success && res.data?.imageUrl) {

@@ -1,10 +1,11 @@
 import express from 'express';
-import { userAuth } from '../middleware/auth.js';
+import { authenticate } from '../middleware/auth.js';
 import Notification from '../models/Notification.js';
 
 const router = express.Router();
 
-router.use(userAuth);
+// Use general authenticate middleware instead of userAuth to allow both users and staff
+router.use(authenticate);
 
 // List notifications for current user
 router.get('/', async (req, res) => {

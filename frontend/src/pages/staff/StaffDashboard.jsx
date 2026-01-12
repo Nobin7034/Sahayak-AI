@@ -20,6 +20,7 @@ import {
   Star
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useStaffTheme } from '../../contexts/StaffThemeContext';
 import staffApiService from '../../services/staffApiService';
 import { StaffMetricsGrid, StaffMetricsSummary } from '../../components/StaffMetricsCard';
 import StaffAppointmentsList from '../../components/StaffAppointmentsList';
@@ -39,6 +40,63 @@ const StaffDashboard = () => {
   const [networkError, setNetworkError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const { user } = useAuth();
+  const { theme } = useStaffTheme();
+
+  // Theme-based classes
+  const themeClasses = {
+    light: {
+      background: 'bg-gradient-to-br from-gray-50 via-gray-100 to-gray-50',
+      card: 'bg-white/80 backdrop-blur-sm border-gray-200',
+      cardSolid: 'bg-white border-gray-200',
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600',
+        tertiary: 'text-gray-500'
+      },
+      error: {
+        background: 'bg-red-50',
+        border: 'border-red-200',
+        text: 'text-red-700'
+      },
+      networkError: {
+        background: 'bg-red-50/90',
+        border: 'border-red-200/50',
+        text: 'text-red-700'
+      },
+      button: {
+        primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+        secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-700',
+        refresh: 'text-gray-500 hover:text-gray-700 focus:ring-blue-500'
+      }
+    },
+    dark: {
+      background: 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900',
+      card: 'bg-slate-800/50 backdrop-blur-sm border-slate-700',
+      cardSolid: 'bg-slate-800 border-slate-700',
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-300',
+        tertiary: 'text-slate-400'
+      },
+      error: {
+        background: 'bg-red-500/20',
+        border: 'border-red-500/30',
+        text: 'text-red-300'
+      },
+      networkError: {
+        background: 'bg-red-500/20',
+        border: 'border-red-500/30',
+        text: 'text-red-300'
+      },
+      button: {
+        primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+        secondary: 'bg-slate-700 hover:bg-slate-600 text-slate-300',
+        refresh: 'text-slate-400 hover:text-white focus:ring-blue-500'
+      }
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
 
   useEffect(() => {
     loadDashboardData();
@@ -272,14 +330,14 @@ const StaffDashboard = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className={`min-h-screen ${currentTheme.background} flex items-center justify-center`}>
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">Error Loading Dashboard</h2>
-          <p className="text-slate-300 mb-4">{error}</p>
+          <h2 className={`text-xl font-semibold ${currentTheme.text.primary} mb-2`}>Error Loading Dashboard</h2>
+          <p className={`${currentTheme.text.secondary} mb-4`}>{error}</p>
           <button
             onClick={() => loadDashboardData()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            className={`${currentTheme.button.primary} px-4 py-2 rounded-md transition-colors`}
           >
             Try Again
           </button>
@@ -294,7 +352,7 @@ const StaffDashboard = () => {
     <ErrorBoundary>
       <NetworkErrorBoundary onRetry={handleRefresh}>
         <div 
-          className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"
+          className={`min-h-screen ${currentTheme.background}`}
           role="main"
           aria-label="Staff Dashboard"
         >
@@ -320,7 +378,7 @@ const StaffDashboard = () => {
           {/* Network Error Banner */}
           {networkError && (
             <div 
-              className="bg-red-500/20 border-b border-red-500/30 p-3"
+              className={`${currentTheme.networkError.background} border-b ${currentTheme.networkError.border} p-3`}
               role="alert"
               aria-live="assertive"
             >
@@ -328,7 +386,7 @@ const StaffDashboard = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <AlertCircle className="h-5 w-5 text-red-400" aria-hidden="true" />
-                    <span className="text-red-300 text-sm">{networkError}</span>
+                    <span className={`${currentTheme.networkError.text} text-sm`}>{networkError}</span>
                     {retryCount > 0 && (
                       <span className="text-red-400 text-xs">
                         (Retry {retryCount}/3)
@@ -338,7 +396,7 @@ const StaffDashboard = () => {
                   <button
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className="text-red-300 hover:text-red-200 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 rounded"
+                    className={`${currentTheme.networkError.text} hover:text-red-200 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 rounded`}
                     aria-label="Retry connection"
                   >
                     {refreshing ? 'Retrying...' : 'Retry Now'}
@@ -349,7 +407,7 @@ const StaffDashboard = () => {
           )}
 
           {/* Header */}
-          <header className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
+          <header className={`${currentTheme.card} border-b`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
                 <div className="flex items-center space-x-4">
@@ -358,8 +416,8 @@ const StaffDashboard = () => {
                       <Building className="h-5 w-5 sm:h-6 sm:w-6 text-white" aria-hidden="true" />
                     </div>
                     <div>
-                      <h1 className="text-xl sm:text-2xl font-bold text-white">Staff Dashboard</h1>
-                      <p className="text-slate-300 text-sm sm:text-base">{centerStatus?.centerName}</p>
+                      <h1 className={`text-xl sm:text-2xl font-bold ${currentTheme.text.primary}`}>Staff Dashboard</h1>
+                      <p className={`${currentTheme.text.secondary} text-sm sm:text-base`}>{centerStatus?.centerName}</p>
                     </div>
                   </div>
                   
@@ -382,17 +440,17 @@ const StaffDashboard = () => {
                     <StaffNotifications />
                   </div>
                   <div className="flex items-center space-x-2">
-                    <div className="h-6 w-6 sm:h-8 sm:w-8 bg-slate-600 rounded-full flex items-center justify-center">
-                      <User className="h-3 w-3 sm:h-4 sm:w-4 text-slate-300" aria-hidden="true" />
+                    <div className={`h-6 w-6 sm:h-8 sm:w-8 ${theme === 'light' ? 'bg-gray-200' : 'bg-slate-600'} rounded-full flex items-center justify-center`}>
+                      <User className={`h-3 w-3 sm:h-4 sm:w-4 ${theme === 'light' ? 'text-gray-600' : 'text-slate-300'}`} aria-hidden="true" />
                     </div>
-                    <span className="text-white text-sm font-medium hidden sm:inline">
+                    <span className={`${currentTheme.text.primary} text-sm font-medium hidden sm:inline`}>
                       {staffInfo?.user?.name || user?.name}
                     </span>
                   </div>
                   <button
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className="p-2 text-slate-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                    className={`p-2 ${currentTheme.button.refresh} transition-colors focus:outline-none focus:ring-2 rounded`}
                     title={networkError ? 'Retry connection (Alt+R)' : 'Refresh data (Alt+R)'}
                     aria-label={networkError ? 'Retry connection' : 'Refresh dashboard data'}
                   >
@@ -414,12 +472,12 @@ const StaffDashboard = () => {
               
               {/* Center Status */}
               <ErrorBoundary fallback={({ retry }) => (
-                <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-6" role="alert">
-                  <h3 className="text-red-300 font-medium mb-2">Center Status Error</h3>
-                  <p className="text-red-400 text-sm mb-3">Failed to load center information</p>
+                <div className={`${currentTheme.error.background} border ${currentTheme.error.border} rounded-2xl p-6`} role="alert">
+                  <h3 className={`${currentTheme.error.text} font-medium mb-2`}>Center Status Error</h3>
+                  <p className={`${currentTheme.error.text} text-sm mb-3`}>Failed to load center information</p>
                   <button 
                     onClick={retry} 
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className={`${currentTheme.button.primary} px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   >
                     Retry
                   </button>
@@ -446,13 +504,13 @@ const StaffDashboard = () => {
               </ErrorBoundary>
 
               {/* Revenue Card */}
-              <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-slate-700">
+              <div className={`${currentTheme.card} rounded-2xl p-4 sm:p-6 border`}>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Today's Revenue</h3>
+                  <h3 className={`text-lg font-semibold ${currentTheme.text.primary}`}>Today's Revenue</h3>
                   <DollarSign className="h-5 w-5 text-green-400" aria-hidden="true" />
                 </div>
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold text-white" aria-label="Today's revenue: 2,450 rupees">₹2,450</div>
+                  <div className={`text-2xl font-bold ${currentTheme.text.primary}`} aria-label="Today's revenue: 2,450 rupees">₹2,450</div>
                   <div className="flex items-center space-x-2">
                     <TrendingUp className="h-4 w-4 text-green-400" aria-hidden="true" />
                     <span className="text-green-400 text-sm">+12% from yesterday</span>
@@ -462,11 +520,11 @@ const StaffDashboard = () => {
 
               {/* Quick Actions */}
               <ErrorBoundary fallback={({ retry }) => (
-                <div className="bg-red-500/20 border border-red-500/30 rounded-2xl p-6" role="alert">
-                  <h3 className="text-red-300 font-medium mb-2">Quick Actions Error</h3>
+                <div className={`${currentTheme.error.background} border ${currentTheme.error.border} rounded-2xl p-6`} role="alert">
+                  <h3 className={`${currentTheme.error.text} font-medium mb-2`}>Quick Actions Error</h3>
                   <button 
                     onClick={retry} 
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className={`${currentTheme.button.primary} px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   >
                     Retry
                   </button>
@@ -497,11 +555,11 @@ const StaffDashboard = () => {
             {/* Metrics Summary */}
             <section aria-label="Performance metrics summary" className="mb-6">
               <ErrorBoundary fallback={({ retry }) => (
-                <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4 mb-6" role="alert">
-                  <h3 className="text-red-300 font-medium mb-2">Metrics Error</h3>
+                <div className={`${currentTheme.error.background} border ${currentTheme.error.border} rounded-lg p-4 mb-6`} role="alert">
+                  <h3 className={`${currentTheme.error.text} font-medium mb-2`}>Metrics Error</h3>
                   <button 
                     onClick={retry} 
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className={`${currentTheme.button.primary} px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   >
                     Retry
                   </button>
@@ -518,11 +576,11 @@ const StaffDashboard = () => {
             {/* Detailed Metrics Grid */}
             <section aria-label="Detailed performance metrics" className="mb-6 sm:mb-8">
               <ErrorBoundary fallback={({ retry }) => (
-                <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4 mb-6" role="alert">
-                  <h3 className="text-red-300 font-medium mb-2">Dashboard Metrics Error</h3>
+                <div className={`${currentTheme.error.background} border ${currentTheme.error.border} rounded-lg p-4 mb-6`} role="alert">
+                  <h3 className={`${currentTheme.error.text} font-medium mb-2`}>Dashboard Metrics Error</h3>
                   <button 
                     onClick={retry} 
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className={`${currentTheme.button.primary} px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   >
                     Retry
                   </button>
@@ -545,11 +603,11 @@ const StaffDashboard = () => {
               
               {/* Upcoming Appointments */}
               <ErrorBoundary fallback={({ retry }) => (
-                <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-6" role="alert">
-                  <h3 className="text-red-300 font-medium mb-2">Appointments Error</h3>
+                <div className={`${currentTheme.error.background} border ${currentTheme.error.border} rounded-xl p-6`} role="alert">
+                  <h3 className={`${currentTheme.error.text} font-medium mb-2`}>Appointments Error</h3>
                   <button 
                     onClick={retry} 
-                    className="bg-red-600 text-white px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className={`${currentTheme.button.primary} px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400`}
                   >
                     Retry
                   </button>
@@ -569,13 +627,13 @@ const StaffDashboard = () => {
               </ErrorBoundary>
 
               {/* Recent Activity */}
-              <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-slate-700">
-                <h2 className="text-lg font-semibold text-white mb-4">Recent Activity</h2>
+              <div className={`${currentTheme.card} rounded-2xl p-4 sm:p-6 border`}>
+                <h2 className={`text-lg font-semibold ${currentTheme.text.primary} mb-4`}>Recent Activity</h2>
                 {(!recentActivity || recentActivity.length === 0) ? (
                   <div className="text-center py-8" role="status" aria-label="No recent activity">
-                    <AlertCircle className="h-12 w-12 text-slate-600 mx-auto mb-4" aria-hidden="true" />
-                    <p className="text-slate-400">No recent activity</p>
-                    <p className="text-slate-500 text-sm mt-1">Activity will appear here as you work</p>
+                    <AlertCircle className={`h-12 w-12 ${theme === 'light' ? 'text-gray-400' : 'text-slate-600'} mx-auto mb-4`} aria-hidden="true" />
+                    <p className={`${currentTheme.text.tertiary}`}>No recent activity</p>
+                    <p className={`${currentTheme.text.tertiary} text-sm mt-1`}>Activity will appear here as you work</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -585,8 +643,8 @@ const StaffDashboard = () => {
                           <AlertCircle className="h-4 w-4 text-blue-400" aria-hidden="true" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-slate-300 text-sm truncate">{activity.message}</p>
-                          <p className="text-slate-500 text-xs mt-1">{activity.time}</p>
+                          <p className={`${currentTheme.text.secondary} text-sm truncate`}>{activity.message}</p>
+                          <p className={`${currentTheme.text.tertiary} text-xs mt-1`}>{activity.time}</p>
                         </div>
                       </div>
                     ))}
@@ -597,7 +655,7 @@ const StaffDashboard = () => {
 
             {/* Last Updated */}
             <footer className="mt-6 sm:mt-8 text-center">
-              <p className="text-slate-500 text-sm">
+              <p className={`${currentTheme.text.tertiary} text-sm`}>
                 Last updated: {dashboardData?.lastUpdated ? new Date(dashboardData.lastUpdated).toLocaleString() : 'Just now'}
                 {retryCount > 0 && (
                   <span className="ml-2 text-yellow-400">

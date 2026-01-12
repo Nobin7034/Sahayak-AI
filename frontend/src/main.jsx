@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import './styles/theme-transitions.css'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { LanguageProvider } from './contexts/LanguageContext'
 

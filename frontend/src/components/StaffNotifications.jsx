@@ -197,7 +197,7 @@ const NotificationDropdown = ({
 }) => {
   if (!isOpen) return null;
 
-  const unreadNotifications = notifications.filter(n => !n.isRead);
+  const unreadNotifications = Array.isArray(notifications) ? notifications.filter(n => !n.isRead) : [];
 
   return (
     <div className="absolute right-0 top-full mt-2 w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50">
@@ -231,19 +231,19 @@ const NotificationDropdown = ({
 
       {/* Content */}
       <div className="max-h-96 overflow-y-auto">
-        {loading && notifications.length === 0 ? (
+        {loading && (!notifications || notifications.length === 0) ? (
           <div className="p-4 text-center">
             <RefreshCw className="h-6 w-6 text-slate-400 animate-spin mx-auto mb-2" />
             <p className="text-slate-400 text-sm">Loading notifications...</p>
           </div>
-        ) : notifications.length === 0 ? (
+        ) : (!notifications || notifications.length === 0) ? (
           <div className="p-8 text-center">
             <Bell className="h-12 w-12 text-slate-600 mx-auto mb-4" />
             <p className="text-slate-400">No notifications</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-700">
-            {notifications.map((notification) => (
+            {Array.isArray(notifications) && notifications.map((notification) => (
               <NotificationItem
                 key={notification._id}
                 notification={notification}
@@ -263,7 +263,7 @@ const NotificationDropdown = ({
       </div>
 
       {/* Footer */}
-      {notifications.length > 0 && (
+      {notifications && notifications.length > 0 && (
         <div className="p-3 border-t border-slate-700 text-center">
           <button 
             onClick={() => {
@@ -306,8 +306,11 @@ const StaffNotifications = ({
 
   useEffect(() => {
     // Update unread count when notifications change
-    const count = notifications.filter(n => !n.isRead).length;
-    setUnreadCount(count);
+    // Add safety check to ensure notifications is an array
+    if (Array.isArray(notifications)) {
+      const count = notifications.filter(n => !n.isRead).length;
+      setUnreadCount(count);
+    }
   }, [notifications]);
 
   const loadNotifications = async () => {
@@ -316,7 +319,9 @@ const StaffNotifications = ({
       const response = await staffApiService.getNotifications();
       
       if (response.success) {
-        setNotifications(response.data || []);
+        // Handle the correct API response structure
+        const notificationsData = response.data?.items || [];
+        setNotifications(notificationsData);
         setError('');
       }
     } catch (error) {
@@ -388,7 +393,7 @@ const StaffNotifications = ({
   };
 
   const handleMarkAllAsRead = async () => {
-    const unreadIds = notifications.filter(n => !n.isRead).map(n => n._id);
+    const unreadIds = Array.isArray(notifications) ? notifications.filter(n => !n.isRead).map(n => n._id) : [];
     
     // Update local state immediately
     setNotifications(prev => 
@@ -469,7 +474,9 @@ const NotificationsList = () => {
       const response = await staffApiService.getNotifications();
       
       if (response.success) {
-        setNotifications(response.data || []);
+        // Handle the correct API response structure
+        const notificationsData = response.data?.items || [];
+        setNotifications(notificationsData);
         setError('');
       }
     } catch (error) {
@@ -480,11 +487,11 @@ const NotificationsList = () => {
     }
   };
 
-  const filteredNotifications = notifications.filter(notification => {
+  const filteredNotifications = Array.isArray(notifications) ? notifications.filter(notification => {
     if (filter === 'unread') return !notification.isRead;
     if (filter === 'read') return notification.isRead;
     return true;
-  });
+  }) : [];
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -517,7 +524,7 @@ const NotificationsList = () => {
                 {filterType.charAt(0).toUpperCase() + filterType.slice(1)}
                 {filterType === 'unread' && (
                   <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1">
-                    {notifications.filter(n => !n.isRead).length}
+                    {Array.isArray(notifications) ? notifications.filter(n => !n.isRead).length : 0}
                   </span>
                 )}
               </button>
@@ -552,7 +559,7 @@ const NotificationsList = () => {
             </div>
           ) : (
             <div className="divide-y divide-slate-700">
-              {filteredNotifications.map((notification) => (
+              {Array.isArray(filteredNotifications) && filteredNotifications.map((notification) => (
                 <NotificationItem
                   key={notification._id}
                   notification={notification}

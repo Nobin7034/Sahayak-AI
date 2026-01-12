@@ -14,12 +14,32 @@ import {
   Calendar,
   Activity
 } from 'lucide-react';
+import { useStaffTheme } from '../contexts/StaffThemeContext';
 
 /**
  * WorkingStatusIndicator Component
  * Shows current working status with appropriate colors
  */
 const WorkingStatusIndicator = ({ isWorking, workingHours }) => {
+  const { theme } = useStaffTheme();
+  
+  const themeClasses = {
+    light: {
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600'
+      }
+    },
+    dark: {
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-400'
+      }
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
+
   const getCurrentTime = () => {
     return new Date().toLocaleTimeString('en-IN', { 
       hour: '2-digit', 
@@ -51,8 +71,8 @@ const WorkingStatusIndicator = ({ isWorking, workingHours }) => {
         </span>
       </div>
       <div className="text-right">
-        <p className="text-white text-sm font-medium">{currentTime}</p>
-        <p className="text-slate-400 text-xs">{workingHours}</p>
+        <p className={`text-sm font-medium ${currentTheme.text.primary}`}>{currentTime}</p>
+        <p className={`text-xs ${currentTheme.text.secondary}`}>{workingHours}</p>
       </div>
     </div>
   );
@@ -63,35 +83,58 @@ const WorkingStatusIndicator = ({ isWorking, workingHours }) => {
  * Displays center contact and location information
  */
 const CenterInfoSection = ({ centerInfo }) => {
+  const { theme } = useStaffTheme();
+  
+  const themeClasses = {
+    light: {
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600',
+        tertiary: 'text-gray-500'
+      },
+      icon: 'text-gray-500'
+    },
+    dark: {
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-300',
+        tertiary: 'text-slate-500'
+      },
+      icon: 'text-slate-400'
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
+
   return (
     <div className="space-y-3">
       <div className="flex items-center space-x-3">
-        <MapPin className="h-4 w-4 text-slate-400 flex-shrink-0" />
+        <MapPin className={`h-4 w-4 ${currentTheme.icon} flex-shrink-0`} />
         <div className="flex-1 min-w-0">
-          <p className="text-slate-300 text-sm truncate">{centerInfo?.address}</p>
-          <p className="text-slate-500 text-xs">{centerInfo?.district}, {centerInfo?.state}</p>
+          <p className={`${currentTheme.text.secondary} text-sm truncate`}>{centerInfo?.address}</p>
+          <p className={`${currentTheme.text.tertiary} text-xs`}>{centerInfo?.district}, {centerInfo?.state}</p>
         </div>
       </div>
       
       {centerInfo?.contact && (
         <div className="flex items-center space-x-3">
-          <Phone className="h-4 w-4 text-slate-400 flex-shrink-0" />
-          <span className="text-slate-300 text-sm">{centerInfo.contact}</span>
+          <Phone className={`h-4 w-4 ${currentTheme.icon} flex-shrink-0`} />
+          <span className={`${currentTheme.text.secondary} text-sm`}>{centerInfo.contact}</span>
         </div>
       )}
       
       {centerInfo?.email && (
         <div className="flex items-center space-x-3">
-          <Mail className="h-4 w-4 text-slate-400 flex-shrink-0" />
-          <span className="text-slate-300 text-sm">{centerInfo.email}</span>
+          <Mail className={`h-4 w-4 ${currentTheme.icon} flex-shrink-0`} />
+          <span className={`${currentTheme.text.secondary} text-sm`}>{centerInfo.email}</span>
         </div>
       )}
       
       {centerInfo?.rating && (
         <div className="flex items-center space-x-3">
-          <Star className="h-4 w-4 text-slate-400 flex-shrink-0" />
+          <Star className={`h-4 w-4 ${currentTheme.icon} flex-shrink-0`} />
           <div className="flex items-center space-x-2">
-            <span className="text-slate-300 text-sm">{centerInfo.rating}</span>
+            <span className={`${currentTheme.text.secondary} text-sm`}>{centerInfo.rating}</span>
             <div className="flex space-x-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
@@ -99,7 +142,7 @@ const CenterInfoSection = ({ centerInfo }) => {
                   className={`h-3 w-3 ${
                     star <= Math.floor(centerInfo.rating)
                       ? 'text-yellow-400 fill-current'
-                      : 'text-slate-600'
+                      : theme === 'light' ? 'text-gray-300' : 'text-slate-600'
                   }`}
                 />
               ))}
@@ -116,6 +159,31 @@ const CenterInfoSection = ({ centerInfo }) => {
  * Shows current staff shift information
  */
 const StaffShiftInfo = ({ staffInfo, shiftData }) => {
+  const { theme } = useStaffTheme();
+  
+  const themeClasses = {
+    light: {
+      container: 'bg-gray-100 border-gray-300',
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600',
+        tertiary: 'text-gray-500'
+      },
+      border: 'border-gray-300'
+    },
+    dark: {
+      container: 'bg-slate-700/30 border-slate-600',
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-300',
+        tertiary: 'text-slate-400'
+      },
+      border: 'border-slate-600'
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
+
   const getShiftStatus = () => {
     if (!shiftData) return { status: 'unknown', message: 'Shift data unavailable' };
     
@@ -172,34 +240,34 @@ const StaffShiftInfo = ({ staffInfo, shiftData }) => {
   const shiftStatus = getShiftStatus();
 
   return (
-    <div className="bg-slate-700/30 rounded-lg p-3 border border-slate-600">
+    <div className={`${currentTheme.container} rounded-lg p-3 border`}>
       <div className="flex items-center justify-between mb-2">
-        <h4 className="text-white font-medium text-sm">Your Shift</h4>
+        <h4 className={`${currentTheme.text.primary} font-medium text-sm`}>Your Shift</h4>
         <div className={`h-2 w-2 rounded-full ${
           shiftStatus.status === 'active' ? 'bg-green-400' :
           shiftStatus.status === 'upcoming' ? 'bg-yellow-400' :
           shiftStatus.status === 'ended' ? 'bg-red-400' :
-          'bg-slate-400'
+          theme === 'light' ? 'bg-gray-400' : 'bg-slate-400'
         }`}></div>
       </div>
       
-      <p className="text-slate-300 text-xs mb-1">{shiftStatus.message}</p>
+      <p className={`${currentTheme.text.secondary} text-xs mb-1`}>{shiftStatus.message}</p>
       
       {shiftStatus.timeRemaining && (
-        <p className="text-slate-400 text-xs">
+        <p className={`${currentTheme.text.tertiary} text-xs`}>
           {formatMinutesToTime(shiftStatus.timeRemaining)} remaining
         </p>
       )}
       
       {shiftStatus.timeUntil && (
-        <p className="text-slate-400 text-xs">
+        <p className={`${currentTheme.text.tertiary} text-xs`}>
           Starts in {formatMinutesToTime(shiftStatus.timeUntil)}
         </p>
       )}
       
       {shiftData?.breakTime && (
-        <div className="mt-2 pt-2 border-t border-slate-600">
-          <p className="text-slate-400 text-xs">
+        <div className={`mt-2 pt-2 border-t ${currentTheme.border}`}>
+          <p className={`${currentTheme.text.tertiary} text-xs`}>
             Break: {shiftData.breakTime.start} - {shiftData.breakTime.end}
           </p>
         </div>
@@ -213,6 +281,27 @@ const StaffShiftInfo = ({ staffInfo, shiftData }) => {
  * Shows center performance metrics
  */
 const CenterMetrics = ({ metrics, loading = false }) => {
+  const { theme } = useStaffTheme();
+  
+  const themeClasses = {
+    light: {
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600'
+      },
+      skeleton: 'bg-gray-200'
+    },
+    dark: {
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-400'
+      },
+      skeleton: 'bg-slate-600'
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
+
   const metricsData = [
     {
       label: 'Today\'s Visitors',
@@ -239,8 +328,8 @@ const CenterMetrics = ({ metrics, loading = false }) => {
       <div className="grid grid-cols-3 gap-3">
         {metricsData.map((_, index) => (
           <div key={index} className="text-center">
-            <div className="h-4 bg-slate-600 rounded animate-pulse mb-1"></div>
-            <div className="h-3 bg-slate-600 rounded animate-pulse w-8 mx-auto"></div>
+            <div className={`h-4 ${currentTheme.skeleton} rounded animate-pulse mb-1`}></div>
+            <div className={`h-3 ${currentTheme.skeleton} rounded animate-pulse w-8 mx-auto`}></div>
           </div>
         ))}
       </div>
@@ -256,8 +345,8 @@ const CenterMetrics = ({ metrics, loading = false }) => {
             <div className="flex items-center justify-center mb-1">
               <Icon className={`h-4 w-4 ${metric.color}`} />
             </div>
-            <p className="text-white text-sm font-medium">{metric.value}</p>
-            <p className="text-slate-400 text-xs">{metric.label}</p>
+            <p className={`${currentTheme.text.primary} text-sm font-medium`}>{metric.value}</p>
+            <p className={`${currentTheme.text.secondary} text-xs`}>{metric.label}</p>
           </div>
         );
       })}
@@ -278,6 +367,31 @@ const CenterStatusCard = ({
   showShiftInfo = true,
   showMetrics = true
 }) => {
+  const { theme } = useStaffTheme();
+  
+  // Theme-based classes
+  const themeClasses = {
+    light: {
+      card: 'bg-white/80 backdrop-blur-sm border-gray-200',
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600',
+        tertiary: 'text-gray-500'
+      },
+      skeleton: 'bg-gray-200'
+    },
+    dark: {
+      card: 'bg-slate-800/50 backdrop-blur-sm border-slate-700',
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-300',
+        tertiary: 'text-slate-400'
+      },
+      skeleton: 'bg-slate-600'
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
   const [realTimeData, setRealTimeData] = useState({
     isWorking: true,
     workingHours: '9:00 AM - 5:00 PM',
@@ -316,15 +430,15 @@ const CenterStatusCard = ({
 
   if (loading) {
     return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+      <div className={`${currentTheme.card} rounded-2xl p-6 border`}>
         <div className="flex items-center justify-between mb-4">
-          <div className="h-5 bg-slate-600 rounded animate-pulse w-32"></div>
-          <div className="h-4 w-4 bg-slate-600 rounded animate-pulse"></div>
+          <div className={`h-5 ${currentTheme.skeleton} rounded animate-pulse w-32`}></div>
+          <div className={`h-4 w-4 ${currentTheme.skeleton} rounded animate-pulse`}></div>
         </div>
         <div className="space-y-3">
-          <div className="h-4 bg-slate-600 rounded animate-pulse"></div>
-          <div className="h-4 bg-slate-600 rounded animate-pulse w-3/4"></div>
-          <div className="h-4 bg-slate-600 rounded animate-pulse w-1/2"></div>
+          <div className={`h-4 ${currentTheme.skeleton} rounded animate-pulse`}></div>
+          <div className={`h-4 ${currentTheme.skeleton} rounded animate-pulse w-3/4`}></div>
+          <div className={`h-4 ${currentTheme.skeleton} rounded animate-pulse w-1/2`}></div>
         </div>
       </div>
     );
@@ -332,9 +446,9 @@ const CenterStatusCard = ({
 
   if (error) {
     return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-red-500/30">
+      <div className={`${currentTheme.card} rounded-2xl p-6 border border-red-500/30`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Center Status</h3>
+          <h3 className={`text-lg font-semibold ${currentTheme.text.primary}`}>Center Status</h3>
           <AlertCircle className="h-5 w-5 text-red-400" />
         </div>
         <div className="text-center py-4">
@@ -353,9 +467,9 @@ const CenterStatusCard = ({
   }
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+    <div className={`${currentTheme.card} rounded-2xl p-6 border`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">Center Status</h3>
+        <h3 className={`text-lg font-semibold ${currentTheme.text.primary}`}>Center Status</h3>
         <div className="flex items-center space-x-2">
           {onRefresh && (
             <button
@@ -379,14 +493,14 @@ const CenterStatusCard = ({
       <div className="mt-4 space-y-4">
         {/* Center Information */}
         <div>
-          <h4 className="text-white font-medium mb-2 text-sm">Center Information</h4>
+          <h4 className={`${currentTheme.text.primary} font-medium mb-2 text-sm`}>Center Information</h4>
           <CenterInfoSection centerInfo={centerInfo} />
         </div>
 
         {/* Center Metrics */}
         {showMetrics && (
           <div>
-            <h4 className="text-white font-medium mb-2 text-sm">Today's Overview</h4>
+            <h4 className={`${currentTheme.text.primary} font-medium mb-2 text-sm`}>Today's Overview</h4>
             <CenterMetrics 
               metrics={{
                 todayVisitors: realTimeData.todayVisitors,
@@ -401,7 +515,7 @@ const CenterStatusCard = ({
         {/* Staff Shift Information */}
         {showShiftInfo && staffInfo && (
           <div>
-            <h4 className="text-white font-medium mb-2 text-sm">Shift Information</h4>
+            <h4 className={`${currentTheme.text.primary} font-medium mb-2 text-sm`}>Shift Information</h4>
             <StaffShiftInfo 
               staffInfo={staffInfo}
               shiftData={shiftData}
@@ -411,8 +525,8 @@ const CenterStatusCard = ({
       </div>
 
       {/* Last Updated */}
-      <div className="mt-4 pt-3 border-t border-slate-700">
-        <p className="text-slate-500 text-xs text-center">
+      <div className={`mt-4 pt-3 border-t ${theme === 'light' ? 'border-gray-200' : 'border-slate-700'}`}>
+        <p className={`${currentTheme.text.tertiary} text-xs text-center`}>
           Last updated: {new Date().toLocaleTimeString()}
         </p>
       </div>

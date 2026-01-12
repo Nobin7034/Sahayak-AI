@@ -148,6 +148,87 @@ class StaffApiService {
   }
 
   /**
+   * Get available services (all services minus hidden ones)
+   */
+  async getAvailableServices() {
+    try {
+      const response = await axios.get(`${this.baseURL}/services/available`, {
+        headers: this.getAuthHeaders()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Available services API error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get hidden services
+   */
+  async getHiddenServices() {
+    try {
+      const response = await axios.get(`${this.baseURL}/services/hidden`, {
+        headers: this.getAuthHeaders()
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Hidden services API error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Hide/unhide a service
+   */
+  async toggleServiceVisibility(serviceId, hidden) {
+    try {
+      const response = await axios.put(
+        `${this.baseURL}/services/${serviceId}/hide`,
+        { hidden },
+        { headers: this.getAuthHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Toggle service visibility API error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Toggle service availability at center
+   */
+  async toggleServiceAvailability(serviceId, enabled) {
+    try {
+      const response = await axios.put(
+        `${this.baseURL}/services/${serviceId}/toggle`,
+        { enabled },
+        { headers: this.getAuthHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Toggle service availability API error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Update service settings
+   */
+  async updateServiceSettings(serviceId, settings) {
+    try {
+      const response = await axios.put(
+        `${this.baseURL}/services/${serviceId}/settings`,
+        settings,
+        { headers: this.getAuthHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Update service settings API error:', error);
+      throw this.handleError(error);
+    }
+  }
+
+  /**
    * Get analytics data
    */
   async getAnalytics(period = 'month', type = 'appointments') {
@@ -177,7 +258,7 @@ class StaffApiService {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('staff');
-          window.location.href = '/staff/login';
+          window.location.href = '/login';
           return new Error('Session expired. Please login again.');
           
         case 403:

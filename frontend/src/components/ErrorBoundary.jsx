@@ -252,8 +252,8 @@ const AuthErrorHandler = ({ children }) => {
         localStorage.removeItem('user');
         localStorage.removeItem('staff');
         
-        // Redirect to staff login
-        window.location.href = '/staff/login?reason=session_expired';
+        // Redirect to login
+        window.location.href = '/login?reason=session_expired';
       }
     };
 

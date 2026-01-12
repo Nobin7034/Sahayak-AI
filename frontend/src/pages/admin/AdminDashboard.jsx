@@ -75,7 +75,7 @@ const AdminDashboard = () => {
 
       console.log('AdminDashboard - Making request with config:', config)
       
-      const response = await axios.get('/admin/dashboard-stats', config)
+      const response = await axios.get('/api/admin/dashboard-stats', config)
       
       console.log('AdminDashboard - Dashboard response:', response.data)
       
@@ -112,7 +112,7 @@ const AdminDashboard = () => {
       setSending(true)
       const token = localStorage.getItem('token')
       const config = { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
-      const res = await axios.post('/admin/broadcast/appointments', {
+      const res = await axios.post('/api/admin/broadcast/appointments', {
         date: broadcast.date,
         title: broadcast.title,
         message: broadcast.message,

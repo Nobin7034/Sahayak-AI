@@ -2,21 +2,18 @@ import React, { useState } from 'react';
 import { 
   Plus, 
   Calendar, 
-  FileText, 
   Users, 
   Settings, 
   BarChart3,
   Upload,
-  Download,
   Search,
-  Edit,
   CheckCircle,
   AlertCircle,
   Clock,
   RefreshCw,
-  Eye,
   Printer
 } from 'lucide-react';
+import { useStaffTheme } from '../contexts/StaffThemeContext';
 
 /**
  * ActionButton Component
@@ -34,6 +31,7 @@ const ActionButton = ({
   size = 'normal',
   tooltip = null
 }) => {
+  const { theme } = useStaffTheme();
   const [feedback, setFeedback] = useState(null);
 
   // Check if user has required permission
@@ -61,26 +59,30 @@ const ActionButton = ({
   };
 
   const getVariantClasses = () => {
-    const baseClasses = 'transition-all duration-200 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800';
+    const baseClasses = `transition-all duration-200 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${theme === 'light' ? 'focus:ring-offset-white' : 'focus:ring-offset-slate-800'}`;
     
     if (isDisabled) {
-      return `${baseClasses} bg-slate-700 text-slate-500 cursor-not-allowed`;
+      return `${baseClasses} ${theme === 'light' ? 'bg-gray-200 text-gray-400' : 'bg-slate-700 text-slate-500'} cursor-not-allowed`;
     }
 
-    switch (variant) {
-      case 'primary':
-        return `${baseClasses} bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500`;
-      case 'secondary':
-        return `${baseClasses} bg-slate-600 hover:bg-slate-700 text-white focus:ring-slate-500`;
-      case 'success':
-        return `${baseClasses} bg-green-600 hover:bg-green-700 text-white focus:ring-green-500`;
-      case 'warning':
-        return `${baseClasses} bg-yellow-600 hover:bg-yellow-700 text-white focus:ring-yellow-500`;
-      case 'danger':
-        return `${baseClasses} bg-red-600 hover:bg-red-700 text-white focus:ring-red-500`;
-      default:
-        return `${baseClasses} bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500`;
-    }
+    const lightVariants = {
+      primary: `${baseClasses} bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500`,
+      secondary: `${baseClasses} bg-gray-200 hover:bg-gray-300 text-gray-700 focus:ring-gray-500`,
+      success: `${baseClasses} bg-green-600 hover:bg-green-700 text-white focus:ring-green-500`,
+      warning: `${baseClasses} bg-yellow-600 hover:bg-yellow-700 text-white focus:ring-yellow-500`,
+      danger: `${baseClasses} bg-red-600 hover:bg-red-700 text-white focus:ring-red-500`
+    };
+
+    const darkVariants = {
+      primary: `${baseClasses} bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500`,
+      secondary: `${baseClasses} bg-slate-600 hover:bg-slate-700 text-white focus:ring-slate-500`,
+      success: `${baseClasses} bg-green-600 hover:bg-green-700 text-white focus:ring-green-500`,
+      warning: `${baseClasses} bg-yellow-600 hover:bg-yellow-700 text-white focus:ring-yellow-500`,
+      danger: `${baseClasses} bg-red-600 hover:bg-red-700 text-white focus:ring-red-500`
+    };
+
+    const variants = theme === 'light' ? lightVariants : darkVariants;
+    return variants[variant] || variants.primary;
   };
 
   const getSizeClasses = () => {
@@ -167,7 +169,30 @@ const StaffQuickActions = ({
   columns = 2,
   title = "Quick Actions"
 }) => {
+  const { theme } = useStaffTheme();
   const [actionStates, setActionStates] = useState({});
+
+  // Theme-based classes
+  const themeClasses = {
+    light: {
+      card: 'bg-white/80 backdrop-blur-sm border-gray-200',
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600',
+        tertiary: 'text-gray-500'
+      }
+    },
+    dark: {
+      card: 'bg-slate-800/50 backdrop-blur-sm border-slate-700',
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-300',
+        tertiary: 'text-slate-400'
+      }
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
 
   const setActionLoading = (actionId, loading) => {
     setActionStates(prev => ({
@@ -305,11 +330,11 @@ const StaffQuickActions = ({
   );
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+    <div className={`${currentTheme.card} rounded-2xl p-6 border`}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <h3 className={`text-lg font-semibold ${currentTheme.text.primary}`}>{title}</h3>
         <div className="flex items-center space-x-2">
-          <span className="text-xs text-slate-400">
+          <span className={`text-xs ${currentTheme.text.tertiary}`}>
             {availableActions.length} actions available
           </span>
           {unavailableActions.length > 0 && (
@@ -322,9 +347,9 @@ const StaffQuickActions = ({
 
       {availableActions.length === 0 ? (
         <div className="text-center py-8">
-          <AlertCircle className="h-8 w-8 text-slate-600 mx-auto mb-2" />
-          <p className="text-slate-400 text-sm">No actions available</p>
-          <p className="text-slate-500 text-xs">Contact your administrator for permissions</p>
+          <AlertCircle className={`h-8 w-8 ${theme === 'light' ? 'text-gray-400' : 'text-slate-600'} mx-auto mb-2`} />
+          <p className={`${currentTheme.text.tertiary} text-sm`}>No actions available</p>
+          <p className={`${currentTheme.text.tertiary} text-xs`}>Contact your administrator for permissions</p>
         </div>
       ) : (
         <QuickActionsGrid
@@ -336,15 +361,15 @@ const StaffQuickActions = ({
 
       {/* Permission Info */}
       {unavailableActions.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className={`mt-4 pt-3 border-t ${theme === 'light' ? 'border-gray-200' : 'border-slate-700'}`}>
           <details className="group">
-            <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-300 transition-colors">
+            <summary className={`text-xs ${currentTheme.text.tertiary} cursor-pointer hover:${currentTheme.text.secondary} transition-colors`}>
               {unavailableActions.length} restricted actions
             </summary>
             <div className="mt-2 space-y-1">
               {unavailableActions.map((action, index) => (
                 <div key={index} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500">{action.label}</span>
+                  <span className={currentTheme.text.tertiary}>{action.label}</span>
                   <span className="text-red-400">Requires: {action.permission}</span>
                 </div>
               ))}

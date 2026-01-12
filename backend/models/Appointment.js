@@ -69,6 +69,23 @@ appointmentSchema.index({ center: 1, status: 1 });
 appointmentSchema.index({ center: 1, appointmentDate: 1, status: 1 });
 appointmentSchema.index({ user: 1, appointmentDate: -1 });
 
+// Middleware to ensure center is always populated for staff queries
+appointmentSchema.statics.findByCenter = function(centerId, options = {}) {
+  return this.find({ center: centerId, ...options });
+};
+
+appointmentSchema.statics.findByCenterAndStatus = function(centerId, status, options = {}) {
+  return this.find({ center: centerId, status, ...options });
+};
+
+appointmentSchema.statics.findByCenterAndDateRange = function(centerId, startDate, endDate, options = {}) {
+  return this.find({ 
+    center: centerId, 
+    appointmentDate: { $gte: startDate, $lt: endDate },
+    ...options 
+  });
+};
+
 // Update the updatedAt field before saving
 appointmentSchema.pre('save', function(next) {
   this.updatedAt = Date.now();

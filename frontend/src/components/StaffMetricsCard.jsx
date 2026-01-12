@@ -9,6 +9,7 @@ import {
   TrendingDown,
   Minus
 } from 'lucide-react';
+import { useStaffTheme } from '../contexts/StaffThemeContext';
 
 /**
  * StaffMetricsCard Component
@@ -25,6 +26,37 @@ const StaffMetricsCard = ({
   subtitle = null,
   onClick = null
 }) => {
+  const { theme } = useStaffTheme();
+
+  // Theme-based classes
+  const themeClasses = {
+    light: {
+      card: 'bg-white/80 backdrop-blur-sm border-gray-200',
+      cardHover: 'hover:border-gray-300 hover:bg-white/90',
+      cardError: 'border-red-200',
+      text: {
+        primary: 'text-gray-900',
+        secondary: 'text-gray-600',
+        tertiary: 'text-gray-500',
+        error: 'text-red-600'
+      },
+      skeleton: 'bg-gray-200'
+    },
+    dark: {
+      card: 'bg-slate-800/50 backdrop-blur-sm border-slate-700',
+      cardHover: 'hover:border-slate-600 hover:bg-slate-800/70',
+      cardError: 'border-red-500/30',
+      text: {
+        primary: 'text-white',
+        secondary: 'text-slate-300',
+        tertiary: 'text-slate-400',
+        error: 'text-red-400'
+      },
+      skeleton: 'bg-slate-600'
+    }
+  };
+
+  const currentTheme = themeClasses[theme];
   const colorClasses = {
     blue: {
       bg: 'bg-blue-500/20',
@@ -68,20 +100,20 @@ const StaffMetricsCard = ({
     
     if (trend > 0) return 'text-green-400';
     if (trend < 0) return 'text-red-400';
-    return 'text-slate-400';
+    return `${currentTheme.text.tertiary}`;
   };
 
   if (loading) {
     return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700">
+      <div className={`${currentTheme.card} rounded-2xl p-6 border`}>
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <div className="h-4 bg-slate-600 rounded animate-pulse mb-2"></div>
-            <div className="h-8 bg-slate-600 rounded animate-pulse w-16"></div>
-            {subtitle && <div className="h-3 bg-slate-600 rounded animate-pulse mt-1 w-24"></div>}
+            <div className={`h-4 ${currentTheme.skeleton} rounded animate-pulse mb-2`}></div>
+            <div className={`h-8 ${currentTheme.skeleton} rounded animate-pulse w-16`}></div>
+            {subtitle && <div className={`h-3 ${currentTheme.skeleton} rounded animate-pulse mt-1 w-24`}></div>}
           </div>
           <div className={`h-12 w-12 ${colors.bg} rounded-xl flex items-center justify-center`}>
-            <div className="h-6 w-6 bg-slate-600 rounded animate-pulse"></div>
+            <div className={`h-6 w-6 ${currentTheme.skeleton} rounded animate-pulse`}></div>
           </div>
         </div>
       </div>
@@ -90,11 +122,11 @@ const StaffMetricsCard = ({
 
   if (error) {
     return (
-      <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-red-500/30">
+      <div className={`${currentTheme.card} ${currentTheme.cardError} rounded-2xl p-6 border`}>
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-slate-400 text-sm">{title}</p>
-            <p className="text-red-400 text-sm mt-1">Error loading data</p>
+            <p className={`${currentTheme.text.secondary} text-sm`}>{title}</p>
+            <p className={`${currentTheme.text.error} text-sm mt-1`}>Error loading data</p>
           </div>
           <div className="h-12 w-12 bg-red-500/20 rounded-xl flex items-center justify-center">
             <AlertCircle className="h-6 w-6 text-red-400" />
@@ -106,16 +138,16 @@ const StaffMetricsCard = ({
 
   return (
     <div 
-      className={`bg-slate-800/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-700 transition-all duration-200 ${
-        onClick ? 'cursor-pointer hover:border-slate-600 hover:bg-slate-800/70' : ''
+      className={`${currentTheme.card} rounded-2xl p-6 border transition-all duration-200 ${
+        onClick ? `cursor-pointer ${currentTheme.cardHover}` : ''
       }`}
       onClick={onClick}
     >
       <div className="flex items-center justify-between">
         <div className="flex-1">
-          <p className="text-slate-400 text-sm">{title}</p>
+          <p className={`${currentTheme.text.secondary} text-sm`}>{title}</p>
           <div className="flex items-baseline space-x-2">
-            <p className="text-2xl font-bold text-white">{value}</p>
+            <p className={`text-2xl font-bold ${currentTheme.text.primary}`}>{value}</p>
             {trend !== null && (
               <div className={`flex items-center space-x-1 ${getTrendColor()}`}>
                 {getTrendIcon()}
@@ -126,7 +158,7 @@ const StaffMetricsCard = ({
             )}
           </div>
           {subtitle && (
-            <p className="text-slate-500 text-xs mt-1">{subtitle}</p>
+            <p className={`${currentTheme.text.tertiary} text-xs mt-1`}>{subtitle}</p>
           )}
         </div>
         <div className={`h-12 w-12 ${colors.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>

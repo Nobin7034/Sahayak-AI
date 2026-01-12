@@ -861,7 +861,24 @@ router.post('/admin/approve-staff/:userId', async (req, res) => {
 
     // Activate the center
     center.status = 'active';
+    
+    // Auto-assign all existing services to the newly approved center
+    const { default: Service } = await import('../models/Service.js');
+    const allServices = await Service.find({ isActive: true }).select('_id');
+    const serviceIds = allServices.map(service => service._id);
+    
+    // Add all services to the center if not already present
+    const existingServiceIds = center.services.map(id => id.toString());
+    const newServiceIds = serviceIds.filter(id => !existingServiceIds.includes(id.toString()));
+    
+    if (newServiceIds.length > 0) {
+      center.services.push(...newServiceIds);
+    }
+    
     await center.save();
+    
+    console.log(`✅ Center ${center.name} approved and ${serviceIds.length} services automatically assigned`);
+    
 
     // Activate the staff record
     staffRecord.isActive = true;
@@ -889,11 +906,13 @@ router.post('/admin/approve-staff/:userId', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Staff registration approved successfully',
+      message: `Staff registration approved successfully. ${serviceIds.length} services automatically assigned to ${center.name}.`,
       data: {
         user: { id: staffUser._id, name: staffUser.name, email: staffUser.email },
         center: { id: center._id, name: center.name },
-        staff: { id: staffRecord._id }
+        staff: { id: staffRecord._id },
+        servicesAssigned: serviceIds.length,
+        newServicesAdded: newServiceIds.length
       }
     });
 

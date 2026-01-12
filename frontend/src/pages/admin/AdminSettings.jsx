@@ -47,7 +47,7 @@ const AdminSettings = () => {
       const today = new Date()
       const month = String(today.getMonth() + 1)
       const year = String(today.getFullYear())
-      const res = await axios.get(`/admin/holidays?month=${month}&year=${year}`, config)
+      const res = await axios.get(`/api/admin/holidays?month=${month}&year=${year}`, config)
       if (res.data?.success) setHolidays(res.data.data)
     } catch (e) {}
   }
@@ -57,7 +57,7 @@ const AdminSettings = () => {
     try {
       const token = localStorage.getItem('token')
       const config = { headers: { 'Authorization': `Bearer ${token}` } }
-      const res = await axios.post('/admin/holidays', newHoliday, config)
+      const res = await axios.post('/api/admin/holidays', newHoliday, config)
       if (res.data?.success) {
         setNewHoliday({ date: '', reason: '' })
         await fetchHolidays()
@@ -73,7 +73,7 @@ const AdminSettings = () => {
     try {
       const token = localStorage.getItem('token')
       const config = { headers: { 'Authorization': `Bearer ${token}` } }
-      await axios.delete(`/admin/holidays/${id}`, config)
+      await axios.delete(`/api/admin/holidays/${id}`, config)
       await fetchHolidays()
     } catch (err) {
       alert('Failed to delete holiday')

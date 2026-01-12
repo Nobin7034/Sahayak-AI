@@ -448,13 +448,14 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
 });
 
 // Update appointment status
-router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermission('update_status'), async (req, res) => {
+router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
   try {
     const { id } = req.params;
     const { status, reason, notes } = req.body;
 
     // Import Appointment model dynamically
     const { default: Appointment } = await import('../models/Appointment.js');
+    const { default: Notification } = await import('../models/Notification.js');
 
     // Validate status
     const validStatuses = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'];
@@ -465,7 +466,7 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
       });
     }
 
-    // Find appointment
+    // Find appointment - ensure it belongs to staff's center
     const appointment = await Appointment.findOne({
       _id: id,
       ...req.centerFilter
@@ -474,7 +475,7 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
     if (!appointment) {
       return res.status(404).json({
         success: false,
-        message: 'Appointment not found'
+        message: 'Appointment not found or not accessible'
       });
     }
 
@@ -494,7 +495,7 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
       });
     }
 
-    // Update appointment
+    const oldStatus = appointment.status;
     appointment.status = status;
     
     // Add to status history
@@ -528,8 +529,33 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
 
     await appointment.save();
 
-    // TODO: Send notification to user about status change
-    // This would be implemented in the notification system
+    // Send notification to user about status change
+    try {
+      const statusMessages = {
+        'confirmed': 'Your appointment has been confirmed.',
+        'in_progress': 'Your appointment is now in progress.',
+        'completed': 'Your appointment has been completed.',
+        'cancelled': 'Your appointment has been cancelled.'
+      };
+
+      if (statusMessages[status]) {
+        await Notification.create({
+          user: appointment.user._id,
+          type: 'appointment_status',
+          title: 'Appointment Update',
+          message: statusMessages[status],
+          meta: { 
+            appointmentId: appointment._id, 
+            status,
+            centerId: appointment.center,
+            serviceId: appointment.service._id
+          }
+        });
+      }
+    } catch (notificationError) {
+      console.error('Failed to send status notification:', notificationError);
+      // Don't fail the status update if notification fails
+    }
 
     res.json({
       success: true,
@@ -542,6 +568,184 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
     res.status(500).json({
       success: false,
       message: 'Failed to update appointment status',
+      error: error.message
+    });
+  }
+});
+
+// Get appointment details
+router.get('/appointments/:id', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Import Appointment model dynamically
+    const { default: Appointment } = await import('../models/Appointment.js');
+
+    const appointment = await Appointment.findOne({
+      _id: id,
+      ...req.centerFilter
+    })
+    .populate('user', 'name email phone')
+    .populate('service', 'name category fees processingTime requiredDocuments')
+    .populate('center', 'name address contact');
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: appointment
+    });
+
+  } catch (error) {
+    console.error('Get appointment details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch appointment details',
+      error: error.message
+    });
+  }
+});
+
+// Add comment/note to appointment
+router.post('/appointments/:id/notes', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content, isVisible = true } = req.body;
+
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Note content is required'
+      });
+    }
+
+    // Import Appointment model dynamically
+    const { default: Appointment } = await import('../models/Appointment.js');
+
+    // Find appointment - ensure it belongs to staff's center
+    const appointment = await Appointment.findOne({
+      _id: id,
+      ...req.centerFilter
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    // Add note
+    if (!appointment.staffNotes) {
+      appointment.staffNotes = [];
+    }
+
+    const note = {
+      author: req.user.userId,
+      content: content.trim(),
+      isVisible: Boolean(isVisible),
+      createdAt: new Date()
+    };
+
+    appointment.staffNotes.push(note);
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: 'Note added successfully',
+      data: note
+    });
+
+  } catch (error) {
+    console.error('Add appointment note error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add note',
+      error: error.message
+    });
+  }
+});
+
+// Get appointment statistics for staff center
+router.get('/appointments/stats/summary', staffAuth, centerAccess, requirePermission('view_reports'), async (req, res) => {
+  try {
+    const { period = 'today' } = req.query;
+
+    // Import Appointment model dynamically
+    const { default: Appointment } = await import('../models/Appointment.js');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let startDate, endDate;
+    
+    switch (period) {
+      case 'today':
+        startDate = new Date(today);
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
+        break;
+      case 'week':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - startDate.getDay()); // Start of week
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 7);
+        break;
+      case 'month':
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        endDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        break;
+      default:
+        startDate = new Date(today);
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
+    }
+
+    // Get appointments for the period
+    const appointments = await Appointment.find({
+      ...req.centerFilter,
+      appointmentDate: { $gte: startDate, $lt: endDate }
+    }).populate('service', 'name category');
+
+    // Calculate statistics
+    const stats = {
+      total: appointments.length,
+      pending: appointments.filter(a => a.status === 'pending').length,
+      confirmed: appointments.filter(a => a.status === 'confirmed').length,
+      inProgress: appointments.filter(a => a.status === 'in_progress').length,
+      completed: appointments.filter(a => a.status === 'completed').length,
+      cancelled: appointments.filter(a => a.status === 'cancelled').length,
+      byService: {}
+    };
+
+    // Group by service
+    appointments.forEach(appointment => {
+      const serviceName = appointment.service?.name || 'Unknown';
+      if (!stats.byService[serviceName]) {
+        stats.byService[serviceName] = 0;
+      }
+      stats.byService[serviceName]++;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        period,
+        dateRange: { startDate, endDate },
+        stats
+      }
+    });
+
+  } catch (error) {
+    console.error('Get appointment stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch appointment statistics',
       error: error.message
     });
   }
@@ -651,19 +855,53 @@ router.get('/appointments/:id', staffAuth, centerAccess, requirePermission('mana
   }
 });
 
-// Get available services (global list)
+// Get available services (global list - all services admin provides)
 router.get('/services/available', staffAuth, requirePermission('manage_services'), async (req, res) => {
   try {
     // Import Service model dynamically
     const { default: Service } = await import('../models/Service.js');
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
 
+    // Get ALL active services that admin has created (global list)
     const services = await Service.find({ isActive: true })
-      .select('name description category fees processingTime requiredDocuments')
+      .select('name description category fee processingTime requiredDocuments')
       .sort({ category: 1, name: 1 });
+
+    // Get center to check which services are hidden by this specific staff
+    const center = await AkshayaCenter.findById(req.staff.centerId);
+    const hiddenServiceIds = center?.hiddenServices?.map(id => id.toString()) || [];
+    const enabledServiceIds = center?.services?.map(id => id.toString()) || [];
+
+    // Transform the data and mark services as hidden/enabled for this center
+    const transformedServices = services.map(service => {
+      const serviceId = service._id.toString();
+      const isHidden = hiddenServiceIds.includes(serviceId);
+      const isEnabled = enabledServiceIds.includes(serviceId);
+      
+      return {
+        ...service.toObject(),
+        fees: service.fee, // Map fee to fees for frontend compatibility
+        isHidden: isHidden,
+        isEnabled: isEnabled,
+        // Add center-specific status
+        centerStatus: {
+          isHidden: isHidden,
+          isEnabled: isEnabled,
+          canEnable: !isHidden, // Can only enable if not hidden
+          canHide: true // Can always hide
+        }
+      };
+    });
 
     res.json({
       success: true,
-      data: services
+      data: transformedServices,
+      meta: {
+        total: transformedServices.length,
+        enabled: transformedServices.filter(s => s.isEnabled).length,
+        hidden: transformedServices.filter(s => s.isHidden).length,
+        available: transformedServices.filter(s => !s.isHidden).length
+      }
     });
 
   } catch (error) {
@@ -683,7 +921,7 @@ router.get('/services/center', staffAuth, centerAccess, requirePermission('manag
     const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
 
     const center = await AkshayaCenter.findById(req.staff.centerId)
-      .populate('services', 'name description category fees processingTime');
+      .populate('services', 'name description category fee processingTime');
 
     if (!center) {
       return res.status(404).json({
@@ -695,6 +933,7 @@ router.get('/services/center', staffAuth, centerAccess, requirePermission('manag
     // Add center-specific settings to services
     const centerServices = center.services.map(service => ({
       ...service.toObject(),
+      fees: service.fee, // Map fee to fees for frontend compatibility
       isEnabled: true,
       // Add any center-specific settings here
       availabilityNotes: center.serviceSettings?.[service._id]?.availabilityNotes || '',
@@ -819,6 +1058,105 @@ router.put('/services/:id/settings', staffAuth, centerAccess, requirePermission(
     res.status(500).json({
       success: false,
       message: 'Failed to update service settings',
+      error: error.message
+    });
+  }
+});
+
+// Hide/unhide service for staff (not permanent delete)
+router.put('/services/:id/hide', staffAuth, centerAccess, requirePermission('manage_services'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { hidden } = req.body;
+
+    // Import models dynamically
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    const { default: Service } = await import('../models/Service.js');
+
+    // Verify service exists
+    const service = await Service.findById(id);
+    if (!service || !service.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found or inactive'
+      });
+    }
+
+    // Get center
+    const center = await AkshayaCenter.findById(req.staff.centerId);
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Initialize hiddenServices array if not exists
+    if (!center.hiddenServices) {
+      center.hiddenServices = [];
+    }
+
+    // Update hidden services list
+    if (hidden) {
+      // Add service to hidden list if not already present
+      if (!center.hiddenServices.includes(id)) {
+        center.hiddenServices.push(id);
+      }
+    } else {
+      // Remove service from hidden list
+      center.hiddenServices = center.hiddenServices.filter(serviceId => serviceId.toString() !== id);
+    }
+
+    await center.save();
+
+    res.json({
+      success: true,
+      message: `Service ${hidden ? 'hidden' : 'unhidden'} successfully`
+    });
+
+  } catch (error) {
+    console.error('Hide service error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update service visibility',
+      error: error.message
+    });
+  }
+});
+
+// Get hidden services for staff
+router.get('/services/hidden', staffAuth, centerAccess, requirePermission('manage_services'), async (req, res) => {
+  try {
+    // Import models dynamically
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+
+    const center = await AkshayaCenter.findById(req.staff.centerId)
+      .populate('hiddenServices', 'name description category fee processingTime');
+
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Transform hidden services data
+    const hiddenServices = (center.hiddenServices || []).map(service => ({
+      ...service.toObject(),
+      fees: service.fee, // Map fee to fees for frontend compatibility
+      isHidden: true
+    }));
+
+    res.json({
+      success: true,
+      data: hiddenServices
+    });
+
+  } catch (error) {
+    console.error('Get hidden services error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch hidden services',
       error: error.message
     });
   }

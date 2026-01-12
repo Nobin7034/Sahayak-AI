@@ -510,32 +510,48 @@ router.delete('/news/:id', async (req, res) => {
   }
 });
 
-// Appointment Management
+// Appointment Management (Read-Only for Monitoring)
 router.get('/appointments', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     const status = req.query.status;
+    const centerId = req.query.center;
 
     let query = {};
     if (status) {
       query.status = status;
     }
+    if (centerId) {
+      query.center = centerId;
+    }
 
     const appointments = await Appointment.find(query)
       .populate('user', 'name email phone')
       .populate('service', 'name category fee')
+      .populate('center', 'name address.city address.district')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
     const totalAppointments = await Appointment.countDocuments(query);
 
+    // Group appointments by center for better monitoring
+    const appointmentsByCenter = {};
+    appointments.forEach(appointment => {
+      const centerName = appointment.center?.name || 'Unknown Center';
+      if (!appointmentsByCenter[centerName]) {
+        appointmentsByCenter[centerName] = [];
+      }
+      appointmentsByCenter[centerName].push(appointment);
+    });
+
     res.json({
       success: true,
       data: {
         appointments,
+        appointmentsByCenter,
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalAppointments / limit),
@@ -555,46 +571,106 @@ router.get('/appointments', async (req, res) => {
   }
 });
 
-router.patch('/appointments/:id/status', async (req, res) => {
+// Get appointment statistics by center (Read-Only)
+router.get('/appointments/stats', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status, notes } = req.body;
-
-    const appointment = await Appointment.findByIdAndUpdate(
-      id,
-      { status, notes },
-      { new: true }
-    ).populate('user', 'name email phone')
-     .populate('service', 'name category fee');
-
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Appointment not found'
-      });
+    const { period = 'month' } = req.query;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let startDate, endDate;
+    
+    switch (period) {
+      case 'today':
+        startDate = new Date(today);
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
+        break;
+      case 'week':
+        startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 7);
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
+        break;
+      case 'month':
+        startDate = new Date(today);
+        startDate.setMonth(startDate.getMonth() - 1);
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
+        break;
+      default:
+        startDate = new Date(today);
+        startDate.setMonth(startDate.getMonth() - 1);
+        endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1);
     }
 
-    // Notify user about status change
-    try {
-      await Notification.create({
-        user: appointment.user,
-        type: 'status',
-        title: 'Appointment Update',
-        message: `Your appointment status is now ${status}.`,
-        meta: { appointmentId: appointment._id, status }
-      });
-    } catch (_) {}
+    // Get appointments with center and service info
+    const appointments = await Appointment.find({
+      appointmentDate: { $gte: startDate, $lt: endDate }
+    })
+    .populate('center', 'name address.city address.district')
+    .populate('service', 'name category');
+
+    // Calculate statistics by center
+    const centerStats = {};
+    const serviceStats = {};
+    const statusStats = {
+      pending: 0,
+      confirmed: 0,
+      in_progress: 0,
+      completed: 0,
+      cancelled: 0
+    };
+
+    appointments.forEach(appointment => {
+      const centerName = appointment.center?.name || 'Unknown Center';
+      const serviceName = appointment.service?.name || 'Unknown Service';
+      const status = appointment.status;
+
+      // Center statistics
+      if (!centerStats[centerName]) {
+        centerStats[centerName] = {
+          total: 0,
+          pending: 0,
+          confirmed: 0,
+          in_progress: 0,
+          completed: 0,
+          cancelled: 0,
+          location: appointment.center?.address?.city || 'Unknown'
+        };
+      }
+      centerStats[centerName].total++;
+      centerStats[centerName][status]++;
+
+      // Service statistics
+      if (!serviceStats[serviceName]) {
+        serviceStats[serviceName] = 0;
+      }
+      serviceStats[serviceName]++;
+
+      // Overall status statistics
+      statusStats[status]++;
+    });
 
     res.json({
       success: true,
-      message: 'Appointment status updated successfully',
-      data: appointment
+      data: {
+        period,
+        dateRange: { startDate, endDate },
+        totalAppointments: appointments.length,
+        centerStats,
+        serviceStats,
+        statusStats
+      }
     });
+
   } catch (error) {
-    console.error('Update appointment status error:', error);
+    console.error('Get appointment stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update appointment status',
+      message: 'Failed to fetch appointment statistics',
       error: error.message
     });
   }
