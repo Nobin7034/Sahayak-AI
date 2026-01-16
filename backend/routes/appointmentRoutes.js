@@ -12,31 +12,35 @@ const router = express.Router();
 // Apply user authentication middleware to all routes
 router.use(userAuth);
 
-// Get user's appointments
+  // Get user's appointments
 router.get('/', async (req, res) => {
   try {
     const appointments = await Appointment.find({ user: req.user.userId })
-      .populate('service', 'name category fees processingTime')
-      .populate('center', 'name address contact')
+      .populate('service', 'name category fee processingTime serviceCharge')
+      .populate('center', 'name address contact location')
       .sort({ createdAt: -1 });
 
-    // Add canEdit flag to each appointment
+    // Add canEdit and canCancel flags to each appointment
     const now = new Date();
-    const appointmentsWithEditFlag = appointments.map(appointment => {
-      const appointmentTime = new Date(appointment.appointmentDate);
-      const timeDiff = appointmentTime.getTime() - now.getTime();
-      const hoursDiff = timeDiff / (1000 * 60 * 60);
-      const canEdit = appointment.status === 'pending' && hoursDiff > 3;
+    const appointmentsWithFlags = appointments.map(appointment => {
+      const appointmentDate = new Date(appointment.appointmentDate);
+      const appointmentDay = new Date(appointmentDate);
+      appointmentDay.setHours(9, 0, 0, 0); // 9:00 AM on appointment day
+      
+      // Can edit/cancel until 9:00 AM on appointment day
+      const canEdit = ['pending', 'confirmed'].includes(appointment.status) && now < appointmentDay;
+      const canCancel = ['pending', 'confirmed'].includes(appointment.status) && now < appointmentDay;
       
       return {
         ...appointment.toObject(),
-        canEdit
+        canEdit,
+        canCancel
       };
     });
 
     res.json({
       success: true,
-      data: appointmentsWithEditFlag
+      data: appointmentsWithFlags
     });
   } catch (error) {
     console.error('Get appointments error:', error);
@@ -76,6 +80,63 @@ router.post('/', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Selected service is not available at this center'
+      });
+    }
+
+    // Validate appointment timing rules
+    const appointmentDateTime = new Date(appointmentDate);
+    const now = new Date();
+    
+    // Check advance booking rules (3 days in advance maximum)
+    const maxAdvanceDate = new Date();
+    maxAdvanceDate.setDate(maxAdvanceDate.getDate() + 3);
+    maxAdvanceDate.setHours(23, 59, 59, 999);
+    
+    if (appointmentDateTime > maxAdvanceDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointments can only be booked up to 3 days in advance'
+      });
+    }
+
+    // Check minimum booking time (cannot book for today if center is closed or after hours)
+    const isToday = appointmentDateTime.toDateString() === now.toDateString();
+    if (isToday) {
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTime = currentHour * 100 + currentMinute;
+      
+      // Center working hours: 9:00 AM to 5:00 PM (900 to 1700)
+      if (currentTime >= 1700) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot book appointments for today after 5:00 PM. Please book for tomorrow.'
+        });
+      }
+      
+      if (currentTime < 900) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot book appointments before center opening hours (9:00 AM)'
+        });
+      }
+    }
+
+    // Validate time slot is within working hours (9:00 AM to 5:00 PM)
+    const timeSlotHour = parseInt(timeSlot.split(':')[0]);
+    const timeSlotPeriod = timeSlot.includes('PM') ? 'PM' : 'AM';
+    let timeSlotIn24 = timeSlotHour;
+    
+    if (timeSlotPeriod === 'PM' && timeSlotHour !== 12) {
+      timeSlotIn24 += 12;
+    } else if (timeSlotPeriod === 'AM' && timeSlotHour === 12) {
+      timeSlotIn24 = 0;
+    }
+    
+    if (timeSlotIn24 < 9 || timeSlotIn24 >= 17) {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointments can only be booked between 9:00 AM and 5:00 PM'
       });
     }
 
@@ -201,18 +262,21 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // Check if appointment can be edited (more than 3 hours away and not completed/cancelled)
+    // Check if appointment can be edited/cancelled (before 9:00 AM on appointment day)
     const now = new Date();
-    const appointmentTime = new Date(appointment.appointmentDate);
-    const timeDiff = appointmentTime.getTime() - now.getTime();
-    const hoursDiff = timeDiff / (1000 * 60 * 60);
-    const canEdit = ['pending', 'confirmed'].includes(appointment.status) && hoursDiff > 3;
+    const appointmentDate = new Date(appointment.appointmentDate);
+    const appointmentDay = new Date(appointmentDate);
+    appointmentDay.setHours(9, 0, 0, 0); // 9:00 AM on appointment day
+    
+    const canEdit = ['pending', 'confirmed'].includes(appointment.status) && now < appointmentDay;
+    const canCancel = ['pending', 'confirmed'].includes(appointment.status) && now < appointmentDay;
 
     res.json({
       success: true,
       data: {
         ...appointment.toObject(),
-        canEdit
+        canEdit,
+        canCancel
       }
     });
   } catch (error) {
@@ -225,7 +289,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update appointment (only if pending and more than 3 hours away)
+// Update appointment (only if pending and before 9:00 AM on appointment day)
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -244,17 +308,74 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Check if appointment is more than 3 hours away
+    // Check modification timing rules - can only modify until 9:00 AM on appointment day
     const now = new Date();
-    const appointmentTime = new Date(appointment.appointmentDate);
-    const timeDiff = appointmentTime.getTime() - now.getTime();
-    const hoursDiff = timeDiff / (1000 * 60 * 60);
-
-    if (hoursDiff <= 3) {
+    const currentAppointmentDate = new Date(appointment.appointmentDate);
+    const appointmentDay = new Date(currentAppointmentDate);
+    appointmentDay.setHours(9, 0, 0, 0); // 9:00 AM on appointment day
+    
+    if (now >= appointmentDay) {
       return res.status(400).json({
         success: false,
-        message: 'Appointment cannot be modified within 3 hours of scheduled time'
+        message: 'Appointments cannot be modified after 9:00 AM on the appointment day'
       });
+    }
+
+    // Validate new appointment timing rules if date is being changed
+    if (appointmentDate) {
+      const newAppointmentDate = new Date(appointmentDate);
+      const maxAdvanceDate = new Date();
+      maxAdvanceDate.setDate(maxAdvanceDate.getDate() + 3);
+      maxAdvanceDate.setHours(23, 59, 59, 999);
+      
+      if (newAppointmentDate > maxAdvanceDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'Appointments can only be booked up to 3 days in advance'
+        });
+      }
+
+      // Check if new date is today and validate timing
+      const isNewDateToday = newAppointmentDate.toDateString() === now.toDateString();
+      if (isNewDateToday) {
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTime = currentHour * 100 + currentMinute;
+        
+        if (currentTime >= 1700) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cannot reschedule to today after 5:00 PM. Please select tomorrow.'
+          });
+        }
+        
+        if (currentTime < 900) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cannot reschedule before center opening hours (9:00 AM)'
+          });
+        }
+      }
+    }
+
+    // Validate time slot is within working hours if being changed
+    if (timeSlot) {
+      const timeSlotHour = parseInt(timeSlot.split(':')[0]);
+      const timeSlotPeriod = timeSlot.includes('PM') ? 'PM' : 'AM';
+      let timeSlotIn24 = timeSlotHour;
+      
+      if (timeSlotPeriod === 'PM' && timeSlotHour !== 12) {
+        timeSlotIn24 += 12;
+      } else if (timeSlotPeriod === 'AM' && timeSlotHour === 12) {
+        timeSlotIn24 = 0;
+      }
+      
+      if (timeSlotIn24 < 9 || timeSlotIn24 >= 17) {
+        return res.status(400).json({
+          success: false,
+          message: 'Appointments can only be scheduled between 9:00 AM and 5:00 PM'
+        });
+      }
     }
 
     // Block Sundays, second Saturdays and manual holidays for the target date
@@ -287,6 +408,7 @@ router.put('/:id', async (req, res) => {
 
       const existingAppointment = await Appointment.findOne({
         _id: { $ne: id },
+        center: appointment.center, // Ensure we check within the same center
         appointmentDate: newDate,
         timeSlot: newTimeSlot,
         status: { $in: ['pending', 'confirmed'] }
@@ -295,7 +417,7 @@ router.put('/:id', async (req, res) => {
       if (existingAppointment) {
         return res.status(400).json({
           success: false,
-          message: 'This time slot is already booked'
+          message: 'This time slot is already booked at this center'
         });
       }
     }
@@ -446,16 +568,17 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Check if appointment can be cancelled (more than 3 hours away)
+    // Check cancellation timing rules - can only cancel until 9:00 AM on appointment day
     const now = new Date();
-    const appointmentTime = new Date(appointment.appointmentDate);
-    const timeDiff = appointmentTime.getTime() - now.getTime();
-    const hoursDiff = timeDiff / (1000 * 60 * 60);
-
-    if (hoursDiff <= 3) {
+    const appointmentDate = new Date(appointment.appointmentDate);
+    const appointmentDay = new Date(appointmentDate);
+    appointmentDay.setHours(9, 0, 0, 0); // 9:00 AM on appointment day
+    
+    // If it's the appointment day and current time is 9:00 AM or later, prevent cancellation
+    if (now >= appointmentDay) {
       return res.status(400).json({
         success: false,
-        message: 'Appointment cannot be cancelled within 3 hours of scheduled time'
+        message: 'Appointments cannot be cancelled after 9:00 AM on the appointment day. Please contact the center staff for assistance.'
       });
     }
 
@@ -504,11 +627,11 @@ router.get('/slots/:serviceId/:date', async (req, res) => {
       return res.json({ success: true, data: { date, availableSlots: [], bookedSlots: [], isHoliday: true, reason: manualHoliday.reason || 'Holiday' } });
     }
 
-    // Define available time slots (you can make this configurable)
+    // Define available time slots within working hours (9:00 AM to 5:00 PM)
     const allTimeSlots = [
       '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-      '12:00 PM', '12:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
-      '04:00 PM', '04:30 PM', '05:00 PM'
+      '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', 
+      '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'
     ];
 
     // Get booked slots for the date at the specific center (if provided)

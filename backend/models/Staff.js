@@ -28,7 +28,10 @@ const staffSchema = new mongoose.Schema({
         'upload_documents',
         'manage_services',
         'view_analytics',
-        'manage_schedule'
+        'manage_schedule',
+        'view_ratings',
+        'manage_ratings',
+        'view_reports'
       ]
     },
     granted: {

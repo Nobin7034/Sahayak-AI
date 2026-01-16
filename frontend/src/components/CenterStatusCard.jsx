@@ -317,9 +317,10 @@ const CenterMetrics = ({ metrics, loading = false }) => {
     },
     {
       label: 'Avg. Rating',
-      value: metrics?.avgRating ? `${metrics.avgRating}/5` : 'N/A',
+      value: metrics?.avgRating ? `${metrics.avgRating.toFixed(1)}/5` : 'N/A',
       icon: Star,
-      color: 'text-yellow-400'
+      color: 'text-yellow-400',
+      subtitle: metrics?.totalRatings ? `${metrics.totalRatings} ratings` : ''
     }
   ];
 
@@ -347,6 +348,9 @@ const CenterMetrics = ({ metrics, loading = false }) => {
             </div>
             <p className={`${currentTheme.text.primary} text-sm font-medium`}>{metric.value}</p>
             <p className={`${currentTheme.text.secondary} text-xs`}>{metric.label}</p>
+            {metric.subtitle && (
+              <p className={`${currentTheme.text.secondary} text-xs opacity-70`}>{metric.subtitle}</p>
+            )}
           </div>
         );
       })}
@@ -420,8 +424,7 @@ const CenterStatusCard = ({
       
       setRealTimeData(prev => ({
         ...prev,
-        isWorking,
-        currentVisitors: Math.max(0, prev.currentVisitors + Math.floor(Math.random() * 3) - 1)
+        isWorking
       }));
     }, 30000); // Update every 30 seconds
 
@@ -486,8 +489,8 @@ const CenterStatusCard = ({
 
       {/* Working Status */}
       <WorkingStatusIndicator 
-        isWorking={realTimeData.isWorking}
-        workingHours={realTimeData.workingHours}
+        isWorking={centerInfo?.isWorking !== undefined ? centerInfo.isWorking : realTimeData.isWorking}
+        workingHours={centerInfo?.todayHours || realTimeData.workingHours}
       />
 
       <div className="mt-4 space-y-4">
@@ -503,9 +506,10 @@ const CenterStatusCard = ({
             <h4 className={`${currentTheme.text.primary} font-medium mb-2 text-sm`}>Today's Overview</h4>
             <CenterMetrics 
               metrics={{
-                todayVisitors: realTimeData.todayVisitors,
-                activeServices: centerInfo?.activeServices || 15,
-                avgRating: centerInfo?.rating || 4.8
+                todayVisitors: centerInfo?.todayVisitors || 0,
+                activeServices: centerInfo?.activeServices || 0,
+                avgRating: centerInfo?.rating || 0,
+                totalRatings: centerInfo?.totalRatings || 0
               }}
               loading={loading}
             />

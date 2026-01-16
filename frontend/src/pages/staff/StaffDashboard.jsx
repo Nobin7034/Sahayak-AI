@@ -236,60 +236,6 @@ const StaffDashboard = () => {
         }, retryDelay);
         return;
       }
-      
-      // Use mock data for development when API fails after retries
-      if (retryCount >= 3) {
-        console.log('Using fallback mock data after failed retries');
-        setDashboardData({
-          metrics: {
-            totalToday: 12,
-            pendingApprovals: 3,
-            completedToday: 8,
-            inProgress: 1,
-            todayVisits: 45,
-            avgRating: 4.8
-          },
-          upcomingAppointments: [
-            {
-              _id: '1',
-              user: { name: 'Rajesh Kumar', email: 'rajesh@example.com', phone: '9876543210' },
-              service: { name: 'Aadhaar Card Update', category: 'Identity' },
-              timeSlot: '10:00 AM',
-              appointmentDate: new Date(),
-              status: 'confirmed'
-            },
-            {
-              _id: '2',
-              user: { name: 'Priya Nair', email: 'priya@example.com', phone: '9876543211' },
-              service: { name: 'PAN Card Application', category: 'Identity' },
-              timeSlot: '11:30 AM',
-              appointmentDate: new Date(),
-              status: 'confirmed'
-            },
-            {
-              _id: '3',
-              user: { name: 'Arjun Menon', email: 'arjun@example.com', phone: '9876543212' },
-              service: { name: 'Passport Application', category: 'Travel' },
-              timeSlot: '2:00 PM',
-              appointmentDate: new Date(),
-              status: 'pending'
-            }
-          ],
-          centerStatus: {
-            centerName: 'Akshaya Center - Kochi',
-            isWorking: true,
-            todayHours: '9:00 AM - 5:00 PM'
-          },
-          recentActivity: [
-            { type: 'appointment', message: 'New appointment booked by Rajesh Kumar', time: '5 minutes ago' },
-            { type: 'status', message: 'Appointment completed for Priya Nair', time: '15 minutes ago' },
-            { type: 'payment', message: 'Payment received ₹110 for PAN service', time: '30 minutes ago' }
-          ],
-          lastUpdated: new Date()
-        });
-        setLastRefresh(new Date());
-        setError(''); // Clear error when using fallback data
-      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -407,8 +353,8 @@ const StaffDashboard = () => {
           )}
 
           {/* Header */}
-          <header className={`${currentTheme.card} border-b`}>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+          <header className={`${currentTheme.card} border-b relative z-30 overflow-visible`}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-visible">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-3 sm:space-x-4">
@@ -485,14 +431,18 @@ const StaffDashboard = () => {
               )}>
                 <CenterStatusCard
                   centerInfo={{
-                    name: centerStatus?.centerName || 'Akshaya Center - Kochi',
-                    address: '123 MG Road, Ernakulam',
-                    district: 'Ernakulam',
-                    state: 'Kerala',
-                    contact: '+91 484 123 4567',
-                    email: 'kochi@akshaya.kerala.gov.in',
-                    rating: metrics?.avgRating || 4.8,
-                    activeServices: 15
+                    name: centerStatus?.centerName || 'Akshaya Center',
+                    address: centerStatus?.address || 'Address not available',
+                    district: centerStatus?.district || 'District',
+                    state: centerStatus?.state || 'State',
+                    contact: centerStatus?.contact || 'Contact not available',
+                    email: centerStatus?.email || 'Email not available',
+                    rating: centerStatus?.rating || metrics?.avgRating || 0,
+                    activeServices: centerStatus?.activeServices || 0,
+                    todayVisitors: centerStatus?.todayVisitors || metrics?.todayVisits || 0,
+                    totalRatings: metrics?.totalRatings || 0,
+                    isWorking: centerStatus?.isWorking !== undefined ? centerStatus.isWorking : true,
+                    todayHours: centerStatus?.todayHours || '9:00 AM - 5:00 PM'
                   }}
                   staffInfo={staffInfo}
                   loading={loading}
@@ -510,10 +460,12 @@ const StaffDashboard = () => {
                   <DollarSign className="h-5 w-5 text-green-400" aria-hidden="true" />
                 </div>
                 <div className="space-y-2">
-                  <div className={`text-2xl font-bold ${currentTheme.text.primary}`} aria-label="Today's revenue: 2,450 rupees">₹2,450</div>
+                  <div className={`text-2xl font-bold ${currentTheme.text.primary}`} aria-label={`Today's revenue: ${metrics?.todayRevenue || 0} rupees`}>
+                    ₹{metrics?.todayRevenue || 0}
+                  </div>
                   <div className="flex items-center space-x-2">
                     <TrendingUp className="h-4 w-4 text-green-400" aria-hidden="true" />
-                    <span className="text-green-400 text-sm">+12% from yesterday</span>
+                    <span className="text-green-400 text-sm">From {metrics?.completedToday || 0} completed services</span>
                   </div>
                 </div>
               </div>

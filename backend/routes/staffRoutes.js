@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Staff from '../models/Staff.js';
 import AkshayaCenter from '../models/AkshayaCenter.js';
@@ -244,42 +245,125 @@ router.get('/dashboard', staffAuth, centerAccess, async (req, res) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Import Appointment model dynamically to avoid circular dependency
+    // Import models dynamically to avoid circular dependency
     const { default: Appointment } = await import('../models/Appointment.js');
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    const { default: CenterRating } = await import('../models/CenterRating.js');
+
+    // Get center details from database
+    const center = await AkshayaCenter.findById(req.staff.centerId)
+      .populate('services', 'name category fee');
+
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
 
     // Get today's appointments for the center
     const todayAppointments = await Appointment.find({
-      ...req.centerFilter,
+      center: req.staff.centerId,
       appointmentDate: { $gte: today, $lt: tomorrow }
-    }).populate('service', 'name category').populate('user', 'name email phone');
+    }).populate('service', 'name category fee').populate('user', 'name email phone');
 
     // Calculate dashboard metrics
     const totalToday = todayAppointments.length;
     const pendingApprovals = todayAppointments.filter(apt => apt.status === 'pending').length;
     const completedToday = todayAppointments.filter(apt => apt.status === 'completed').length;
     const inProgress = todayAppointments.filter(apt => apt.status === 'in_progress').length;
+    const confirmedToday = todayAppointments.filter(apt => apt.status === 'confirmed').length;
 
-    // Get upcoming appointments (next 5)
+    // Calculate today's revenue from completed appointments
+    const todayRevenue = todayAppointments
+      .filter(apt => apt.status === 'completed' && apt.payment?.status === 'paid')
+      .reduce((sum, apt) => sum + (apt.service?.fee || 0), 0);
+
+    // Get live center rating from CenterRating model
+    const centerRatingStats = await CenterRating.calculateCenterRating(req.staff.centerId);
+    const avgRating = centerRatingStats.avgRating || 0;
+    const totalRatings = centerRatingStats.totalRatings || 0;
+
+    // Get upcoming appointments (next 5 confirmed or in-progress)
     const upcomingAppointments = todayAppointments
       .filter(apt => apt.status === 'confirmed' || apt.status === 'in_progress')
       .sort((a, b) => a.timeSlot.localeCompare(b.timeSlot))
       .slice(0, 5);
 
+    // Get recent activity (last 10 status changes today)
+    const recentActivity = [];
+    todayAppointments
+      .filter(apt => apt.statusHistory && apt.statusHistory.length > 0)
+      .forEach(apt => {
+        const latestStatus = apt.statusHistory[apt.statusHistory.length - 1];
+        if (latestStatus) {
+          const timeAgo = getTimeAgo(latestStatus.changedAt);
+          let message = '';
+          
+          switch (latestStatus.status) {
+            case 'confirmed':
+              message = `Appointment confirmed for ${apt.user?.name || 'User'}`;
+              break;
+            case 'in_progress':
+              message = `Started processing ${apt.service?.name || 'service'} for ${apt.user?.name || 'User'}`;
+              break;
+            case 'completed':
+              message = `Completed ${apt.service?.name || 'service'} for ${apt.user?.name || 'User'}`;
+              break;
+            case 'cancelled':
+              message = `Appointment cancelled for ${apt.user?.name || 'User'}`;
+              break;
+            default:
+              message = `Status updated to ${latestStatus.status} for ${apt.user?.name || 'User'}`;
+          }
+          
+          recentActivity.push({
+            type: 'appointment',
+            message,
+            time: timeAgo,
+            timestamp: latestStatus.changedAt
+          });
+        }
+      });
+
+    // Sort by timestamp and take last 10
+    recentActivity.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const limitedActivity = recentActivity.slice(0, 10).map(({ timestamp, ...rest }) => rest);
+
     // Get center status
-    const centerStatus = req.staff ? {
-      isWorking: req.staff.isCurrentlyWorking,
-      centerName: req.staff.centerName
-    } : null;
+    const currentHour = new Date().getHours();
+    const isWorking = currentHour >= 9 && currentHour < 17; // Simple working hours check
+
+    const centerStatus = {
+      centerName: center.name,
+      isWorking: isWorking,
+      todayHours: '9:00 AM - 5:00 PM',
+      address: center.address ? `${center.address.street}, ${center.address.city}` : 'Address not available',
+      contact: center.contact?.phone || 'Contact not available',
+      email: center.contact?.email || 'Email not available',
+      district: center.address?.district || 'District not available',
+      state: center.address?.state || 'Kerala',
+      activeServices: center.services?.length || 0,
+      rating: parseFloat(avgRating.toFixed(1)),
+      totalRatings: totalRatings,
+      todayVisitors: totalToday // Live visitor count from today's appointments
+    };
 
     const dashboardData = {
       metrics: {
         totalToday,
         pendingApprovals,
         completedToday,
-        inProgress
+        inProgress,
+        confirmedToday,
+        todayRevenue,
+        avgRating: parseFloat(avgRating.toFixed(1)),
+        todayVisits: totalToday,
+        totalRatings: totalRatings
       },
       upcomingAppointments,
       centerStatus,
+      recentActivity: limitedActivity,
       lastUpdated: new Date()
     };
 
@@ -297,6 +381,16 @@ router.get('/dashboard', staffAuth, centerAccess, async (req, res) => {
     });
   }
 });
+
+// Helper function to calculate time ago
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+  return `${Math.floor(seconds / 86400)} days ago`;
+}
 
 // Get appointments for staff center
 router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
@@ -332,23 +426,40 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
         dateFilter = { appointmentDate: { $gte: tomorrowStart, $lt: dayAfterTomorrow } };
         break;
       case 'week':
-        const weekEnd = new Date(today);
-        weekEnd.setDate(weekEnd.getDate() + 7);
-        dateFilter = { appointmentDate: { $gte: today, $lt: weekEnd } };
+        // Get the start of the current week (Sunday)
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay()); // Go back to Sunday
+        weekStart.setHours(0, 0, 0, 0);
+        // Get the end of the current week (Saturday)
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 7); // Next Sunday (exclusive)
+        weekEnd.setHours(0, 0, 0, 0);
+        dateFilter = { appointmentDate: { $gte: weekStart, $lt: weekEnd } };
         break;
       case 'month':
-        const monthEnd = new Date(today);
-        monthEnd.setMonth(monthEnd.getMonth() + 1);
-        dateFilter = { appointmentDate: { $gte: today, $lt: monthEnd } };
+        // Start of current month
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        monthStart.setHours(0, 0, 0, 0);
+        // Start of next month
+        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        monthEnd.setHours(0, 0, 0, 0);
+        dateFilter = { appointmentDate: { $gte: monthStart, $lt: monthEnd } };
+        break;
+      case 'all':
+        // No date filter for 'all' - shows all appointments for this center
+        dateFilter = {};
         break;
       default:
-        // 'all' - no date filter
+        // Default to today if invalid dateRange
+        const defaultTomorrow = new Date(today);
+        defaultTomorrow.setDate(defaultTomorrow.getDate() + 1);
+        dateFilter = { appointmentDate: { $gte: today, $lt: defaultTomorrow } };
         break;
     }
 
-    // Build query
+    // Build query - CRITICAL: Only appointments for this staff's center
     const query = {
-      ...req.centerFilter,
+      center: req.staff.centerId, // Enforce center-specific access
       ...dateFilter
     };
 
@@ -376,8 +487,17 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
           as: 'service'
         }
       },
+      {
+        $lookup: {
+          from: 'akshayacenters',
+          localField: 'center',
+          foreignField: '_id',
+          as: 'center'
+        }
+      },
       { $unwind: '$user' },
-      { $unwind: '$service' }
+      { $unwind: '$service' },
+      { $unwind: '$center' }
     ];
 
     // Add search filter
@@ -393,11 +513,11 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
       });
     }
 
-    // Add service type filter
-    if (serviceType !== 'all') {
+    // Add service filter (by service ID)
+    if (serviceType !== 'all' && mongoose.Types.ObjectId.isValid(serviceType)) {
       pipeline.push({
         $match: {
-          'service.category': { $regex: serviceType, $options: 'i' }
+          'service._id': new mongoose.Types.ObjectId(serviceType)
         }
       });
     }
@@ -433,6 +553,10 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
           limit: parseInt(limit),
           total,
           totalPages
+        },
+        centerInfo: {
+          centerId: req.staff.centerId,
+          centerName: req.staff.centerName
         }
       }
     });
@@ -447,8 +571,8 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
   }
 });
 
-// Update appointment status
-router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
+// Update appointment status - ONLY STAFF CAN UPDATE STATUS
+router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermission('update_status'), async (req, res) => {
   try {
     const { id } = req.params;
     const { status, reason, notes } = req.body;
@@ -458,34 +582,35 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
     const { default: Notification } = await import('../models/Notification.js');
 
     // Validate status
-    const validStatuses = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rejected'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status'
+        message: 'Invalid status. Valid statuses: ' + validStatuses.join(', ')
       });
     }
 
-    // Find appointment - ensure it belongs to staff's center
+    // Find appointment - CRITICAL: ensure it belongs to staff's center ONLY
     const appointment = await Appointment.findOne({
       _id: id,
-      ...req.centerFilter
+      center: req.staff.centerId // Enforce center-specific access
     }).populate('user', 'name email phone').populate('service', 'name category');
 
     if (!appointment) {
       return res.status(404).json({
         success: false,
-        message: 'Appointment not found or not accessible'
+        message: 'Appointment not found or not accessible from your center'
       });
     }
 
     // Validate status transition
     const validTransitions = {
-      'pending': ['confirmed', 'cancelled'],
+      'pending': ['confirmed', 'rejected', 'cancelled'],
       'confirmed': ['in_progress', 'cancelled'],
       'in_progress': ['completed', 'cancelled'],
       'completed': [], // Cannot change from completed
-      'cancelled': [] // Cannot change from cancelled
+      'cancelled': [], // Cannot change from cancelled
+      'rejected': [] // Cannot change from rejected
     };
 
     if (!validTransitions[appointment.status].includes(status)) {
@@ -507,7 +632,9 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
       status,
       changedBy: req.user.userId,
       changedAt: new Date(),
-      reason: reason || notes
+      reason: reason || notes,
+      staffName: req.user.name,
+      centerName: req.staff.centerName
     });
 
     // Set completion time for completed appointments
@@ -532,23 +659,27 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
     // Send notification to user about status change
     try {
       const statusMessages = {
-        'confirmed': 'Your appointment has been confirmed.',
+        'confirmed': 'Your appointment has been confirmed by the center staff.',
         'in_progress': 'Your appointment is now in progress.',
-        'completed': 'Your appointment has been completed.',
-        'cancelled': 'Your appointment has been cancelled.'
+        'completed': 'Your appointment has been completed successfully.',
+        'cancelled': 'Your appointment has been cancelled by the center staff.',
+        'rejected': 'Your appointment has been rejected. Please contact the center for more information.'
       };
 
       if (statusMessages[status]) {
         await Notification.create({
           user: appointment.user._id,
           type: 'appointment_status',
-          title: 'Appointment Update',
+          title: 'Appointment Status Update',
           message: statusMessages[status],
           meta: { 
             appointmentId: appointment._id, 
             status,
+            oldStatus,
             centerId: appointment.center,
-            serviceId: appointment.service._id
+            centerName: req.staff.centerName,
+            serviceId: appointment.service._id,
+            updatedBy: req.user.name
           }
         });
       }
@@ -559,8 +690,15 @@ router.put('/appointments/:id/status', staffAuth, centerAccess, requirePermissio
 
     res.json({
       success: true,
-      message: 'Appointment status updated successfully',
-      data: appointment
+      message: `Appointment status updated from ${oldStatus} to ${status}`,
+      data: {
+        appointmentId: appointment._id,
+        oldStatus,
+        newStatus: status,
+        updatedBy: req.user.name,
+        updatedAt: new Date(),
+        centerName: req.staff.centerName
+      }
     });
 
   } catch (error) {
@@ -1542,6 +1680,113 @@ router.delete('/documents/:id', staffAuth, requirePermission('upload_documents')
     res.status(500).json({
       success: false,
       message: 'Failed to delete document',
+      error: error.message
+    });
+  }
+});
+
+// Get center profile with statistics
+router.get('/center-profile', staffAuth, centerAccess, async (req, res) => {
+  try {
+    // Import models dynamically
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    const { default: Appointment } = await import('../models/Appointment.js');
+    const { default: User } = await import('../models/User.js');
+
+    // Get center details
+    const center = await AkshayaCenter.findById(req.staff.centerId)
+      .populate('services', 'name category fee');
+
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Get all appointments for this center
+    const allAppointments = await Appointment.find({
+      center: req.staff.centerId
+    }).populate('service', 'name category fee').populate('user', 'name');
+
+    // Calculate statistics
+    const totalAppointments = allAppointments.length;
+    const completedServices = allAppointments.filter(apt => apt.status === 'completed').length;
+    
+    // Calculate average rating from completed appointments with ratings
+    const ratedAppointments = allAppointments.filter(apt => apt.rating && apt.rating.score);
+    const avgRating = ratedAppointments.length > 0
+      ? ratedAppointments.reduce((sum, apt) => sum + apt.rating.score, 0) / ratedAppointments.length
+      : 0;
+
+    // Get unique customers
+    const uniqueCustomers = new Set(allAppointments.map(apt => apt.user?._id?.toString()).filter(Boolean));
+    const totalCustomers = uniqueCustomers.size;
+
+    // Calculate service statistics
+    const serviceStats = {};
+    allAppointments.forEach(apt => {
+      if (apt.service && apt.status === 'completed') {
+        const serviceName = apt.service.name;
+        if (!serviceStats[serviceName]) {
+          serviceStats[serviceName] = {
+            name: serviceName,
+            count: 0,
+            revenue: 0
+          };
+        }
+        serviceStats[serviceName].count++;
+        serviceStats[serviceName].revenue += apt.service.fee || 0;
+      }
+    });
+
+    // Get top 4 services by count
+    const topServices = Object.values(serviceStats)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4);
+
+    // Get staff info
+    const staffUser = await User.findById(req.user.userId).select('name email');
+
+    const profileData = {
+      centerName: center.name,
+      address: {
+        street: center.address?.street || '',
+        city: center.address?.city || '',
+        district: center.address?.district || '',
+        state: center.address?.state || 'Kerala',
+        pincode: center.address?.pincode || ''
+      },
+      contact: {
+        phone: center.contact?.phone || '',
+        email: center.contact?.email || '',
+        website: center.contact?.website || ''
+      },
+      operatingHours: center.operatingHours || {},
+      stats: {
+        totalAppointments,
+        completedServices,
+        avgRating: parseFloat(avgRating.toFixed(1)),
+        totalCustomers
+      },
+      services: topServices,
+      staffInfo: {
+        name: staffUser?.name || '',
+        email: staffUser?.email || '',
+        role: req.staff.role || 'staff'
+      }
+    };
+
+    res.json({
+      success: true,
+      data: profileData
+    });
+
+  } catch (error) {
+    console.error('Get center profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch center profile',
       error: error.message
     });
   }

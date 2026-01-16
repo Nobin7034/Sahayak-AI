@@ -796,6 +796,156 @@ router.post('/notifications/mark-read', async (req, res) => {
   }
 });
 
+// Admin Service Management for Centers
+router.get('/centers/:id/services', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Import AkshayaCenter model dynamically
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    
+    const center = await AkshayaCenter.findById(id)
+      .populate('services', 'name description category fee processingTime requiredDocuments');
+    
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      services: center.services || []
+    });
+  } catch (error) {
+    console.error('Get center services error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch center services',
+      error: error.message
+    });
+  }
+});
+
+router.post('/centers/:id/services/enable-all', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Import models dynamically
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    
+    const center = await AkshayaCenter.findById(id);
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Get all active services
+    const allServices = await Service.find({ isActive: true }).select('_id');
+    const allServiceIds = allServices.map(s => s._id);
+
+    // Add all services to center (avoiding duplicates)
+    const existingServiceIds = center.services.map(s => s.toString());
+    const newServiceIds = allServiceIds.filter(sId => !existingServiceIds.includes(sId.toString()));
+    
+    center.services.push(...newServiceIds);
+    await center.save();
+
+    res.json({
+      success: true,
+      message: `All services enabled for center. Added ${newServiceIds.length} new services.`,
+      addedServices: newServiceIds.length
+    });
+  } catch (error) {
+    console.error('Enable all services for center error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to enable all services for center',
+      error: error.message
+    });
+  }
+});
+
+router.post('/centers/:id/services/:serviceId', async (req, res) => {
+  try {
+    const { id, serviceId } = req.params;
+    
+    // Import models dynamically
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    
+    const center = await AkshayaCenter.findById(id);
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Verify service exists
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+
+    // Add service to center if not already present
+    if (!center.services.includes(serviceId)) {
+      center.services.push(serviceId);
+      await center.save();
+    }
+
+    res.json({
+      success: true,
+      message: 'Service enabled for center successfully'
+    });
+  } catch (error) {
+    console.error('Enable service for center error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to enable service for center',
+      error: error.message
+    });
+  }
+});
+
+router.delete('/centers/:id/services/:serviceId', async (req, res) => {
+  try {
+    const { id, serviceId } = req.params;
+    
+    // Import AkshayaCenter model dynamically
+    const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
+    
+    const center = await AkshayaCenter.findById(id);
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Remove service from center
+    center.services = center.services.filter(sId => sId.toString() !== serviceId);
+    await center.save();
+
+    res.json({
+      success: true,
+      message: 'Service disabled for center successfully'
+    });
+  } catch (error) {
+    console.error('Disable service for center error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to disable service for center',
+      error: error.message
+    });
+  }
+});
+
 // Holidays management
 router.get('/holidays', async (req, res) => {
   try {

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, 
   Edit, 
   Trash2, 
   MapPin, 
@@ -9,11 +8,12 @@ import {
   Clock,
   Users,
   Search,
-  Filter,
-  AlertTriangle
+  AlertTriangle,
+  Settings,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
-import centerService from '../../services/centerService';
-import geocodingService from '../../services/geocodingService';
+import axios from 'axios';
 
 const AdminCenters = () => {
   const [centers, setCenters] = useState([]);
@@ -23,6 +23,13 @@ const AdminCenters = () => {
   const [editingCenter, setEditingCenter] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  
+  // Service management states
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [selectedCenter, setSelectedCenter] = useState(null);
+  const [availableServices, setAvailableServices] = useState([]);
+  const [centerServices, setCenterServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -316,6 +323,74 @@ Type "DELETE ALL" to confirm bulk permanent deletion:`;
     });
   };
 
+  // Service Management Functions
+  const openServiceModal = async (center) => {
+    setSelectedCenter(center);
+    setShowServiceModal(true);
+    await loadServicesForCenter(center._id);
+  };
+
+  const loadServicesForCenter = async (centerId) => {
+    try {
+      setLoadingServices(true);
+      
+      // Load all available services
+      const servicesResponse = await axios.get('/api/admin/services', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      
+      // Load center's current services
+      const centerResponse = await axios.get(`/api/admin/centers/${centerId}/services`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      
+      setAvailableServices(servicesResponse.data.data || []);
+      setCenterServices(centerResponse.data.services || []);
+    } catch (error) {
+      console.error('Error loading services:', error);
+      setError('Failed to load services');
+    } finally {
+      setLoadingServices(false);
+    }
+  };
+
+  const toggleServiceForCenter = async (serviceId, isEnabled) => {
+    try {
+      const endpoint = isEnabled 
+        ? `/api/admin/centers/${selectedCenter._id}/services/${serviceId}`
+        : `/api/admin/centers/${selectedCenter._id}/services/${serviceId}`;
+      
+      const method = isEnabled ? 'POST' : 'DELETE';
+      
+      await axios({
+        method,
+        url: endpoint,
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      
+      // Reload services for the center
+      await loadServicesForCenter(selectedCenter._id);
+    } catch (error) {
+      console.error('Error toggling service:', error);
+      setError('Failed to update service');
+    }
+  };
+
+  const enableAllServicesForCenter = async () => {
+    try {
+      await axios.post(`/api/admin/centers/${selectedCenter._id}/services/enable-all`, {}, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      
+      // Reload services for the center
+      await loadServicesForCenter(selectedCenter._id);
+      alert('All services enabled successfully!');
+    } catch (error) {
+      console.error('Error enabling all services:', error);
+      setError('Failed to enable all services');
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -490,6 +565,14 @@ Type "DELETE ALL" to confirm bulk permanent deletion:`;
             </div>
 
             <div className="flex items-center justify-end space-x-2 mt-4 pt-4 border-t">
+              <button
+                onClick={() => openServiceModal(center)}
+                className="p-2 text-green-600 hover:bg-green-50 rounded-md"
+                title="Manage Services"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+              
               <button
                 onClick={() => handleEdit(center)}
                 className="p-2 text-blue-600 hover:bg-blue-50 rounded-md"
@@ -696,6 +779,135 @@ Type "DELETE ALL" to confirm bulk permanent deletion:`;
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Service Management Modal */}
+      {showServiceModal && selectedCenter && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Manage Services - {selectedCenter.name}
+                </h2>
+                <button
+                  onClick={() => setShowServiceModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle className="h-6 w-6" />
+                </button>
+              </div>
+
+              {loadingServices ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Quick Actions */}
+                  <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-blue-900">Quick Actions</h3>
+                      <p className="text-sm text-blue-700">Enable all services for this center at once</p>
+                    </div>
+                    <button
+                      onClick={enableAllServicesForCenter}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Enable All Services
+                    </button>
+                  </div>
+
+                  {/* Services List */}
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Available Services</h3>
+                    
+                    {availableServices.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">No services available</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {availableServices.map((service) => {
+                          const isEnabled = centerServices.some(cs => cs._id === service._id);
+                          
+                          return (
+                            <div key={service._id} className="border rounded-lg p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3">
+                                    <h4 className="font-medium text-gray-900">{service.name}</h4>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      isEnabled 
+                                        ? 'bg-green-100 text-green-800'
+                                        : 'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {isEnabled ? 'Enabled' : 'Disabled'}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-600 mt-1">{service.description}</p>
+                                  <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
+                                    <span>Category: {service.category}</span>
+                                    <span>Fee: ₹{service.fee}</span>
+                                    <span>Processing: {service.processingTime} mins</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => toggleServiceForCenter(service._id, !isEnabled)}
+                                    className={`px-3 py-1 rounded-md text-sm font-medium ${
+                                      isEnabled
+                                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                    }`}
+                                  >
+                                    {isEnabled ? 'Disable' : 'Enable'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Currently Enabled Services Summary */}
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      Enabled Services ({centerServices.length})
+                    </h3>
+                    {centerServices.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {centerServices.map((service) => (
+                          <span
+                            key={service._id}
+                            className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
+                          >
+                            {service.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-sm">No services enabled for this center</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end space-x-3 pt-6 border-t">
+                <button
+                  onClick={() => setShowServiceModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

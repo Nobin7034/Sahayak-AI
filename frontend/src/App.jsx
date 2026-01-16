@@ -31,6 +31,7 @@ import StaffAppointments from './pages/staff/StaffAppointments'
 import StaffServices from './pages/staff/StaffServices'
 import StaffAnalytics from './pages/staff/StaffAnalytics'
 import StaffProfile from './pages/staff/StaffProfile'
+import StaffSettings from './pages/staff/StaffSettings'
 import StaffLayout from './components/StaffLayout'
 
 function App() {
@@ -242,6 +243,13 @@ function App() {
             <ProtectedRoute>
               <StaffLayout>
                 <StaffProfile />
+              </StaffLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/settings" element={
+            <ProtectedRoute>
+              <StaffLayout>
+                <StaffSettings />
               </StaffLayout>
             </ProtectedRoute>
           } />

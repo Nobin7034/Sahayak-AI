@@ -36,10 +36,12 @@ const Appointments = () => {
     if (serviceId) {
       fetchService()
     } else {
-      // Fetch appointments when no service is selected
-      fetchAppointments()
+      // Only fetch appointments if user is authenticated
+      if (user) {
+        fetchAppointments()
+      }
     }
-  }, [serviceId])
+  }, [serviceId, user])
 
   useEffect(() => {
     // load Razorpay key
@@ -58,7 +60,7 @@ const Appointments = () => {
       // check holiday info via slots response or a dedicated endpoint
       ;(async () => {
         try {
-          const res = await axios.get(`/appointments/slots/${serviceId}/${formData.appointmentDate}`)
+          const res = await axios.get(`/api/appointments/slots/${serviceId}/${formData.appointmentDate}`)
           if (res.data?.success) {
             setHolidayInfo({ isHoliday: !!res.data.data.isHoliday, reason: res.data.data.reason || '' })
           }
@@ -71,7 +73,7 @@ const Appointments = () => {
 
   const fetchService = async () => {
     try {
-      const response = await axios.get(`/services/${serviceId}`)
+      const response = await axios.get(`/api/services/${serviceId}`)
       if (response.data.success) {
         setService(response.data.data)
       }
@@ -84,13 +86,23 @@ const Appointments = () => {
   const fetchAppointments = async () => {
     try {
       setAppointmentsLoading(true)
-      const response = await axios.get('/appointments')
+      const token = localStorage.getItem('token')
+      console.log('Fetching appointments with token:', token ? 'Token exists' : 'No token')
+      
+      const response = await axios.get('/api/appointments')
       if (response.data.success) {
         console.log('Fetched appointments:', response.data.data)
         setAppointments(response.data.data)
       }
     } catch (error) {
       console.error('Appointments fetch error:', error)
+      console.error('Error response:', error.response?.data)
+      console.error('Error status:', error.response?.status)
+      
+      // If 403, might be authentication issue
+      if (error.response?.status === 403) {
+        console.error('403 Forbidden - Check if user is logged in and token is valid')
+      }
     } finally {
       setAppointmentsLoading(false)
     }
@@ -98,7 +110,7 @@ const Appointments = () => {
 
   const fetchAvailableSlots = async () => {
     try {
-      const response = await axios.get(`/appointments/slots/${serviceId}/${formData.appointmentDate}`)
+      const response = await axios.get(`/api/appointments/slots/${serviceId}/${formData.appointmentDate}`)
       if (response.data.success) {
         setAvailableSlots(response.data.data.availableSlots)
       }
@@ -186,7 +198,7 @@ const Appointments = () => {
       }
 
       // If no serviceCharge, just create appointment
-      const response = await axios.post('/appointments', {
+      const response = await axios.post('/api/appointments', {
         serviceId,
         appointmentDate: formData.appointmentDate,
         timeSlot: formData.timeSlot,
@@ -248,7 +260,7 @@ const Appointments = () => {
       setSaving(true)
       setMessage({ type: '', text: '' })
       const isReschedule = rescheduleMode === editingAppointment
-      const url = isReschedule ? `/appointments/${editingAppointment}/reschedule` : `/appointments/${editingAppointment}`
+      const url = isReschedule ? `/api/appointments/${editingAppointment}/reschedule` : `/api/appointments/${editingAppointment}`
       const response = await axios.put(url, editForm)
       
       if (response.data.success) {
@@ -285,7 +297,7 @@ const Appointments = () => {
 
     try {
       setDeleting(appointmentId)
-      const response = await axios.delete(`/appointments/${appointmentId}`)
+      const response = await axios.delete(`/api/appointments/${appointmentId}`)
       
       if (response.data.success) {
         // Remove the appointment from the list
@@ -301,24 +313,32 @@ const Appointments = () => {
     }
   }
 
-  // Get available time slots
+  // Get available time slots (updated to exclude 5:00 PM - center closes at 5:00 PM)
   const timeSlots = [
     '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-    '12:00 PM', '12:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
-    '04:00 PM', '04:30 PM', '05:00 PM'
+    '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', 
+    '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM'
   ]
 
-  // Get minimum date (tomorrow)
+  // Get minimum date (today or tomorrow based on timing rules)
   const getMinDate = () => {
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return tomorrow.toISOString().split('T')[0]
+    const now = new Date()
+    const currentHour = now.getHours()
+    
+    // If it's after 5:00 PM today, minimum date is tomorrow
+    if (currentHour >= 17) {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      return tomorrow.toISOString().split('T')[0]
+    } else {
+      return now.toISOString().split('T')[0]
+    }
   }
 
-  // Get maximum date (30 days from now)
+  // Get maximum date (3 days in advance)
   const getMaxDate = () => {
     const maxDate = new Date()
-    maxDate.setDate(maxDate.getDate() + 30)
+    maxDate.setDate(maxDate.getDate() + 3)
     return maxDate.toISOString().split('T')[0]
   }
 
@@ -330,6 +350,23 @@ const Appointments = () => {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">My Appointments</h1>
             <p className="text-lg text-gray-600">Manage your scheduled appointments</p>
+          </div>
+
+          {/* Appointment Rules Info */}
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <Clock className="w-5 h-5 text-blue-500 mr-3 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-2">Appointment Management Rules:</p>
+                <ul className="text-xs space-y-1">
+                  <li>• Edit or cancel appointments until 9:00 AM on appointment day</li>
+                  <li>• Working hours: 9:00 AM - 5:00 PM (Monday to Saturday)</li>
+                  <li>• Book up to 3 days in advance</li>
+                  <li>• Closed on Sundays and second Saturdays</li>
+                  <li>• For assistance after cutoff time, contact center staff</li>
+                </ul>
+              </div>
+            </div>
           </div>
 
           {/* Message Display */}
@@ -397,7 +434,8 @@ const Appointments = () => {
                             value={editForm.appointmentDate}
                             onChange={(e) => setEditForm({ ...editForm, appointmentDate: e.target.value })}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-primary focus:border-primary"
-                            min={new Date().toISOString().split('T')[0]}
+                            min={getMinDate()}
+                            max={getMaxDate()}
                             required
                           />
                         </div>
@@ -480,11 +518,13 @@ const Appointments = () => {
                           (() => {
                             const now = new Date()
                             const aptDate = new Date(appointment.appointmentDate)
-                            const timeDiff = aptDate.getTime() - now.getTime()
-                            const hoursDiff = timeDiff / (1000 * 60 * 60)
+                            const appointmentDay = new Date(aptDate)
+                            appointmentDay.setHours(9, 0, 0, 0) // 9:00 AM on appointment day
+                            
                             const isEnded = aptDate.getTime() < now.getTime()
-                            const canEdit = ['pending', 'confirmed'].includes(appointment.status) && hoursDiff > 3
-                            const canDelete = ['pending', 'confirmed'].includes(appointment.status) && hoursDiff > 3
+                            // Can edit/cancel until 9:00 AM on appointment day
+                            const canEdit = ['pending', 'confirmed'].includes(appointment.status) && now < appointmentDay
+                            const canCancel = ['pending', 'confirmed'].includes(appointment.status) && now < appointmentDay
                             
                             if (isEnded && ['pending','confirmed'].includes(appointment.status)) {
                               return (
@@ -508,7 +548,7 @@ const Appointments = () => {
                                   >
                                     <Edit3 className="w-4 h-4" />
                                   </button>
-                                  {canDelete && (
+                                  {canCancel && (
                                     <button
                                       onClick={() => handleDeleteAppointment(appointment._id)}
                                       disabled={deleting === appointment._id}
@@ -528,7 +568,7 @@ const Appointments = () => {
                             
                             return (
                               <span className="text-xs text-gray-400">
-                                {hoursDiff <= 3 ? 'Cannot edit within 3 hours' : 'Cannot edit'}
+                                {now >= appointmentDay ? 'Cannot edit after 9:00 AM on appointment day' : 'Cannot edit'}
                               </span>
                             )
                           })()
@@ -536,30 +576,114 @@ const Appointments = () => {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="w-4 h-4 text-gray-500" />
-                          <span>
-                            {(() => {
-                              const now = new Date()
-                              const aptDate = new Date(appointment.appointmentDate)
-                              const ended = aptDate.getTime() < now.getTime()
-                              const dateText = `${aptDate.toLocaleDateString()} at ${appointment.timeSlot}`
-                              return ended ? `Date ended: ${dateText}` : dateText
-                            })()}
-                          </span>
+                      <div className="space-y-4">
+                        {/* Appointment Details Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4 text-gray-500" />
+                            <span>
+                              {(() => {
+                                const now = new Date()
+                                const aptDate = new Date(appointment.appointmentDate)
+                                const ended = aptDate.getTime() < now.getTime()
+                                const dateText = `${aptDate.toLocaleDateString()} at ${appointment.timeSlot}`
+                                return ended ? `Date ended: ${dateText}` : dateText
+                              })()}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Clock className="w-4 h-4 text-gray-500" />
+                            <span>Processing: {appointment.service?.processingTime}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="w-4 h-4 text-gray-500" />
-                          <span>Akshaya Service Center</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Clock className="w-4 h-4 text-gray-500" />
-                          <span>Processing: {appointment.service?.processingTime}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <FileText className="w-4 h-4 text-gray-500" />
-                          <span>Fee: {appointment.service?.fee === 0 ? 'Free' : `₹${appointment.service?.fee}`}</span>
+
+                        {/* Center Information Section */}
+                        {appointment.center && (
+                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-blue-600" />
+                              Center Details
+                            </h4>
+                            <div className="space-y-2 text-sm">
+                              <div>
+                                <span className="text-gray-600">Name:</span>
+                                <p className="font-medium text-gray-900">{appointment.center.name}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Address:</span>
+                                <p className="font-medium text-gray-900">
+                                  {typeof appointment.center.address === 'string' 
+                                    ? appointment.center.address 
+                                    : `${appointment.center.address?.street || ''}, ${appointment.center.address?.city || ''}, ${appointment.center.address?.district || ''}, ${appointment.center.address?.state || ''} - ${appointment.center.address?.pincode || ''}`
+                                  }
+                                </p>
+                              </div>
+                              {appointment.center.contact && (
+                                <div>
+                                  <span className="text-gray-600">Contact:</span>
+                                  <p className="font-medium text-gray-900">
+                                    {typeof appointment.center.contact === 'string'
+                                      ? appointment.center.contact
+                                      : appointment.center.contact?.phone || appointment.center.contact?.email || 'N/A'
+                                    }
+                                  </p>
+                                </div>
+                              )}
+                              {appointment.center.location && appointment.center.location.coordinates && (
+                                <div className="mt-3">
+                                  <a
+                                    href={`https://www.google.com/maps?q=${appointment.center.location.coordinates[1]},${appointment.center.location.coordinates[0]}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                  >
+                                    <MapPin className="w-4 h-4" />
+                                    View on Google Maps
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Payment Information Section */}
+                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                            <IndianRupee className="w-4 h-4 text-gray-600" />
+                            Payment Details
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-gray-600">Total Fee:</span>
+                              <p className="font-medium text-gray-900">
+                                {appointment.service?.fee === 0 ? 'Free' : `₹${appointment.service?.fee}`}
+                              </p>
+                            </div>
+                            {appointment.payment && appointment.payment.status === 'paid' && (
+                              <>
+                                <div>
+                                  <span className="text-gray-600">Paid Amount:</span>
+                                  <p className="font-medium text-green-600">₹{appointment.payment.amount}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">Payment Status:</span>
+                                  <p className="font-medium text-green-600 capitalize">{appointment.payment.status}</p>
+                                </div>
+                                {appointment.payment.paymentId && (
+                                  <div>
+                                    <span className="text-gray-600">Payment ID:</span>
+                                    <p className="font-medium text-gray-900 text-xs">{appointment.payment.paymentId}</p>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {(!appointment.payment || appointment.payment.status !== 'paid') && appointment.service?.fee > 0 && (
+                              <div>
+                                <span className="text-gray-600">Payment Status:</span>
+                                <p className="font-medium text-orange-600">Pending - Pay at center</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                       
@@ -574,7 +698,7 @@ const Appointments = () => {
                       {!appointment.canEdit && appointment.status === 'pending' && (
                         <div className="mt-4 flex items-center space-x-2 text-orange-600">
                           <Clock className="w-4 h-4" />
-                          <span className="text-sm">Cannot edit within 3 hours of appointment</span>
+                          <span className="text-sm">Cannot edit after 9:00 AM on appointment day</span>
                         </div>
                       )}
                     </>

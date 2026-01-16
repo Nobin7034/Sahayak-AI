@@ -218,74 +218,26 @@ const StaffQuickActions = ({
 
   const defaultActions = [
     {
-      id: 'new-appointment',
-      icon: Plus,
-      label: 'New Appointment',
-      permission: 'manage_appointments',
-      variant: 'primary',
-      onClick: () => handleActionClick('new-appointment', () => {
-        window.location.href = '/staff/appointments/new';
-      }),
-      tooltip: 'Create a new appointment'
-    },
-    {
       id: 'view-appointments',
       icon: Calendar,
       label: 'Appointments',
       permission: 'manage_appointments',
-      variant: 'secondary',
+      variant: 'primary',
       onClick: () => handleActionClick('view-appointments', () => {
         window.location.href = '/staff/appointments';
       }),
-      tooltip: 'View all appointments'
+      tooltip: 'View and manage appointments'
     },
     {
-      id: 'search-customer',
-      icon: Search,
-      label: 'Find Customer',
-      permission: 'view_customers',
-      variant: 'secondary',
-      onClick: () => handleActionClick('search-customer', () => {
-        // Open search modal or navigate to search page
-        console.log('Opening customer search...');
-      }),
-      tooltip: 'Search for customer records'
-    },
-    {
-      id: 'quick-service',
+      id: 'manage-services',
       icon: CheckCircle,
-      label: 'Quick Service',
+      label: 'Services',
       permission: 'manage_services',
-      variant: 'success',
-      onClick: () => handleActionClick('quick-service', () => {
-        // Open quick service modal
-        console.log('Opening quick service...');
-      }),
-      tooltip: 'Process a quick service request'
-    },
-    {
-      id: 'upload-document',
-      icon: Upload,
-      label: 'Upload Doc',
-      permission: 'upload_documents',
       variant: 'secondary',
-      onClick: () => handleActionClick('upload-document', () => {
-        // Open file upload modal
-        console.log('Opening document upload...');
+      onClick: () => handleActionClick('manage-services', () => {
+        window.location.href = '/staff/services';
       }),
-      tooltip: 'Upload customer documents'
-    },
-    {
-      id: 'print-report',
-      icon: Printer,
-      label: 'Print Report',
-      permission: 'view_reports',
-      variant: 'secondary',
-      onClick: () => handleActionClick('print-report', () => {
-        // Generate and print report
-        console.log('Generating report...');
-      }),
-      tooltip: 'Generate and print reports'
+      tooltip: 'Manage center services'
     },
     {
       id: 'view-analytics',
@@ -301,13 +253,13 @@ const StaffQuickActions = ({
     {
       id: 'staff-profile',
       icon: Settings,
-      label: 'Profile',
+      label: 'Settings',
       permission: null, // Always available
       variant: 'secondary',
       onClick: () => handleActionClick('staff-profile', () => {
-        window.location.href = '/staff/profile';
+        window.location.href = '/staff/settings';
       }),
-      tooltip: 'Manage your profile settings'
+      tooltip: 'Manage your settings'
     }
   ];
 

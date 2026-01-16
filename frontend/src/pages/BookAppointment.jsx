@@ -168,8 +168,61 @@ const BookAppointment = () => {
     }
   };
 
+  const validateBookingTiming = (selectedDate) => {
+    const now = new Date();
+    const appointmentDate = new Date(selectedDate);
+    const isToday = appointmentDate.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentTime = currentHour * 100 + currentMinute;
+      
+      // Center working hours: 9:00 AM to 5:00 PM (900 to 1700)
+      if (currentTime >= 1700) {
+        return {
+          valid: false,
+          message: 'Cannot book appointments for today after 5:00 PM. Please select tomorrow.'
+        };
+      }
+      
+      if (currentTime < 900) {
+        return {
+          valid: false,
+          message: 'Cannot book appointments before center opening hours (9:00 AM).'
+        };
+      }
+    }
+    
+    // Check if date is more than 3 days in advance
+    const maxAdvanceDate = new Date();
+    maxAdvanceDate.setDate(maxAdvanceDate.getDate() + 3);
+    maxAdvanceDate.setHours(23, 59, 59, 999);
+    
+    if (appointmentDate > maxAdvanceDate) {
+      return {
+        valid: false,
+        message: 'Appointments can only be booked up to 3 days in advance.'
+      };
+    }
+    
+    return { valid: true };
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // Validate date selection timing
+    if (name === 'appointmentDate' && value) {
+      const validation = validateBookingTiming(value);
+      if (!validation.valid) {
+        setError(validation.message);
+        return;
+      } else {
+        setError('');
+      }
+    }
+    
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -318,14 +371,24 @@ const BookAppointment = () => {
   };
 
   const getMinDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // If it's after 5:00 PM today, minimum date is tomorrow
+    // If it's before 9:00 AM today, minimum date is today
+    // Otherwise, minimum date is today
+    if (currentHour >= 17) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow.toISOString().split('T')[0];
+    } else {
+      return now.toISOString().split('T')[0];
+    }
   };
 
   const getMaxDate = () => {
     const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 30); // 30 days from now
+    maxDate.setDate(maxDate.getDate() + 3); // 3 days in advance
     return maxDate.toISOString().split('T')[0];
   };
 
@@ -488,6 +551,23 @@ const BookAppointment = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Appointment Date *
               </label>
+              
+              {/* Booking Rules Info */}
+              <div className="mb-3 bg-blue-50 border border-blue-200 rounded-md p-3">
+                <div className="flex items-start">
+                  <Clock className="h-4 w-4 text-blue-500 mr-2 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Booking Rules:</p>
+                    <ul className="text-xs space-y-1">
+                      <li>• Appointments available: 9:00 AM - 5:00 PM</li>
+                      <li>• Book up to 3 days in advance</li>
+                      <li>• Cancel until 9:00 AM on appointment day</li>
+                      <li>• After 5:00 PM today, book for tomorrow</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              
               <input
                 type="date"
                 name="appointmentDate"

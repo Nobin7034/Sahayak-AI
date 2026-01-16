@@ -278,7 +278,7 @@ const CenterFinder = () => {
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-medium text-gray-700">Distance:</span>
                   <div className="flex space-x-1">
-                    {[10, 20, 50, 100].map((radius) => (
+                    {[5, 10, 20, 50, 100].map((radius) => (
                       <button
                         key={radius}
                         onClick={() => {

@@ -156,8 +156,28 @@ router.post("/register", async (req, res) => {
 
       // Auto-geocode if coordinates not provided
       let coordinates = [0, 0]; // Default coordinates
+      let actualPincode = centerAddress.pincode; // Default to provided pincode
+
       if (centerLocation?.latitude && centerLocation?.longitude) {
         coordinates = [parseFloat(centerLocation.longitude), parseFloat(centerLocation.latitude)];
+
+        // Use reverse geocoding to get the correct pincode based on coordinates
+        try {
+          const geocodeResponse = await fetch(`${req.protocol}://${req.get('host')}/api/geocode/reverse?lat=${centerLocation.latitude}&lng=${centerLocation.longitude}`);
+          const geocodeData = await geocodeResponse.json();
+
+          if (geocodeData.success && geocodeData.components) {
+            // Extract pincode from reverse geocoding result
+            const components = geocodeData.components;
+            if (components.postcode) {
+              actualPincode = components.postcode;
+              console.log(`Reverse geocoded pincode: ${actualPincode} for coordinates: ${centerLocation.latitude}, ${centerLocation.longitude}`);
+            }
+          }
+        } catch (error) {
+          console.error('Reverse geocoding failed during center creation:', error);
+          // Fall back to provided pincode
+        }
       } else if (centerAddress?.pincode) {
         // Try to geocode from pincode (simplified - you could integrate with a geocoding service)
         // For now, use default Kerala coordinates
@@ -172,7 +192,7 @@ router.post("/register", async (req, res) => {
           city: centerAddress.city,
           district: centerAddress.district,
           state: centerAddress.state || 'Kerala',
-          pincode: centerAddress.pincode
+          pincode: actualPincode
         },
         location: {
           type: 'Point',
@@ -813,7 +833,7 @@ router.post('/upload-avatar', authenticate, upload.single('avatar'), async (req,
 router.post('/admin/approve-staff/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { adminId, notes = '' } = req.body;
+    const { adminId, notes = '', enableAllServices = false } = req.body; // Changed default to false
 
     // Find the staff user
     const staffUser = await User.findById(userId);
@@ -862,22 +882,31 @@ router.post('/admin/approve-staff/:userId', async (req, res) => {
     // Activate the center
     center.status = 'active';
     
-    // Auto-assign all existing services to the newly approved center
-    const { default: Service } = await import('../models/Service.js');
-    const allServices = await Service.find({ isActive: true }).select('_id');
-    const serviceIds = allServices.map(service => service._id);
+    let servicesAssigned = 0;
+    let newServicesAdded = 0;
     
-    // Add all services to the center if not already present
-    const existingServiceIds = center.services.map(id => id.toString());
-    const newServiceIds = serviceIds.filter(id => !existingServiceIds.includes(id.toString()));
-    
-    if (newServiceIds.length > 0) {
-      center.services.push(...newServiceIds);
+    // Auto-assign all existing services to the newly approved center (if enabled)
+    if (enableAllServices) {
+      const { default: Service } = await import('../models/Service.js');
+      const allServices = await Service.find({ isActive: true }).select('_id');
+      const serviceIds = allServices.map(service => service._id);
+      
+      // Add all services to the center if not already present
+      const existingServiceIds = center.services.map(id => id.toString());
+      const newServiceIds = serviceIds.filter(id => !existingServiceIds.includes(id.toString()));
+      
+      if (newServiceIds.length > 0) {
+        center.services.push(...newServiceIds);
+        newServicesAdded = newServiceIds.length;
+      }
+      
+      servicesAssigned = serviceIds.length;
+      console.log(`✅ Center ${center.name} approved and ${servicesAssigned} services automatically assigned`);
+    } else {
+      console.log(`✅ Center ${center.name} approved without automatic service assignment`);
     }
     
     await center.save();
-    
-    console.log(`✅ Center ${center.name} approved and ${serviceIds.length} services automatically assigned`);
     
 
     // Activate the staff record
@@ -906,13 +935,16 @@ router.post('/admin/approve-staff/:userId', async (req, res) => {
 
     res.json({
       success: true,
-      message: `Staff registration approved successfully. ${serviceIds.length} services automatically assigned to ${center.name}.`,
+      message: enableAllServices 
+        ? `Staff registration approved successfully. ${servicesAssigned} services automatically assigned to ${center.name}.`
+        : `Staff registration approved successfully. No services were automatically assigned to ${center.name}.`,
       data: {
         user: { id: staffUser._id, name: staffUser.name, email: staffUser.email },
         center: { id: center._id, name: center.name },
         staff: { id: staffRecord._id },
-        servicesAssigned: serviceIds.length,
-        newServicesAdded: newServiceIds.length
+        servicesAssigned: servicesAssigned,
+        newServicesAdded: newServicesAdded,
+        enableAllServices: enableAllServices
       }
     });
 

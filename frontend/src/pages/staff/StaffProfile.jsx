@@ -84,49 +84,8 @@ const StaffProfile = () => {
       }
     } catch (error) {
       console.error('Profile load error:', error);
-      // Mock data for development
-      setCenterData({
-        centerName: 'Akshaya Center - Kochi',
-        address: {
-          street: 'MG Road, Near Metro Station',
-          city: 'Kochi',
-          district: 'Ernakulam',
-          state: 'Kerala',
-          pincode: '682016'
-        },
-        contact: {
-          phone: '+91 9876543210',
-          email: 'kochi.center@sahayak.ai',
-          website: 'www.sahayak-kochi.com'
-        },
-        operatingHours: {
-          monday: { open: '09:00', close: '17:00', isOpen: true },
-          tuesday: { open: '09:00', close: '17:00', isOpen: true },
-          wednesday: { open: '09:00', close: '17:00', isOpen: true },
-          thursday: { open: '09:00', close: '17:00', isOpen: true },
-          friday: { open: '09:00', close: '17:00', isOpen: true },
-          saturday: { open: '09:00', close: '17:00', isOpen: true },
-          sunday: { open: '10:00', close: '16:00', isOpen: false }
-        },
-        stats: {
-          totalAppointments: 1250,
-          completedServices: 1180,
-          avgRating: 4.8,
-          totalCustomers: 890
-        },
-        services: [
-          { name: 'Aadhaar Services', count: 450, revenue: 22500 },
-          { name: 'PAN Card Services', count: 320, revenue: 35200 },
-          { name: 'Passport Services', count: 180, revenue: 36000 },
-          { name: 'Certificate Services', count: 230, revenue: 11500 }
-        ],
-        staffInfo: {
-          name: 'Rajesh Kumar',
-          role: 'Center Manager',
-          joinDate: '2023-01-15',
-          experience: '5 years'
-        }
-      });
+      // Show error message instead of mock data
+      setCenterData(null);
     } finally {
       setLoading(false);
     }
@@ -185,6 +144,26 @@ const StaffProfile = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
           <p className={`mt-4 ${currentTheme.text.secondary}`}>Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!centerData) {
+    return (
+      <div className={`min-h-screen ${currentTheme.background} flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="h-12 w-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="h-6 w-6 text-red-600" />
+          </div>
+          <h2 className={`text-xl font-semibold ${currentTheme.text.primary} mb-2`}>Failed to Load Profile</h2>
+          <p className={`${currentTheme.text.secondary} mb-4`}>Unable to fetch center profile data</p>
+          <button
+            onClick={loadCenterProfile}
+            className={`${currentTheme.button.primary} px-4 py-2 rounded-lg transition-colors`}
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -332,34 +311,18 @@ const StaffProfile = () => {
                     )}
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={`block text-xs ${currentTheme.text.tertiary} mb-1`}>City</label>
-                      {editing ? (
-                        <input
-                          type="text"
-                          value={data?.address?.city || ''}
-                          onChange={(e) => updateEditData('address.city', e.target.value)}
-                          className={`w-full ${currentTheme.input} rounded-lg px-3 py-2 focus:outline-none focus:ring-2`}
-                        />
-                      ) : (
-                        <p className={currentTheme.text.secondary}>{data?.address?.city}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className={`block text-xs ${currentTheme.text.tertiary} mb-1`}>Pincode</label>
-                      {editing ? (
-                        <input
-                          type="text"
-                          value={data?.address?.pincode || ''}
-                          onChange={(e) => updateEditData('address.pincode', e.target.value)}
-                          className={`w-full ${currentTheme.input} rounded-lg px-3 py-2 focus:outline-none focus:ring-2`}
-                        />
-                      ) : (
-                        <p className={currentTheme.text.secondary}>{data?.address?.pincode}</p>
-                      )}
-                    </div>
+                  <div>
+                    <label className={`block text-xs ${currentTheme.text.tertiary} mb-1`}>City</label>
+                    {editing ? (
+                      <input
+                        type="text"
+                        value={data?.address?.city || ''}
+                        onChange={(e) => updateEditData('address.city', e.target.value)}
+                        className={`w-full ${currentTheme.input} rounded-lg px-3 py-2 focus:outline-none focus:ring-2`}
+                      />
+                    ) : (
+                      <p className={currentTheme.text.secondary}>{data?.address?.city}</p>
+                    )}
                   </div>
                 </div>
               </div>

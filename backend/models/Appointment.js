@@ -26,8 +26,97 @@ const appointmentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+    enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rejected'],
     default: 'pending'
+  },
+  // Status change audit trail
+  statusHistory: [{
+    status: {
+      type: String,
+      enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rejected']
+    },
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now
+    },
+    reason: String,
+    staffName: String,
+    centerName: String
+  }],
+  // Processing information
+  completedAt: Date,
+  actualDuration: Number, // in minutes
+  processingNotes: String,
+  // Staff notes and comments
+  staffNotes: [{
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    content: String,
+    isVisible: {
+      type: Boolean,
+      default: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  // Comments from staff and users
+  comments: [{
+    author: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    authorType: {
+      type: String,
+      enum: ['user', 'staff', 'admin'],
+      default: 'user'
+    },
+    content: String,
+    isVisible: {
+      type: Boolean,
+      default: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  // Result documents uploaded by staff
+  resultDocuments: [{
+    name: String,
+    originalName: String,
+    type: String,
+    size: Number,
+    url: String,
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    isPublic: {
+      type: Boolean,
+      default: true
+    }
+  }],
+  // Rating and feedback
+  rating: {
+    score: {
+      type: Number,
+      min: 1,
+      max: 5
+    },
+    feedback: String,
+    ratedAt: Date
   },
   // Payment tracking for service charge collection
   payment: {

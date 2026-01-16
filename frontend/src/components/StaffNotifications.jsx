@@ -200,7 +200,7 @@ const NotificationDropdown = ({
   const unreadNotifications = Array.isArray(notifications) ? notifications.filter(n => !n.isRead) : [];
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-50">
+    <div className="absolute right-0 top-full mt-2 w-96 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-[9999]">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-slate-700">
         <h3 className="text-lg font-semibold text-white">Notifications</h3>
@@ -433,7 +433,7 @@ const StaffNotifications = ({
   }, [isOpen]);
 
   return (
-    <div className="relative notification-container">
+    <div className="relative notification-container z-[100]">
       <NotificationBell
         unreadCount={unreadCount}
         onClick={handleToggleDropdown}

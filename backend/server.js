@@ -40,6 +40,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import centerRoutes from './routes/centers.js';
 import geocodeRoutes from './routes/geocode.js';
 import staffRoutes from './routes/staffRoutes.js';
+import ratingRoutes from './routes/ratingRoutes.js';
 
 // Base route (dev info). In production we serve the frontend build instead.
 app.get('/', (req, res) => {
@@ -77,6 +78,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/centers', centerRoutes);
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/ratings', ratingRoutes);
 
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {
