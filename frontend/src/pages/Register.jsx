@@ -233,7 +233,7 @@ const Register = () => {
     const t = setTimeout(async () => {
       try {
         // Use different endpoint for staff email checking
-        const endpoint = formData.accountType === 'staff' ? '/auth/check-staff-email' : '/auth/check-email';
+        const endpoint = formData.accountType === 'staff' ? '/api/auth/check-staff-email' : '/api/auth/check-email';
         const { data } = await axios.get(endpoint, { params: { email } });
         if (!active) return;
         setEmailStatus({ checking: false, exists: !!data?.exists });

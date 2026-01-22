@@ -1,182 +1,399 @@
 import express from 'express';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
-import { userAuth, adminAuth } from '../middleware/auth.js';
+import dotenv from 'dotenv';
+import { authenticate } from '../middleware/auth.js';
 import Service from '../models/Service.js';
 import Appointment from '../models/Appointment.js';
-import Notification from '../models/Notification.js';
-import Holiday from '../models/Holiday.js';
+import AkshayaCenter from '../models/AkshayaCenter.js';
+
+// Ensure environment variables are loaded
+dotenv.config();
 
 const router = express.Router();
 
-const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_RGXWGOBliVCIpU';
-const key_secret = process.env.RAZORPAY_KEY_SECRET || '9Q49llzcN0kLD3021OoSstOp';
+// Initialize Razorpay
+let razorpay = null;
 
-const razorpay = new Razorpay({ key_id, key_secret });
-
-// Public config for frontend
-router.get('/config', (req, res) => {
-  return res.json({ success: true, data: { keyId: key_id, currency: 'INR' } });
-});
-
-// Create order for a service's serviceCharge
-router.post('/create-order', userAuth, async (req, res) => {
-  try {
-    const { serviceId } = req.body;
-    const service = await Service.findById(serviceId);
-    if (!service || !service.isActive) {
-      return res.status(404).json({ success: false, message: 'Service not found or inactive' });
-    }
-    const amountPaise = Math.round((service.serviceCharge || 0) * 100);
-    if (amountPaise <= 0) {
-      return res.status(400).json({ success: false, message: 'Service charge must be greater than 0. Please ask admin to set serviceCharge in Service.' });
-    }
-    try {
-      const shortSvc = String(serviceId).slice(-6);
-      const shortTs = Date.now().toString(36);
-      let receipt = `svc_${shortSvc}_${shortTs}`;
-      if (receipt.length > 40) receipt = receipt.slice(0, 40);
-      const order = await razorpay.orders.create({
-        amount: amountPaise,
-        currency: 'INR',
-        receipt,
-        notes: { serviceId: serviceId.toString(), userId: req.user.userId }
-      });
-      return res.status(201).json({ success: true, data: { order } });
-    } catch (rzpErr) {
-      const details = rzpErr?.error || rzpErr?.response || rzpErr;
-      console.error('Razorpay order create error:', details);
-      const msg = details?.description || details?.message || 'Razorpay order creation failed. Check keys/network.';
-      return res.status(500).json({ success: false, message: msg });
-    }
-  } catch (error) {
-    console.error('Create order error:', error);
-    return res.status(500).json({ success: false, message: error?.message || 'Failed to create order' });
-  }
-});
-
-// Verify payment signature and create appointment entry
-router.post('/verify-and-create-appointment', userAuth, async (req, res) => {
-  try {
-    const { serviceId, appointmentDate, timeSlot, notes, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-
-    // Verify signature
-    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const expected = crypto.createHmac('sha256', key_secret).update(body).digest('hex');
-    if (expected !== razorpay_signature) {
-      return res.status(400).json({ success: false, message: 'Payment verification failed' });
-    }
-
-    const service = await Service.findById(serviceId);
-    if (!service || !service.isActive) {
-      return res.status(404).json({ success: false, message: 'Service not found or inactive' });
-    }
-
-  // Block Sundays, second Saturdays and manual holidays
-    const dateObj = new Date(appointmentDate);
-  if (dateObj.getDay() === 0) {
-    return res.status(400).json({ success: false, message: 'Bookings are not available on Sundays.' });
-  }
-  if (dateObj.getDay() === 6) {
-    const firstOfMonth = new Date(dateObj.getFullYear(), dateObj.getMonth(), 1);
-    const firstSatOffset = (6 - firstOfMonth.getDay() + 7) % 7;
-    const firstSat = 1 + firstSatOffset;
-    const secondSat = firstSat + 7;
-    if (dateObj.getDate() === secondSat) {
-      return res.status(400).json({ success: false, message: 'Bookings are not available on second Saturdays.' });
-    }
-  }
-  const start = new Date(dateObj); start.setHours(0,0,0,0);
-  const end = new Date(start); end.setDate(end.getDate() + 1);
-  const manualHoliday = await Holiday.findOne({ date: { $gte: start, $lt: end } });
-  if (manualHoliday) {
-    return res.status(400).json({ success: false, message: `Bookings are not available on this holiday: ${manualHoliday.reason || 'Holiday'}.` });
-  }
-
-    // Enforce exclusivity: ensure no other appointment has this slot (globally across all services)
-    const conflict = await Appointment.findOne({
-      appointmentDate: dateObj,
-      timeSlot,
-      status: { $in: ['pending', 'confirmed'] }
+try {
+  if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
-  if (conflict) {
-    return res.status(400).json({ success: false, message: 'This time slot is already booked' });
+    console.log('✅ Razorpay initialized successfully');
+  } else {
+    console.warn('⚠️ Razorpay credentials not found in environment variables');
   }
+} catch (error) {
+  console.error('❌ Failed to initialize Razorpay:', error.message);
+}
 
-    // Create appointment marked as confirmed once paid
-    const appointment = new Appointment({
-      user: req.user.userId,
-      service: serviceId,
-      appointmentDate: dateObj,
-      timeSlot,
-      notes,
-      status: 'confirmed',
-      payment: {
-        status: 'paid',
-        amount: service.serviceCharge,
-        currency: 'INR',
-        orderId: razorpay_order_id,
-        paymentId: razorpay_payment_id,
-        signature: razorpay_signature,
-        history: [{ action: 'payment_captured', meta: { orderId: razorpay_order_id, paymentId: razorpay_payment_id } }]
+// Get Razorpay configuration
+router.get('/config', (req, res) => {
+  try {
+    if (!process.env.RAZORPAY_KEY_ID) {
+      return res.status(500).json({
+        success: false,
+        message: 'Razorpay not configured'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        keyId: process.env.RAZORPAY_KEY_ID
+      }
+    });
+  } catch (error) {
+    console.error('Config fetch error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment configuration'
+    });
+  }
+});
+
+// Create payment order
+router.post('/create-order', authenticate, async (req, res) => {
+  try {
+    if (!razorpay) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment service not available'
+      });
+    }
+
+    const { serviceId, centerId } = req.body;
+
+    if (!serviceId || !centerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Service ID and Center ID are required'
+      });
+    }
+
+    // Fetch service details
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+
+    // Fetch center details
+    const center = await AkshayaCenter.findById(centerId);
+    if (!center) {
+      return res.status(404).json({
+        success: false,
+        message: 'Center not found'
+      });
+    }
+
+    // Check if service has charges
+    if (service.fee <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'This service does not require payment'
+      });
+    }
+
+    // Create Razorpay order with short receipt (max 40 chars)
+    const receipt = `${Date.now().toString().slice(-10)}_${req.user.userId.slice(-8)}`;
+    
+    const orderOptions = {
+      amount: service.fee * 100, // Amount in paise
+      currency: 'INR',
+      receipt: receipt,
+      notes: {
+        serviceId: serviceId,
+        centerId: centerId,
+        userId: req.user.userId,
+        serviceName: service.name,
+        centerName: center.name
+      }
+    };
+
+    const order = await razorpay.orders.create(orderOptions);
+
+    res.json({
+      success: true,
+      data: {
+        order: {
+          id: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          receipt: order.receipt
+        },
+        service: {
+          id: service._id,
+          name: service.name,
+          fee: service.fee
+        },
+        center: {
+          id: center._id,
+          name: center.name
+        }
       }
     });
 
-    await appointment.save();
-    const populated = await Appointment.findById(appointment._id).populate('service', 'name category fee processingTime');
-    try {
-      await Notification.create({
-        user: req.user.userId,
-        type: 'status',
-        title: 'Appointment Confirmed',
-        message: `Your booking for ${populated.service?.name || 'service'} is confirmed.`,
-        meta: { appointmentId: populated._id }
-      });
-    } catch (_) {}
-    return res.status(201).json({ success: true, message: 'Appointment created', data: populated });
   } catch (error) {
-    console.error('Verify/create appointment error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to create appointment', error: error.message });
+    console.error('Create order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment order',
+      error: error.message
+    });
   }
 });
 
-// Admin-triggered refund for an appointment's payment
-router.post('/refund/:appointmentId', adminAuth, async (req, res) => {
+// Verify payment
+router.post('/verify', authenticate, async (req, res) => {
   try {
-    const { appointmentId } = req.params;
-    const appointment = await Appointment.findById(appointmentId).populate('service', 'serviceCharge');
-    if (!appointment) return res.status(404).json({ success: false, message: 'Appointment not found' });
-    if (!appointment.payment || appointment.payment.status !== 'paid' || !appointment.payment.paymentId) {
-      return res.status(400).json({ success: false, message: 'No eligible paid transaction to refund' });
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing payment verification parameters'
+      });
     }
 
-    // Amount in paise
-    const amountPaise = Math.round((appointment.payment.amount || appointment.service?.serviceCharge || 0) * 100);
-    const refund = await razorpay.payments.refund(appointment.payment.paymentId, { amount: amountPaise });
+    // Verify signature
+    const body = razorpay_order_id + '|' + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body.toString())
+      .digest('hex');
 
-    appointment.payment.refundId = refund.id;
-    appointment.payment.refundStatus = 'processed';
-    appointment.payment.status = 'refunded';
-    appointment.payment.history.push({ action: 'refund_processed', meta: { refundId: refund.id } });
-    await appointment.save();
-
-    try {
-      await Notification.create({
-        user: appointment.user,
-        type: 'refund',
-        title: 'Refund Processed',
-        message: `Your refund for the service charge has been processed.`,
-        meta: { appointmentId: appointment._id, refundId: refund.id }
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification failed'
       });
-    } catch (_) {}
+    }
 
-    return res.json({ success: true, message: 'Refund processed', data: { refund } });
+    // Fetch payment details from Razorpay
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+    
+    if (payment.status !== 'captured') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment not captured'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+        signature: razorpay_signature,
+        amount: payment.amount / 100, // Convert back to rupees
+        status: payment.status
+      }
+    });
+
   } catch (error) {
-    console.error('Refund error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to process refund', error: error.message });
+    console.error('Payment verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Payment verification failed',
+      error: error.message
+    });
   }
 });
 
+// Get payment details
+router.get('/payment/:paymentId', authenticate, async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    const payment = await razorpay.payments.fetch(paymentId);
+
+    res.json({
+      success: true,
+      data: {
+        id: payment.id,
+        amount: payment.amount / 100,
+        currency: payment.currency,
+        status: payment.status,
+        method: payment.method,
+        createdAt: new Date(payment.created_at * 1000),
+        notes: payment.notes
+      }
+    });
+
+  } catch (error) {
+    console.error('Payment fetch error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment details',
+      error: error.message
+    });
+  }
+});
+
+// Refund payment
+router.post('/refund', authenticate, async (req, res) => {
+  try {
+    const { paymentId, amount, reason } = req.body;
+
+    if (!paymentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment ID is required'
+      });
+    }
+
+    // Create refund
+    const refundOptions = {
+      payment_id: paymentId,
+      notes: {
+        reason: reason || 'Appointment cancellation',
+        refundedBy: req.user.userId
+      }
+    };
+
+    if (amount) {
+      refundOptions.amount = amount * 100; // Convert to paise
+    }
+
+    const refund = await razorpay.payments.refund(paymentId, refundOptions);
+
+    res.json({
+      success: true,
+      data: {
+        refundId: refund.id,
+        paymentId: refund.payment_id,
+        amount: refund.amount / 100,
+        status: refund.status,
+        createdAt: new Date(refund.created_at * 1000)
+      }
+    });
+
+  } catch (error) {
+    console.error('Refund error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process refund',
+      error: error.message
+    });
+  }
+});
+
+// Webhook for payment status updates
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const signature = req.headers['x-razorpay-signature'];
+    const body = req.body;
+
+    // Verify webhook signature
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid webhook signature'
+      });
+    }
+
+    const event = JSON.parse(body);
+    
+    // Handle different webhook events
+    switch (event.event) {
+      case 'payment.captured':
+        await handlePaymentCaptured(event.payload.payment.entity);
+        break;
+      case 'payment.failed':
+        await handlePaymentFailed(event.payload.payment.entity);
+        break;
+      case 'refund.processed':
+        await handleRefundProcessed(event.payload.refund.entity);
+        break;
+      default:
+        console.log('Unhandled webhook event:', event.event);
+    }
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Webhook processing failed'
+    });
+  }
+});
+
+// Helper functions for webhook handling
+const handlePaymentCaptured = async (payment) => {
+  try {
+    // Find appointment with this payment ID and update status
+    const appointment = await Appointment.findOne({
+      'payment.paymentId': payment.id
+    });
+
+    if (appointment) {
+      appointment.payment.status = 'paid';
+      appointment.payment.history.push({
+        action: 'payment_captured',
+        meta: { paymentId: payment.id, amount: payment.amount / 100 }
+      });
+      await appointment.save();
+    }
+  } catch (error) {
+    console.error('Error handling payment captured:', error);
+  }
+};
+
+const handlePaymentFailed = async (payment) => {
+  try {
+    // Find appointment with this payment ID and update status
+    const appointment = await Appointment.findOne({
+      'payment.orderId': payment.order_id
+    });
+
+    if (appointment) {
+      appointment.payment.status = 'failed';
+      appointment.payment.history.push({
+        action: 'payment_failed',
+        meta: { paymentId: payment.id, reason: payment.error_description }
+      });
+      await appointment.save();
+    }
+  } catch (error) {
+    console.error('Error handling payment failed:', error);
+  }
+};
+
+const handleRefundProcessed = async (refund) => {
+  try {
+    // Find appointment with this payment ID and update refund status
+    const appointment = await Appointment.findOne({
+      'payment.paymentId': refund.payment_id
+    });
+
+    if (appointment) {
+      appointment.payment.refundStatus = 'processed';
+      appointment.payment.refundId = refund.id;
+      appointment.payment.history.push({
+        action: 'refund_processed',
+        meta: { refundId: refund.id, amount: refund.amount / 100 }
+      });
+      await appointment.save();
+    }
+  } catch (error) {
+    console.error('Error handling refund processed:', error);
+  }
+};
+
 export default router;
-
-

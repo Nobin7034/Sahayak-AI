@@ -18,6 +18,39 @@ import {
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import centerService from '../services/centerService';
+import paymentService from '../services/paymentService';
+import { auth } from '../firebase';
+
+// Create authenticated axios instance with same logic as AuthContext
+const createAuthenticatedAxios = () => {
+  const instance = axios.create();
+  
+  instance.interceptors.request.use(async (config) => {
+    try {
+      config.headers = config.headers || {};
+
+      // First try backend JWT token
+      const jwtToken = localStorage.getItem('token');
+      if (jwtToken) {
+        config.headers.Authorization = `Bearer ${jwtToken}`;
+        return config;
+      }
+
+      // Fallback to Firebase ID token
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const token = await currentUser.getIdToken(false);
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('BookAppointment auth error:', error);
+      // Let request proceed without token
+    }
+    return config;
+  });
+  
+  return instance;
+};
 
 const BookAppointment = () => {
   const [searchParams] = useSearchParams();
@@ -25,6 +58,9 @@ const BookAppointment = () => {
   const centerId = searchParams.get('center');
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Create authenticated axios instance
+  const authAxios = createAuthenticatedAxios();
 
   const [service, setService] = useState(null);
   const [services, setServices] = useState([]);
@@ -82,10 +118,7 @@ const BookAppointment = () => {
 
   const loadRazorpayConfig = async () => {
     try {
-      const res = await axios.get('/api/payments/config');
-      if (res.data?.success) {
-        setRazorpayKey(res.data.data.keyId);
-      }
+      await paymentService.loadConfig();
     } catch (error) {
       console.error('Failed to load Razorpay config:', error);
     }
@@ -93,7 +126,7 @@ const BookAppointment = () => {
 
   const loadAllServices = async () => {
     try {
-      const response = await axios.get('/api/services');
+      const response = await authAxios.get('/api/services');
       if (response.data.success) {
         setServices(response.data.data);
       }
@@ -104,7 +137,7 @@ const BookAppointment = () => {
 
   const loadServiceDetails = async () => {
     try {
-      const response = await axios.get(`/api/services/${formData.serviceId}`);
+      const response = await authAxios.get(`/api/services/${formData.serviceId}`);
       if (response.data.success) {
         setService(response.data.data);
       }
@@ -140,7 +173,7 @@ const BookAppointment = () => {
 
   const fetchAvailableSlots = async () => {
     try {
-      const response = await axios.get(
+      const response = await authAxios.get(
         `/api/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
       );
       if (response.data.success) {
@@ -154,7 +187,7 @@ const BookAppointment = () => {
 
   const checkHolidayInfo = async () => {
     try {
-      const response = await axios.get(
+      const response = await authAxios.get(
         `/api/appointments/slots/${formData.serviceId}/${formData.appointmentDate}?center=${formData.centerId}`
       );
       if (response.data?.success) {
@@ -253,7 +286,7 @@ const BookAppointment = () => {
 
     try {
       // If service has charges, handle payment first
-      if (service && service.fees > 0) {
+      if (service && service.fee > 0) {
         await handlePaymentFlow();
       } else {
         await createAppointment();
@@ -270,80 +303,55 @@ const BookAppointment = () => {
   const handlePaymentFlow = async () => {
     setIsPaying(true);
     
-    // Create payment order
-    const orderRes = await axios.post('/api/payments/create-order', {
-      serviceId: formData.serviceId,
-      centerId: formData.centerId
-    });
-    
-    if (!orderRes.data?.success) {
-      throw new Error('Failed to create payment order');
+    try {
+      // Create payment order
+      const orderData = await paymentService.createOrder(formData.serviceId, formData.centerId);
+      const order = orderData.order;
+
+      // Open Razorpay checkout
+      await paymentService.openCheckout({
+        amount: order.amount,
+        currency: order.currency,
+        name: 'Sahayak AI',
+        description: `${service.name} - ${center?.name}`,
+        order_id: order.id,
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+          contact: user?.phone
+        },
+        notes: {
+          serviceId: formData.serviceId,
+          centerId: formData.centerId
+        },
+        handler: async (response) => {
+          try {
+            // Verify payment and create appointment
+            await verifyPaymentAndCreateAppointment(response);
+          } catch (error) {
+            setError('Payment verification failed. Please contact support.');
+            setIsPaying(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsPaying(false);
+            setError('Payment cancelled');
+          }
+        }
+      });
+    } catch (error) {
+      setIsPaying(false);
+      throw error;
     }
-    
-    const order = orderRes.data.data.order;
-
-    // Ensure Razorpay script is loaded
-    await ensureRazorpayScript();
-
-    // Open Razorpay checkout
-    const options = {
-      key: razorpayKey,
-      amount: order.amount,
-      currency: order.currency,
-      name: 'Sahayak AI',
-      description: `${service.name} - ${center?.name}`,
-      order_id: order.id,
-      prefill: {
-        name: user?.name,
-        email: user?.email,
-        contact: user?.phone
-      },
-      notes: {
-        serviceId: formData.serviceId,
-        centerId: formData.centerId
-      },
-      handler: async (response) => {
-        try {
-          // Verify payment and create appointment
-          await verifyPaymentAndCreateAppointment(response);
-        } catch (error) {
-          setError('Payment verification failed. Please contact support.');
-        }
-      },
-      modal: {
-        ondismiss: () => {
-          setIsPaying(false);
-          setError('Payment cancelled');
-        }
-      }
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-  };
-
-  const ensureRazorpayScript = () => {
-    return new Promise((resolve, reject) => {
-      if (window.Razorpay) return resolve();
-      
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Razorpay'));
-      document.body.appendChild(script);
-    });
   };
 
   const verifyPaymentAndCreateAppointment = async (paymentResponse) => {
-    const verifyRes = await axios.post('/api/payments/verify', {
+    const verificationData = await paymentService.verifyPayment({
       razorpay_order_id: paymentResponse.razorpay_order_id,
       razorpay_payment_id: paymentResponse.razorpay_payment_id,
       razorpay_signature: paymentResponse.razorpay_signature
     });
-
-    if (!verifyRes.data?.success) {
-      throw new Error('Payment verification failed');
-    }
 
     await createAppointment(paymentResponse.razorpay_payment_id);
   };
@@ -358,7 +366,7 @@ const BookAppointment = () => {
       paymentId
     };
 
-    const response = await axios.post('/api/appointments', appointmentData);
+    const response = await authAxios.post('/api/appointments', appointmentData);
     
     if (response.data.success) {
       setSuccess('Appointment booked successfully!');
@@ -470,14 +478,14 @@ const BookAppointment = () => {
                 Service *
               </label>
               {service ? (
-                <div className="bg-gray-50 border rounded-md p-3">
+                  <div className="bg-gray-50 border rounded-md p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium text-gray-900">{service.name}</h3>
                       <p className="text-sm text-gray-600">{service.category}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-green-600">₹{service.fees}</p>
+                      <p className="font-medium text-green-600">₹{service.fee}</p>
                       <p className="text-xs text-gray-500">{service.processingTime}</p>
                     </div>
                   </div>
@@ -493,7 +501,7 @@ const BookAppointment = () => {
                   <option value="">Select a service</option>
                   {services.map((service) => (
                     <option key={service._id} value={service._id}>
-                      {service.name} - ₹{service.fees}
+                      {service.name} - ₹{service.fee}
                     </option>
                   ))}
                 </select>
@@ -664,8 +672,8 @@ const BookAppointment = () => {
                 ) : (
                   <div className="flex items-center justify-center">
                     <Calendar className="h-4 w-4 mr-2" />
-                    {service && service.fees > 0 
-                      ? `Pay ₹${service.fees} & Book Appointment`
+                    {service && service.fee > 0 
+                      ? `Pay ₹${service.fee} & Book Appointment`
                       : 'Book Appointment'
                     }
                   </div>

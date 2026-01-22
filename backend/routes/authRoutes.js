@@ -833,7 +833,7 @@ router.post('/upload-avatar', authenticate, upload.single('avatar'), async (req,
 router.post('/admin/approve-staff/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const { adminId, notes = '', enableAllServices = false } = req.body; // Changed default to false
+    const { adminId, notes = '' } = req.body; // Removed selectedServices parameter
 
     // Find the staff user
     const staffUser = await User.findById(userId);
@@ -879,34 +879,14 @@ router.post('/admin/approve-staff/:userId', async (req, res) => {
     staffUser.reviewNotes = notes;
     await staffUser.save();
 
-    // Activate the center
+    // Activate the center - NO SERVICE ASSIGNMENT
     center.status = 'active';
-    
-    let servicesAssigned = 0;
-    let newServicesAdded = 0;
-    
-    // Auto-assign all existing services to the newly approved center (if enabled)
-    if (enableAllServices) {
-      const { default: Service } = await import('../models/Service.js');
-      const allServices = await Service.find({ isActive: true }).select('_id');
-      const serviceIds = allServices.map(service => service._id);
-      
-      // Add all services to the center if not already present
-      const existingServiceIds = center.services.map(id => id.toString());
-      const newServiceIds = serviceIds.filter(id => !existingServiceIds.includes(id.toString()));
-      
-      if (newServiceIds.length > 0) {
-        center.services.push(...newServiceIds);
-        newServicesAdded = newServiceIds.length;
-      }
-      
-      servicesAssigned = serviceIds.length;
-      console.log(`✅ Center ${center.name} approved and ${servicesAssigned} services automatically assigned`);
-    } else {
-      console.log(`✅ Center ${center.name} approved without automatic service assignment`);
-    }
+    // Ensure services array is empty - staff will manually enable services
+    center.services = [];
     
     await center.save();
+    
+    console.log(`✅ Center ${center.name} approved without automatic service assignment - staff will manually enable services`);
     
 
     // Activate the staff record
@@ -935,16 +915,13 @@ router.post('/admin/approve-staff/:userId', async (req, res) => {
 
     res.json({
       success: true,
-      message: enableAllServices 
-        ? `Staff registration approved successfully. ${servicesAssigned} services automatically assigned to ${center.name}.`
-        : `Staff registration approved successfully. No services were automatically assigned to ${center.name}.`,
+      message: `Staff registration approved successfully. ${center.name} is now active and staff can manually enable services as needed.`,
       data: {
         user: { id: staffUser._id, name: staffUser.name, email: staffUser.email },
         center: { id: center._id, name: center.name },
         staff: { id: staffRecord._id },
-        servicesAssigned: servicesAssigned,
-        newServicesAdded: newServicesAdded,
-        enableAllServices: enableAllServices
+        servicesAssigned: 0, // No automatic assignment
+        manualServiceManagement: true
       }
     });
 

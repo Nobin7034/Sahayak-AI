@@ -994,7 +994,8 @@ router.get('/appointments/:id', staffAuth, centerAccess, requirePermission('mana
 });
 
 // Get available services (global list - all services admin provides)
-router.get('/services/available', staffAuth, requirePermission('manage_services'), async (req, res) => {
+// Get all available services (no permission required - all staff should see services)
+router.get('/services/available', staffAuth, async (req, res) => {
   try {
     // Import Service model dynamically
     const { default: Service } = await import('../models/Service.js');
@@ -1005,12 +1006,12 @@ router.get('/services/available', staffAuth, requirePermission('manage_services'
       .select('name description category fee processingTime requiredDocuments')
       .sort({ category: 1, name: 1 });
 
-    // Get center to check which services are hidden by this specific staff
+    // Get center to check which services are enabled/hidden by this specific staff
     const center = await AkshayaCenter.findById(req.staff.centerId);
     const hiddenServiceIds = center?.hiddenServices?.map(id => id.toString()) || [];
     const enabledServiceIds = center?.services?.map(id => id.toString()) || [];
 
-    // Transform the data and mark services as hidden/enabled for this center
+    // Transform the data - ALL services show as disabled by default
     const transformedServices = services.map(service => {
       const serviceId = service._id.toString();
       const isHidden = hiddenServiceIds.includes(serviceId);
@@ -1020,13 +1021,14 @@ router.get('/services/available', staffAuth, requirePermission('manage_services'
         ...service.toObject(),
         fees: service.fee, // Map fee to fees for frontend compatibility
         isHidden: isHidden,
-        isEnabled: isEnabled,
+        isEnabled: isEnabled, // Only true if staff manually enabled it
         // Add center-specific status
         centerStatus: {
           isHidden: isHidden,
           isEnabled: isEnabled,
-          canEnable: !isHidden, // Can only enable if not hidden
-          canHide: true // Can always hide
+          canEnable: !isHidden && service.isActive, // Can enable if not hidden and admin hasn't disabled globally
+          canHide: true, // Can always hide
+          isGloballyActive: service.isActive // Track admin's global control
         }
       };
     });
@@ -1038,7 +1040,8 @@ router.get('/services/available', staffAuth, requirePermission('manage_services'
         total: transformedServices.length,
         enabled: transformedServices.filter(s => s.isEnabled).length,
         hidden: transformedServices.filter(s => s.isHidden).length,
-        available: transformedServices.filter(s => !s.isHidden).length
+        available: transformedServices.filter(s => !s.isHidden && s.centerStatus.isGloballyActive).length,
+        globallyActive: transformedServices.filter(s => s.centerStatus.isGloballyActive).length
       }
     });
 
@@ -1053,6 +1056,7 @@ router.get('/services/available', staffAuth, requirePermission('manage_services'
 });
 
 // Get center services (services enabled at this center)
+// Get center services (services enabled at this center) - requires permission
 router.get('/services/center', staffAuth, centerAccess, requirePermission('manage_services'), async (req, res) => {
   try {
     // Import models dynamically
@@ -1095,6 +1099,7 @@ router.get('/services/center', staffAuth, centerAccess, requirePermission('manag
 });
 
 // Toggle service availability at center
+// Toggle service availability at center - requires permission
 router.put('/services/:id/toggle', staffAuth, centerAccess, requirePermission('manage_services'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -1104,12 +1109,19 @@ router.put('/services/:id/toggle', staffAuth, centerAccess, requirePermission('m
     const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
     const { default: Service } = await import('../models/Service.js');
 
-    // Verify service exists
+    // Verify service exists and is globally active (admin control)
     const service = await Service.findById(id);
-    if (!service || !service.isActive) {
+    if (!service) {
       return res.status(404).json({
         success: false,
-        message: 'Service not found or inactive'
+        message: 'Service not found'
+      });
+    }
+
+    if (!service.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: 'Service has been disabled by admin and cannot be enabled'
       });
     }
 
@@ -1119,6 +1131,15 @@ router.put('/services/:id/toggle', staffAuth, centerAccess, requirePermission('m
       return res.status(404).json({
         success: false,
         message: 'Center not found'
+      });
+    }
+
+    // Check if service is hidden by staff
+    const isHidden = center.hiddenServices?.includes(id);
+    if (isHidden && enabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot enable a hidden service. Unhide it first.'
       });
     }
 
@@ -1137,7 +1158,13 @@ router.put('/services/:id/toggle', staffAuth, centerAccess, requirePermission('m
 
     res.json({
       success: true,
-      message: `Service ${enabled ? 'enabled' : 'disabled'} successfully`
+      message: `Service ${enabled ? 'enabled' : 'disabled'} successfully`,
+      data: {
+        serviceId: id,
+        serviceName: service.name,
+        enabled: enabled,
+        centerName: center.name
+      }
     });
 
   } catch (error) {

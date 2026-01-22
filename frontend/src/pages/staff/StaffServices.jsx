@@ -101,12 +101,14 @@ const StaffServices = () => {
         
         setCenterServices(enabled);
         setHiddenServices(hidden);
+        
+        setError('');
+      } else {
+        setError(availableResponse.message || 'Failed to load services');
       }
-
-      setError('');
     } catch (error) {
       console.error('Load services error:', error);
-      setError('Failed to load services');
+      setError('Failed to load services. Please check your permissions.');
     } finally {
       setLoading(false);
     }
@@ -224,8 +226,22 @@ const StaffServices = () => {
               <div>
                 <h1 className={`text-2xl font-bold ${currentTheme.text.primary}`}>Service Management</h1>
                 <p className={`text-sm ${currentTheme.text.secondary} mt-1`}>
-                  Manage services available at your center
+                  Enable services for your center from the complete list of available services
                 </p>
+                <div className={`text-xs ${currentTheme.text.tertiary} mt-1 flex items-center space-x-4`}>
+                  <span className="flex items-center">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full mr-1"></div>
+                    Disabled by default
+                  </span>
+                  <span className="flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                    Manually enabled
+                  </span>
+                  <span className="flex items-center">
+                    <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                    Admin disabled
+                  </span>
+                </div>
               </div>
               
               <button
@@ -302,6 +318,29 @@ const StaffServices = () => {
         </div>
       )}
 
+      {/* Workflow Info */}
+      {!error && availableServices.length > 0 && enabledCount === 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex items-start">
+              <Settings className="h-5 w-5 text-blue-500 mr-3 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-medium text-blue-900 mb-1">Service Management Workflow</h3>
+                <p className="text-sm text-blue-800 mb-2">
+                  All services are disabled by default. You can manually enable the services your center is ready to offer.
+                </p>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• <strong>Enable services</strong> that your center can provide</li>
+                  <li>• <strong>Hide services</strong> that are not relevant to your center</li>
+                  <li>• <strong>Customize settings</strong> for enabled services (fees, notes, duration)</li>
+                  <li>• <strong>Admin control:</strong> If admin disables a service globally, it becomes unavailable for all centers</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Services Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -343,6 +382,19 @@ const StaffServices = () => {
                     <Clock className="h-4 w-4 mr-2" />
                     <span>{service.processingTime}</span>
                   </div>
+                  {/* Admin Control Status */}
+                  {service.centerStatus && (
+                    <div className="flex items-center">
+                      <div className={`w-2 h-2 rounded-full mr-2 ${
+                        service.centerStatus.isGloballyActive ? 'bg-green-500' : 'bg-red-500'
+                      }`}></div>
+                      <span className={`text-xs ${
+                        service.centerStatus.isGloballyActive ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {service.centerStatus.isGloballyActive ? 'Available globally' : 'Disabled by admin'}
+                      </span>
+                    </div>
+                  )}
                   {service.description && (
                     <p className={`${currentTheme.text.secondary} text-sm mt-2 line-clamp-2`}>
                       {service.description}
@@ -422,7 +474,7 @@ const StaffServices = () => {
                     )}
 
                     {/* Enable/Disable Button */}
-                    {!isHidden && (
+                    {!isHidden && service.centerStatus?.isGloballyActive && (
                       <button
                         onClick={() => handleServiceToggle(service._id, !isEnabled)}
                         className={`flex items-center px-3 py-1 rounded-md text-sm font-medium transition-colors ${
@@ -441,6 +493,14 @@ const StaffServices = () => {
                           </>
                         )}
                       </button>
+                    )}
+                    
+                    {/* Admin Disabled Message */}
+                    {!isHidden && !service.centerStatus?.isGloballyActive && (
+                      <div className="flex items-center px-3 py-1 text-xs text-red-600 bg-red-50 rounded-md">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Admin disabled
+                      </div>
                     )}
                   </div>
                 </div>

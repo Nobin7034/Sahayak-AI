@@ -1,3 +1,107 @@
+ git log
+commit baa711b74766fc9c11454436e77ebed413072666 (HEAD -> main, origin/main)
+Author: nobin <nobin@gmail.com>
+Date:   Fri Jan 16 16:09:15 2026 +0530
+
+    Appointment Features Updated
+
+commit 33cfdb09f4559caecd20459104f4293e69daf997
+Author: nobin <nobin@gmail.com>
+Date:   Mon Jan 12 14:27:48 2026 +0530
+
+    functionalities added for new module and a fix in service management
+
+commit b156101dd18d87c8aa62f67b804e2b1205194a05
+Merge: 5ff21a4 b59ee8a
+Author: nobin <nobin@gmail.com>
+Date:   Fri Jan 9 09:12:08 2026 +0530
+
+    Merged remote main branch
+
+commit 5ff21a47c1ae9bf12f04bb6e3d9545dd96b4d791
+Author: nobin <nobin@gmail.com>
+Date:   Fri Jan 9 08:57:23 2026 +0530
+
+    Admin functionalities updated
+
+commit b59ee8a75af5450737838069e85cd44c92586068
+Author: Nobin <155228658+Nobin7034@users.noreply.github.com>
+Date:   Wed Jan 7 15:48:06 2026 +0530
+
+    Delete .kiro/specs directory
+
+commit 97195377e1cae80c1bfd5493d9747df22be07318
+Author: nobin <nobin@gmail.com>
+Date:   Tue Jan 6 16:25:42 2026 +0530
+
+    Updations on user and staff modules
+
+commit 99941a5339aa7eae4816dfe7fcc5403c6111fa28
+Author: nobin <nobin@gmail.com>
+Date:   Sat Dec 20 12:08:43 2025 +0530
+
+    Admin functionalities updated with respective to new module
+
+commit 436612a62db4fdfd1c8fdf657cd108e8c8a27c4f
+Author: nobin <nobin@gmail.com>
+Date:   Sat Dec 20 11:23:46 2025 +0530
+
+    Staff and Admin functions updated
+
+commit 6fbee2155d92c95c11c42bde900e7cc245a484a6
+Author: nobin <nobin@gmail.com>
+Date:   Sat Dec 20 10:01:00 2025 +0530
+
+    Updated the center function and profile page
+
+commit f549a62a1971ddfd372678d96a025f59cc5a7ad5
+Author: nobin <nobin@gmail.com>
+Date:   Fri Dec 19 09:07:30 2025 +0530
+
+    Added Map based Features in new Module
+
+commit db4c0ff8cca2b40aecf453a21943986ba7b37a28
+Author: nobin <nobin@gmail.com>
+Date:   Mon Dec 15 14:07:16 2025 +0530
+
+    updated user modules
+
+commit b8b76e0cbe7a9278416e014aafd760ef03e22c69
+Author: nobin <nobin@gmail.com>
+Date:   Mon Dec 15 09:44:56 2025 +0530
+
+    Added Akshaya center staff module to manage user and appointments
+
+commit 812650a11a1000d9e86fa4fdbb0039fea1e33317
+Author: nobin <nobin@gmail.com>
+Date:   Wed Dec 10 10:01:19 2025 +0530
+
+    Added the readme file for new features
+
+commit edb81b671267b8f23e4682dc728ffe3625ba0d4d
+Author: nobin <nobin@gmail.com>
+Date:   Wed Dec 10 09:52:57 2025 +0530
+
+    Deleted all markdown files
+
+commit 117ec23ae1be48381b49f11c04fdf39dcd255662
+Author: Nobin <155228658+Nobin7034@users.noreply.github.com>
+Date:   Wed Dec 10 09:36:38 2025 +0530
+
+    Delete GOOGLE_LOGIN_ROLE_FIX.md
+
+commit 1178201bcacbeeb97c570fae3cd7df99bef020d2
+Author: nobin <nobin@gmail.com>
+Date:   Wed Dec 10 09:27:42 2025 +0530
+
+    Sahayak AI Mini Project
+
+commit 044e15d135d7a0a3580ae94554bd39bad263d151
+Author: nobin <nobin@gmail.com>
+Date:   Tue Oct 28 00:02:27 2025 +0530
+
+    ML integration updated
+
 commit a6be64a61be797465d143555af4305acd7ebd1a8
 Author: nobin <nobin@gmail.com>
 Date:   Sun Oct 26 23:59:23 2025 +0530
@@ -30,40 +134,30 @@ Date:   Mon Oct 6 15:35:58 2025 +0530
 
 commit 12d2772e06064f0b123e0d18ebbe54aa5687009f
 Author: nobin <nobin@gmail.com>
-Date:   Fri Sep 19 07:50:32 2025 +0530
-
-    user dashboard & admin panel updated
-
-commit f5521e5f4f00c1a7181c83da0eb05a6ba8452580
+commit 4ad10ddd9160eec29915094b83d394cec6628418
 Author: nobin <nobin@gmail.com>
-Date:   Thu Sep 18 16:18:29 2025 +0530
+Date:   Thu Sep 11 14:05:05 2025 +0530
 
-    google sign in updated
+    admin dashboard updated
 
-commit de402ec130367727ea5a254c4b5463abd9500630
+commit 51716736cba1e9f249a1d24a33d2cd2f5d613eda
 Author: nobin <nobin@gmail.com>
-Date:   Wed Sep 17 10:49:53 2025 +0530
+Date:   Tue Sep 9 22:53:52 2025 +0530
 
-    registration page changes updated
+    update message
 
-commit 7736f145dbdd4c383cb5e6a693ced143c0270e26
+commit 1e7fc1a6ec640389653503097358b271ca6bf0d2
 Author: nobin <nobin@gmail.com>
-Date:   Mon Sep 15 16:23:10 2025 +0530
+Date:   Tue Sep 9 22:33:12 2025 +0530
 
-    updated user dashboard
+    First commit
 
-commit 4323fad94bc1c5dd2b3194d1f304601966d64d55
+commit 23b86d785095a7d3043f9e2e0d459c9e57f4e0e2
 Author: nobin <nobin@gmail.com>
-Date:   Mon Sep 15 13:23:20 2025 +0530
+Date:   Sat Aug 16 15:23:19 2025 +0530
 
-    service and news updated
-
-commit 475d689ef16b6cc2129c269b9609fd3a6eec369f
-Author: nobin <nobin@gmail.com>
-Date:   Fri Sep 12 15:42:00 2025 +0530
-
-    admin page updated
-
+    Initial commit
+(END)
 commit 4ad10ddd9160eec29915094b83d394cec6628418
 Author: nobin <nobin@gmail.com>
 Date:   Thu Sep 11 14:05:05 2025 +0530

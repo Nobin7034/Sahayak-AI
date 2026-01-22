@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, Clock, FileText, User, Phone, Mail, MapPin, ArrowLeft, Edit3, CheckCircle, AlertTriangle, Loader2, X, IndianRupee, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import { useAuth } from '../contexts/AuthContext'
+import PaymentStatus from '../components/PaymentStatus'
 
 const Appointments = () => {
   const [searchParams] = useSearchParams()
@@ -647,44 +648,11 @@ const Appointments = () => {
                         )}
 
                         {/* Payment Information Section */}
-                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                          <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                            <IndianRupee className="w-4 h-4 text-gray-600" />
-                            Payment Details
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                            <div>
-                              <span className="text-gray-600">Total Fee:</span>
-                              <p className="font-medium text-gray-900">
-                                {appointment.service?.fee === 0 ? 'Free' : `₹${appointment.service?.fee}`}
-                              </p>
-                            </div>
-                            {appointment.payment && appointment.payment.status === 'paid' && (
-                              <>
-                                <div>
-                                  <span className="text-gray-600">Paid Amount:</span>
-                                  <p className="font-medium text-green-600">₹{appointment.payment.amount}</p>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Payment Status:</span>
-                                  <p className="font-medium text-green-600 capitalize">{appointment.payment.status}</p>
-                                </div>
-                                {appointment.payment.paymentId && (
-                                  <div>
-                                    <span className="text-gray-600">Payment ID:</span>
-                                    <p className="font-medium text-gray-900 text-xs">{appointment.payment.paymentId}</p>
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            {(!appointment.payment || appointment.payment.status !== 'paid') && appointment.service?.fee > 0 && (
-                              <div>
-                                <span className="text-gray-600">Payment Status:</span>
-                                <p className="font-medium text-orange-600">Pending - Pay at center</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <PaymentStatus 
+                          payment={appointment.payment} 
+                          service={appointment.service} 
+                          showDetails={true} 
+                        />
                       </div>
                       
                       {appointment.notes && (

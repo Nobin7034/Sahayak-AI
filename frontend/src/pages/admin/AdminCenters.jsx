@@ -61,6 +61,20 @@ const AdminCenters = () => {
 
   useEffect(() => {
     loadCenters();
+    
+    // Add visibility change listener to refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadCenters();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Cleanup listener on unmount
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const loadCenters = async () => {
@@ -175,6 +189,32 @@ const AdminCenters = () => {
     } catch (error) {
       console.error('Error deactivating center:', error);
       setError('Failed to deactivate center');
+    }
+  };
+
+  const toggleUserStatusFromCenter = async (userId, currentStatus, userName) => {
+    if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} user "${userName}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await axios.patch(`/api/admin/users/${userId}/status`, {
+        isActive: !currentStatus
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.data.success) {
+        // Refresh centers to show updated user status
+        loadCenters();
+        const statusText = !currentStatus ? 'activated' : 'deactivated';
+        alert(`User ${statusText} successfully!`);
+      }
+    } catch (error) {
+      console.error('Toggle user status error:', error);
+      alert('Failed to update user status');
     }
   };
 
@@ -491,6 +531,19 @@ Type "DELETE ALL" to confirm bulk permanent deletion:`;
             </select>
           </div>
           
+          {/* Refresh Button */}
+          <div className="sm:w-auto">
+            <button
+              onClick={loadCenters}
+              disabled={loading}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
+              title="Refresh centers data"
+            >
+              <Settings className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+          
           {/* Bulk delete button for inactive centers */}
           {statusFilter === 'inactive' && filteredCenters.length > 0 && (
             <div className="sm:w-auto">
@@ -517,7 +570,20 @@ Type "DELETE ALL" to confirm bulk permanent deletion:`;
       {/* Centers Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredCenters.map((center) => (
-          <div key={center._id} className="bg-white rounded-lg shadow-sm border p-6">
+          <div key={center._id} className={`bg-white rounded-lg shadow-sm border p-6 ${
+            center.registeredBy && !center.registeredBy.isActive 
+              ? 'border-red-200 bg-red-50/30' 
+              : ''
+          }`}>
+            {/* Warning banner for inactive users */}
+            {center.registeredBy && !center.registeredBy.isActive && (
+              <div className="mb-4 p-2 bg-red-100 border border-red-300 rounded-md">
+                <div className="flex items-center text-sm text-red-800">
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  <span>Staff user is inactive - center may not be operational</span>
+                </div>
+              </div>
+            )}
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-gray-900">{center.name}</h3>
@@ -551,9 +617,55 @@ Type "DELETE ALL" to confirm bulk permanent deletion:`;
                 {center.capacity?.maxAppointmentsPerDay || 50} appointments/day
               </div>
               {center.registeredBy && (
-                <div className="flex items-center">
-                  <Clock className="h-4 w-4 mr-2" />
-                  Staff: {center.registeredBy.name}
+                <div className="space-y-1">
+                  <div className="flex items-center">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Staff: {center.registeredBy.name}
+                  </div>
+                  <div className="flex items-center">
+                    {center.registeredBy.isActive ? (
+                      <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 mr-2 text-red-600" />
+                    )}
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      center.registeredBy.isActive 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      User {center.registeredBy.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    <button
+                      onClick={() => toggleUserStatusFromCenter(
+                        center.registeredBy._id, 
+                        center.registeredBy.isActive, 
+                        center.registeredBy.name
+                      )}
+                      className={`text-xs px-2 py-1 rounded-md border ${
+                        center.registeredBy.isActive
+                          ? 'border-red-300 text-red-700 hover:bg-red-50'
+                          : 'border-green-300 text-green-700 hover:bg-green-50'
+                      }`}
+                      title={`${center.registeredBy.isActive ? 'Deactivate' : 'Activate'} user`}
+                    >
+                      {center.registeredBy.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                  </div>
+                  </div>
+                  {center.registeredBy.approvalStatus && (
+                    <div className="flex items-center">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        center.registeredBy.approvalStatus === 'approved' 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : center.registeredBy.approvalStatus === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {center.registeredBy.approvalStatus}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
               {center.metadata && (

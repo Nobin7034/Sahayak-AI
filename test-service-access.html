@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Service Access</title>
+</head>
+<body>
+    <h1>Service Access Test</h1>
+    <div id="result"></div>
+    
+    <script>
+        async function testServiceAccess() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                // Test without authentication first
+                resultDiv.innerHTML += '<p>Testing without auth...</p>';
+                
+                const response = await fetch('http://localhost:5000/api/staff/services/available');
+                const data = await response.json();
+                
+                if (response.status === 401) {
+                    resultDiv.innerHTML += '<p>✅ Correct: 401 Unauthorized (auth required)</p>';
+                } else if (response.status === 403) {
+                    resultDiv.innerHTML += '<p>❌ Still getting 403: ' + data.message + '</p>';
+                } else {
+                    resultDiv.innerHTML += '<p>❓ Unexpected status: ' + response.status + '</p>';
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML += '<p>❌ Error: ' + error.message + '</p>';
+            }
+        }
+        
+        // Run test when page loads
+        testServiceAccess();
+    </script>
+</body>
+</html>

@@ -93,6 +93,10 @@ const AdminUsers = () => {
             ? { ...staffMember, isActive: !currentStatus }
             : staffMember
         ))
+        
+        // Show success message with reminder to refresh Centers view
+        const statusText = !currentStatus ? 'activated' : 'deactivated';
+        alert(`User ${statusText} successfully!`);
       }
     } catch (error) {
       console.error('Toggle user status error:', error)

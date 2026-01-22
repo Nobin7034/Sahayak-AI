@@ -68,7 +68,7 @@ router.get('/admin/all', async (req, res) => {
   try {
     const centers = await AkshayaCenter.find({})
       .populate('services', 'name category fees processingTime')
-      .populate('registeredBy', 'name email role')
+      .populate('registeredBy', 'name email role isActive approvalStatus') // Added isActive and approvalStatus
       .sort({ name: 1 });
     
     res.json({

@@ -16,7 +16,8 @@ import {
   Search,
   Filter,
   ExternalLink,
-  Settings
+  Settings,
+  FileText
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -128,7 +129,7 @@ const AdminStaff = () => {
   const loadStaffRegistrations = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/auth/staff-registrations');
+      const response = await axios.get('/api/auth/staff-registrations');
       
       if (response.data.success) {
         setStaffRegistrations(response.data.registrations);
@@ -153,8 +154,8 @@ const AdminStaff = () => {
 
       const payload = {
         adminId: JSON.parse(localStorage.getItem('user'))?.id,
-        [approvalAction === 'approve' ? 'notes' : 'reason']: approvalNotes,
-        ...(approvalAction === 'approve' && { enableAllServices })
+        [approvalAction === 'approve' ? 'notes' : 'reason']: approvalNotes
+        // No service assignment during approval
       };
 
       const response = await axios.post(endpoint, payload);
@@ -168,7 +169,6 @@ const AdminStaff = () => {
         setSelectedRegistration(null);
         setApprovalAction('');
         setApprovalNotes('');
-        setEnableAllServices(false); // Reset to default (no services)
         
         // Show success message from backend
         alert(response.data.message);
@@ -185,7 +185,6 @@ const AdminStaff = () => {
     setSelectedRegistration(registration);
     setApprovalAction(action);
     setApprovalNotes('');
-    setEnableAllServices(false); // Default to false - admin must explicitly enable services
     setShowApprovalModal(true);
   };
 
@@ -637,26 +636,15 @@ const AdminStaff = () => {
                 Are you sure you want to {approvalAction} the registration for <strong>{selectedRegistration.centerName}</strong>?
               </p>
               
-              {/* Enable All Services Option - Only show for approval */}
+              {/* Service Management Info - Only show for approval */}
               {approvalAction === 'approve' && (
-                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-300 rounded-lg">
                   <div className="flex items-start space-x-3">
-                    <input
-                      type="checkbox"
-                      id="enableAllServices"
-                      checked={enableAllServices}
-                      onChange={(e) => setEnableAllServices(e.target.checked)}
-                      className="mt-1 h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
-                    />
+                    <Settings className="w-5 h-5 text-blue-600 mt-0.5" />
                     <div className="flex-1">
-                      <label htmlFor="enableAllServices" className="flex items-center text-sm font-medium text-yellow-900 cursor-pointer">
-                        <Settings className="w-4 h-4 mr-2" />
-                        Enable all services for this center
-                      </label>
-                      <p className="text-xs text-yellow-800 mt-1">
-                        {enableAllServices 
-                          ? 'All available services will be automatically assigned to this center upon approval.'
-                          : '⚠️ WARNING: No services will be assigned by default. You must manually assign services later via the Centers page.'}
+                      <p className="text-sm font-medium text-blue-900">Service Management</p>
+                      <p className="text-xs text-blue-800 mt-1">
+                        After approval, the staff member will be able to manually enable services for their center from the complete list of available services.
                       </p>
                     </div>
                   </div>

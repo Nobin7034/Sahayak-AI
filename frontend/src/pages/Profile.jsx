@@ -13,6 +13,56 @@ const InfoRow = ({ icon: Icon, label, value }) => (
   </div>
 )
 
+// Enhanced Avatar Display Component with fallback system
+const AvatarDisplay = ({ user, size = 'w-16 h-16', textSize = 'text-xl', clickable = false, onClick }) => {
+  const [imageError, setImageError] = useState(false)
+  
+  const handleImageError = () => {
+    console.log('Avatar image failed to load:', user?.avatar)
+    setImageError(true)
+  }
+  
+  const getInitials = (name) => {
+    if (!name) return '?'
+    return name
+      .split(' ')
+      .map(n => n.charAt(0))
+      .join('')
+      .toUpperCase()
+      .slice(0, 2) // Limit to 2 characters
+  }
+  
+  return (
+    <div 
+      className={`relative group ${clickable ? 'cursor-pointer' : ''}`}
+      onClick={clickable ? onClick : undefined}
+    >
+      <div className={`${size} rounded-full bg-primary/10 flex items-center justify-center overflow-hidden ${clickable ? 'hover:ring-2 hover:ring-primary hover:ring-offset-2 transition-all duration-200' : ''}`}>
+        {user?.avatar && !imageError ? (
+          <img 
+            src={user.avatar} 
+            alt={user.name || 'Profile'} 
+            className="w-full h-full object-cover"
+            onError={handleImageError}
+            crossOrigin="anonymous"
+          />
+        ) : (
+          <span className={`text-primary font-bold ${textSize} flex items-center justify-center w-full h-full`}>
+            {getInitials(user?.name)}
+          </span>
+        )}
+      </div>
+      
+      {/* Overlay on hover for clickable avatars */}
+      {clickable && (
+        <div className="absolute inset-0 rounded-full bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+          <Edit3 className="w-4 h-4 text-white" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 const Profile = () => {
   const { user: ctxUser } = useAuth()
   const [user, setUser] = useState(null)
@@ -26,6 +76,10 @@ const Profile = () => {
   const [selectedFile, setSelectedFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [phoneError, setPhoneError] = useState('')
+
+  // Provider detection
+  const isGoogleUser = user?.provider === 'google'
+  const isLocalUser = user?.provider === 'local'
 
   // Phone validation function
   const validatePhone = (phone) => {
@@ -93,7 +147,8 @@ const Profile = () => {
     const load = async () => {
       try {
         setLoading(true)
-        const res = await axios.get('/auth/me')
+        setMessage({ type: '', text: '' }) // Clear any previous messages
+        const res = await axios.get('/api/auth/me')
         if (res.data.success) {
           setUser(res.data.user)
           setForm({
@@ -102,9 +157,15 @@ const Profile = () => {
             avatar: res.data.user.avatar || ''
           })
           setPhoneError('') // Clear any phone errors
+        } else {
+          setMessage({ type: 'error', text: 'Failed to load profile data' })
         }
       } catch (e) {
         console.error('Failed to load profile', e)
+        setMessage({ 
+          type: 'error', 
+          text: e.response?.data?.message || 'Failed to load profile. Please refresh the page.' 
+        })
       } finally {
         setLoading(false)
       }
@@ -137,12 +198,14 @@ const Profile = () => {
         phone: form.phone ? formatPhoneNumber(form.phone) : ''
       }
       
-      const res = await axios.put('/auth/me', formattedData)
+      const res = await axios.put('/api/auth/me', formattedData)
       if (res.data.success) {
         setUser(res.data.user)
+        // Update form with all current user data from server
         setForm({
-          ...form,
-          phone: res.data.user.phone || ''
+          name: res.data.user.name || '',
+          phone: res.data.user.phone || '',
+          avatar: res.data.user.avatar || ''
         })
         // Also refresh localStorage user if present
         try {
@@ -173,7 +236,7 @@ const Profile = () => {
     try {
       setSaving(true)
       setMessage({ type: '', text: '' })
-      const res = await axios.put('/auth/me/password', pwd)
+      const res = await axios.put('/api/auth/me/password', pwd)
       if (res.data.success) {
         setPwd({ currentPassword: '', newPassword: '' })
         setMessage({ type: 'success', text: 'Password updated successfully.' })
@@ -219,7 +282,7 @@ const Profile = () => {
       const formData = new FormData()
       formData.append('avatar', selectedFile)
       
-      const res = await axios.post('/auth/upload-avatar', formData, {
+      const res = await axios.post('/api/auth/upload-avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -288,16 +351,12 @@ const Profile = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Hidden File Input for Sidebar */}
-          {user?.provider === 'local' && (
+          {isLocalUser && (
             <input
               type="file"
               accept="image/*"
               onChange={handleFileSelect}
-              ref={(input) => {
-                if (input) {
-                  input.style.display = 'none';
-                }
-              }}
+              style={{ display: 'none' }}
               id="avatar-upload"
             />
           )}
@@ -305,42 +364,18 @@ const Profile = () => {
           {/* Sidebar card */}
           <div className="card p-6">
             <div className="flex items-center gap-4 mb-4">
-              <div 
-                className={`relative group ${user?.provider === 'local' ? 'cursor-pointer' : ''}`}
-                onClick={user?.provider === 'local' ? () => document.getElementById('avatar-upload').click() : undefined}
-              >
-                <div className={`w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden ${user?.provider === 'local' ? 'hover:ring-2 hover:ring-primary hover:ring-offset-2 transition-all duration-200' : ''}`}>
-                  {user?.avatar ? (
-                    <img 
-                      src={user.avatar} 
-                      alt={user.name} 
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none'
-                        e.target.nextSibling.style.display = 'flex'
-                      }}
-                    />
-                  ) : null}
-                  <span 
-                    className={`text-primary font-bold text-xl ${user?.avatar ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}
-                  >
-                    {(user?.name || '?').charAt(0)}
-                  </span>
-                </div>
-                {/* Overlay on hover for local users */}
-                {user?.provider === 'local' && (
-                  <div className="absolute inset-0 rounded-full bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                    <Edit3 className="w-4 h-4 text-white" />
-                  </div>
-                )}
-              </div>
+              <AvatarDisplay 
+                user={user}
+                clickable={isLocalUser}
+                onClick={isLocalUser ? () => document.getElementById('avatar-upload')?.click() : undefined}
+              />
               <div>
                 <div className="text-xl font-semibold text-gray-900">{user?.name}</div>
                 <div className="text-sm text-gray-500">{user?.role?.toUpperCase()}</div>
-                {user?.provider === 'google' && (
+                {isGoogleUser && (
                   <div className="text-xs text-blue-600 mt-1">Google Account</div>
                 )}
-                {user?.provider === 'local' && (
+                {isLocalUser && (
                   <div className="text-xs text-gray-500 mt-1">Click image to edit</div>
                 )}
               </div>
@@ -348,7 +383,7 @@ const Profile = () => {
             <div className="space-y-3">
               <InfoRow icon={Mail} label="Email" value={user?.email} />
               <InfoRow icon={Phone} label="Phone" value={user?.phone} />
-              <InfoRow icon={Shield} label="Provider" value={user?.provider === 'google' ? 'Google' : 'Local'} />
+              <InfoRow icon={Shield} label="Provider" value={isGoogleUser ? 'Google' : 'Local'} />
               <InfoRow icon={Calendar} label="Member since" value={joined ? joined.toLocaleDateString() : '-'} />
               <InfoRow icon={Clock} label="Last login" value={lastLogin ? lastLogin.toLocaleString() : '-'} />
             </div>
@@ -389,38 +424,21 @@ const Profile = () => {
                   
                   {/* Current Profile Picture */}
                   <div className="flex items-center gap-4">
-                    <div className="relative group">
-                      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary hover:ring-offset-2 transition-all duration-200">
-                        {user?.avatar ? (
-                          <img 
-                            src={user.avatar} 
-                            alt={user.name} 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.target.style.display = 'none'
-                              e.target.nextSibling.style.display = 'flex'
-                            }}
-                          />
-                        ) : null}
-                        <span 
-                          className={`text-primary font-bold text-2xl ${user?.avatar ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}
-                        >
-                          {(user?.name || '?').charAt(0)}
-                        </span>
-                      </div>
-                      {/* Overlay on hover */}
-                      <div className="absolute inset-0 rounded-full bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
-                        <Edit3 className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
+                    <AvatarDisplay 
+                      user={user}
+                      size="w-20 h-20"
+                      textSize="text-2xl"
+                      clickable={isLocalUser}
+                      onClick={isLocalUser ? () => document.getElementById('avatar-upload')?.click() : undefined}
+                    />
                     <div>
                       <p className="text-sm text-gray-600">
-                        {user?.provider === 'google' 
+                        {isGoogleUser 
                           ? 'Profile picture from Google account' 
                           : 'Click to upload a new profile picture'
                         }
                       </p>
-                      {user?.provider === 'local' && (
+                      {isLocalUser && (
                         <p className="text-xs text-gray-500 mt-1">
                           Click the image above to change your profile picture
                         </p>
@@ -428,13 +446,37 @@ const Profile = () => {
                     </div>
                   </div>
 
-                  {/* File Upload Section */}
-                  {user?.provider === 'local' && (
+                  {/* Google User Message */}
+                  {isGoogleUser && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                        <div>
+                          <p className="text-sm text-blue-800 font-medium">Google Account Profile Picture</p>
+                          <p className="text-sm text-blue-700 mt-1">
+                            Your profile picture is managed by your Google account. To change it, 
+                            update your Google Account profile picture at{' '}
+                            <a 
+                              href="https://myaccount.google.com" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="underline hover:no-underline"
+                            >
+                              myaccount.google.com
+                            </a>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* File Upload Section - Only for Local Users */}
+                  {isLocalUser && (
                     <div className="space-y-4">
                       {/* Clickable Upload Button */}
                       <button
                         type="button"
-                        onClick={() => document.getElementById('avatar-upload').click()}
+                        onClick={() => document.getElementById('avatar-upload')?.click()}
                         className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors duration-200 flex flex-col items-center gap-2"
                       >
                         <Upload className="w-6 h-6 text-gray-400" />
@@ -486,49 +528,49 @@ const Profile = () => {
                       <label className="text-sm text-gray-600">Full Name</label>
                       <input
                         type="text"
-                      className="mt-1 w-full border rounded-lg px-3 py-2"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder="Your name"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Phone Number</label>
-                    <input
-                      type="tel"
-                      className={`mt-1 w-full border rounded-lg px-3 py-2 ${
-                        phoneError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                      } focus:outline-none focus:ring-2`}
-                      value={form.phone}
-                      onChange={handlePhoneChange}
-                      placeholder="+91XXXXXXXXXX or 10-digit number"
-                    />
-                    {phoneError && (
-                      <p className="mt-1 text-sm text-red-600 flex items-center">
-                        <AlertTriangle className="w-4 h-4 mr-1" />
-                        {phoneError}
+                        className="mt-1 w-full border rounded-lg px-3 py-2"
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="Your name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600">Phone Number</label>
+                      <input
+                        type="tel"
+                        className={`mt-1 w-full border rounded-lg px-3 py-2 ${
+                          phoneError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                        } focus:outline-none focus:ring-2`}
+                        value={form.phone}
+                        onChange={handlePhoneChange}
+                        placeholder="+91XXXXXXXXXX or 10-digit number"
+                      />
+                      {phoneError && (
+                        <p className="mt-1 text-sm text-red-600 flex items-center">
+                          <AlertTriangle className="w-4 h-4 mr-1" />
+                          {phoneError}
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">
+                        Enter a valid Indian mobile number (10 digits starting with 6, 7, 8, or 9)
                       </p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      Enter a valid Indian mobile number (10 digits starting with 6, 7, 8, or 9)
-                    </p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button 
-                    type="submit" 
-                    disabled={saving || phoneError} 
-                    className={`btn-primary inline-flex items-center ${
-                      phoneError ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <Save className="w-4 h-4 mr-2" /> {saving ? 'Saving...' : 'Save Changes'}
-                  </button>
-                  <button type="button" onClick={() => setTab('overview')} className="px-4 py-2 border rounded-lg inline-flex items-center">
-                    <Edit3 className="w-4 h-4 mr-2" /> Cancel
-                  </button>
-                </div>
-              </form>
+                  <div className="flex gap-2">
+                    <button 
+                      type="submit" 
+                      disabled={saving || phoneError} 
+                      className={`btn-primary inline-flex items-center ${
+                        phoneError ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <Save className="w-4 h-4 mr-2" /> {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button type="button" onClick={() => setTab('overview')} className="px-4 py-2 border rounded-lg inline-flex items-center">
+                      <Edit3 className="w-4 h-4 mr-2" /> Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
             )}
 
@@ -536,7 +578,7 @@ const Profile = () => {
             {tab === 'security' && (
               <div className="card p-6 space-y-4">
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Security</h2>
-                {user?.provider === 'local' ? (
+                {isLocalUser ? (
                   <form onSubmit={handleChangePassword} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -565,8 +607,25 @@ const Profile = () => {
                     </button>
                   </form>
                 ) : (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                    Password is managed by your Google account. To change it, update your Google Account password.
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm text-blue-800 font-medium">Google Account Security</p>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Your password is managed by your Google account. To change it, 
+                          update your Google Account password at{' '}
+                          <a 
+                            href="https://myaccount.google.com/security" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="underline hover:no-underline"
+                          >
+                            myaccount.google.com/security
+                          </a>
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

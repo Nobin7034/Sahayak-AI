@@ -193,7 +193,7 @@ router.post('/', async (req, res) => {
       ...(paymentId && {
         payment: {
           status: 'paid',
-          amount: serviceDoc.fees,
+          amount: serviceDoc.fee,
           paymentId: paymentId
         }
       })
@@ -227,7 +227,7 @@ router.post('/', async (req, res) => {
     }
 
     const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate('service', 'name category fees processingTime')
+      .populate('service', 'name category fee processingTime')
       .populate('center', 'name address contact');
 
     res.status(201).json({
