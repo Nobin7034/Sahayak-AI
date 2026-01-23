@@ -22,17 +22,22 @@ import centerService from '../services/centerService'
 import MapContainer from '../components/map/MapContainer'
 import SearchBar from '../components/map/SearchBar'
 import CenterInfoPanel from '../components/map/CenterInfoPanel'
+import DocumentReview from '../components/DocumentReview'
+import DocumentValidation from '../components/DocumentValidation'
 
 const ServiceApplication = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   
   // State management
-  const [currentStep, setCurrentStep] = useState(1) // 1: Documents, 2: Center Selection, 3: Appointment
+  const [currentStep, setCurrentStep] = useState(1) // 1: Review Documents, 2: Select Documents, 3: Center Selection, 4: Appointment
   const [service, setService] = useState(null)
   const [centers, setCenters] = useState([])
   const [filteredCenters, setFilteredCenters] = useState([])
   const [selectedCenter, setSelectedCenter] = useState(null)
+  const [selectedDocuments, setSelectedDocuments] = useState([])
+  const [documentValidation, setDocumentValidation] = useState(null)
+  const [documentRequirements, setDocumentRequirements] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -42,11 +47,12 @@ const ServiceApplication = () => {
 
   useEffect(() => {
     fetchService()
+    fetchDocumentRequirements()
     requestUserLocation()
   }, [id])
 
   useEffect(() => {
-    if (service && currentStep === 2) {
+    if (service && currentStep === 3) {
       fetchAvailableCenters()
     }
   }, [service, currentStep])
@@ -175,8 +181,32 @@ const ServiceApplication = () => {
     }
   }
 
+  const fetchDocumentRequirements = async () => {
+    try {
+      const response = await axios.get(`/api/documents/service/${id}`);
+      if (response.data.success) {
+        setDocumentRequirements(response.data.data);
+      }
+    } catch (error) {
+      console.error('Document requirements fetch error:', error);
+      // Fallback to service documents if API fails
+    }
+  };
+
+  const handleDocumentValidation = (documents, validation) => {
+    setSelectedDocuments(documents);
+    setDocumentValidation(validation);
+    if (validation.canProceed) {
+      setCurrentStep(3); // Go to center selection
+    }
+  };
+
+  const handleReviewComplete = () => {
+    setCurrentStep(2); // Go to document selection
+  };
+
   const handleNextStep = () => {
-    if (currentStep < 3) {
+    if (currentStep < 4) {
       setCurrentStep(currentStep + 1)
     }
   }
@@ -203,7 +233,13 @@ const ServiceApplication = () => {
 
   const handleBookAppointment = () => {
     if (selectedCenter) {
-      navigate(`/book-appointment?service=${service._id}&center=${selectedCenter._id}`)
+      // Include selected documents in the booking URL
+      const params = new URLSearchParams({
+        service: service._id,
+        center: selectedCenter._id,
+        documents: JSON.stringify(selectedDocuments)
+      });
+      navigate(`/book-appointment?${params.toString()}`);
     }
   }
 
@@ -283,7 +319,7 @@ const ServiceApplication = () => {
               }`}>
                 2
               </div>
-              <span className="ml-2 font-medium">Select Center</span>
+              <span className="ml-2 font-medium">Select Documents</span>
             </div>
             
             <div className={`flex-1 h-1 mx-4 ${currentStep >= 3 ? 'bg-primary' : 'bg-gray-200'}`}></div>
@@ -294,6 +330,17 @@ const ServiceApplication = () => {
               }`}>
                 3
               </div>
+              <span className="ml-2 font-medium">Select Center</span>
+            </div>
+            
+            <div className={`flex-1 h-1 mx-4 ${currentStep >= 4 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+            
+            <div className={`flex items-center ${currentStep >= 4 ? 'text-primary' : 'text-gray-400'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                currentStep >= 4 ? 'bg-primary text-white' : 'bg-gray-200'
+              }`}>
+                4
+              </div>
               <span className="ml-2 font-medium">Book Appointment</span>
             </div>
           </div>
@@ -301,129 +348,39 @@ const ServiceApplication = () => {
 
         {/* Step Content */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          {/* Step 1: Document Requirements */}
+          {/* Step 1: Review Documents */}
           {currentStep === 1 && (
-            <div>
-              <div className="flex items-center space-x-2 mb-6">
-                <FileText className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-bold text-gray-900">Required Documents</h2>
-              </div>
-              
-              <p className="text-gray-600 mb-6">
-                Please review the documents required for this service. Make sure you have all necessary documents before proceeding.
-              </p>
-
-              <div className="space-y-4 mb-8">
-                {service.documents && service.documents.length > 0 ? (
-                  service.documents.map((d, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{d.name}</h3>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          d.requirement === 'optional' ? 'bg-gray-100 text-gray-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {d.requirement === 'optional' ? 'Optional' : 'Mandatory'}
-                        </span>
-                      </div>
-                      
-                      {d.notes && <p className="text-gray-600 mb-3">{d.notes}</p>}
-                      
-                      {(d.imageUrl || d?.template?.imageUrl) && (
-                        <button
-                          type="button"
-                          className="inline-flex items-center text-primary hover:text-blue-700 text-sm"
-                          onClick={() => {
-                            const url = d.imageUrl || d?.template?.imageUrl
-                            setPreview({ open: true, title: d.name, url })
-                          }}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View Sample Document
-                        </button>
-                      )}
-
-                      {/* Alternatives */}
-                      {d.alternatives && d.alternatives.length > 0 && (
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                          <div className="text-sm font-medium text-gray-800 mb-2">
-                            Alternative Documents (any one):
-                          </div>
-                          <div className="space-y-2">
-                            {d.alternatives.map((alt, altIndex) => (
-                              <div key={altIndex} className="flex items-center justify-between">
-                                <span className="text-sm text-gray-700">{alt.name}</span>
-                                {(alt.imageUrl || alt?.template?.imageUrl) && (
-                                  <button
-                                    type="button"
-                                    className="text-primary hover:text-blue-700 text-xs"
-                                    onClick={() => {
-                                      const url = alt.imageUrl || alt?.template?.imageUrl
-                                      setPreview({ open: true, title: alt.name, url })
-                                    }}
-                                  >
-                                    <Eye className="w-3 h-3 mr-1 inline" />
-                                    Sample
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                ) : service.requiredDocuments && service.requiredDocuments.length > 0 ? (
-                  service.requiredDocuments.map((doc, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-start justify-between">
-                        <h3 className="text-lg font-semibold text-gray-900">{doc}</h3>
-                        <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">
-                          Required
-                        </span>
-                      </div>
-                      <p className="text-gray-600 mt-2">
-                        Please ensure this document is original or self-attested copy.
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No specific documents required for this service.
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <div className="flex items-center space-x-2 mb-2">
-                  <CheckCircle className="w-5 h-5 text-blue-600" />
-                  <span className="font-semibold text-blue-900">Important Note</span>
-                </div>
-                <p className="text-blue-800 text-sm">
-                  All documents must be original or self-attested copies. Ensure all information 
-                  is clearly visible and matches your application details exactly.
-                </p>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={handleNextStep}
-                  className="btn-primary flex items-center"
-                >
-                  I Have All Documents - Continue
-                  <ArrowRight className="ml-2 w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <DocumentReview
+              requirements={documentRequirements}
+              onReviewComplete={handleReviewComplete}
+              onBack={() => navigate('/services')}
+            />
           )}
 
-          {/* Step 2: Center Selection */}
+          {/* Step 2: Select Documents */}
           {currentStep === 2 && (
+            <DocumentValidation
+              serviceId={service._id}
+              onValidationComplete={handleDocumentValidation}
+              onBack={() => setCurrentStep(1)}
+            />
+          )}
+
+          {/* Step 3: Center Selection */}
+          {currentStep === 3 && (
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-2">
                   <Building className="w-6 h-6 text-primary" />
                   <h2 className="text-2xl font-bold text-gray-900">Select Akshaya Center</h2>
                 </div>
+                
+                {/* Document Summary */}
+                {selectedDocuments.length > 0 && (
+                  <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                    ✓ {selectedDocuments.length} documents selected
+                  </div>
+                )}
                 
                 {/* View Toggle */}
                 <div className="flex items-center space-x-2">
@@ -599,84 +556,25 @@ const ServiceApplication = () => {
 
               <div className="flex justify-between">
                 <button
-                  onClick={handlePrevStep}
+                  onClick={() => setCurrentStep(2)}
                   className="btn-secondary flex items-center"
                 >
                   <ArrowLeft className="mr-2 w-4 h-4" />
                   Back to Documents
                 </button>
                 <button
-                  onClick={handleNextStep}
+                  onClick={handleBookAppointment}
                   disabled={!selectedCenter}
                   className="btn-primary flex items-center disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  Continue to Booking
+                  <Calendar className="mr-2 w-4 h-4" />
+                  Book Appointment
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Appointment Booking */}
-          {currentStep === 3 && (
-            <div>
-              <div className="flex items-center space-x-2 mb-6">
-                <Calendar className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-bold text-gray-900">Book Your Appointment</h2>
-              </div>
-              
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Booking Summary</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Service:</span>
-                    <span className="font-medium">{service.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Center:</span>
-                    <span className="font-medium">{selectedCenter?.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Fee:</span>
-                    <span className="font-medium text-green-600">
-                      {service.fees === 0 ? 'Free' : `₹${service.fees}`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Processing Time:</span>
-                    <span className="font-medium">{service.processingTime}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <div className="flex items-center space-x-2 mb-2">
-                  <CheckCircle className="w-5 h-5 text-blue-600" />
-                  <span className="font-semibold text-blue-900">Ready to Book</span>
-                </div>
-                <p className="text-blue-800 text-sm">
-                  You'll be redirected to select your preferred date and time slot for the appointment.
-                </p>
-              </div>
-
-              <div className="flex justify-between">
-                <button
-                  onClick={handlePrevStep}
-                  className="btn-secondary flex items-center"
-                >
-                  <ArrowLeft className="mr-2 w-4 h-4" />
-                  Back to Center Selection
-                </button>
-                <button
-                  onClick={handleBookAppointment}
-                  className="btn-primary flex items-center"
-                >
-                  <Calendar className="mr-2 w-4 h-4" />
-                  Book Appointment
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

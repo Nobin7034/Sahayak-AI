@@ -1820,3 +1820,213 @@ router.get('/center-profile', staffAuth, centerAccess, async (req, res) => {
 });
 
 export default router;
+
+// Add comment to appointment
+router.post('/appointments/:id/comments', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment } = req.body;
+
+    if (!comment || comment.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Comment content is required'
+      });
+    }
+
+    // Import Appointment model dynamically
+    const { default: Appointment } = await import('../models/Appointment.js');
+
+    // Find appointment - ensure it belongs to staff's center
+    const appointment = await Appointment.findOne({
+      _id: id,
+      center: req.staff.centerId
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found or not accessible from your center'
+      });
+    }
+
+    // Add comment
+    if (!appointment.comments) {
+      appointment.comments = [];
+    }
+
+    const newComment = {
+      author: req.user.userId,
+      authorType: 'staff',
+      content: comment.trim(),
+      isVisible: true,
+      createdAt: new Date()
+    };
+
+    appointment.comments.push(newComment);
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: 'Comment added successfully',
+      data: newComment
+    });
+
+  } catch (error) {
+    console.error('Add comment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add comment',
+      error: error.message
+    });
+  }
+});
+
+// Recommend alternative documents to user
+router.post('/appointments/:id/recommend-alternatives', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recommendations } = req.body;
+
+    if (!recommendations || !Array.isArray(recommendations) || recommendations.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recommendations array is required'
+      });
+    }
+
+    // Import models dynamically
+    const { default: Appointment } = await import('../models/Appointment.js');
+    const { default: Notification } = await import('../models/Notification.js');
+    const { default: DocumentRequirement } = await import('../models/DocumentRequirement.js');
+
+    // Find appointment
+    const appointment = await Appointment.findOne({
+      _id: id,
+      center: req.staff.centerId
+    }).populate('user', 'name email').populate('service', 'name');
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found or not accessible from your center'
+      });
+    }
+
+    // Get document requirements to build recommendation message
+    const docRequirements = await DocumentRequirement.findOne({ service: appointment.service._id });
+    
+    if (!docRequirements) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document requirements not found for this service'
+      });
+    }
+
+    // Build recommendation message
+    let recommendationText = 'Alternative document recommendations for your appointment:\n\n';
+    
+    recommendations.forEach(rec => {
+      const document = docRequirements.documents.find(d => d._id.toString() === rec.documentId);
+      if (document && document.alternatives && document.alternatives[rec.alternativeId]) {
+        const alternative = document.alternatives[rec.alternativeId];
+        recommendationText += `• Instead of "${document.name}", you can use "${alternative.name}"\n`;
+        if (alternative.notes) {
+          recommendationText += `  Note: ${alternative.notes}\n`;
+        }
+        recommendationText += '\n';
+      }
+    });
+
+    recommendationText += 'Please bring any of these alternative documents to your appointment.';
+
+    // Create notification for user
+    await Notification.create({
+      user: appointment.user._id,
+      type: 'document_recommendation',
+      title: 'Alternative Document Recommendations',
+      message: recommendationText,
+      meta: {
+        appointmentId: appointment._id,
+        serviceId: appointment.service._id,
+        centerId: appointment.center,
+        recommendations,
+        recommendedBy: req.user.name
+      },
+      priority: 'medium'
+    });
+
+    // Add comment to appointment for record keeping
+    if (!appointment.comments) {
+      appointment.comments = [];
+    }
+
+    appointment.comments.push({
+      author: req.user.userId,
+      authorType: 'staff',
+      content: `Recommended alternative documents to user:\n${recommendationText}`,
+      isVisible: false, // Internal record
+      createdAt: new Date()
+    });
+
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: 'Alternative document recommendations sent to user',
+      data: {
+        recommendationsSent: recommendations.length,
+        notificationSent: true
+      }
+    });
+
+  } catch (error) {
+    console.error('Recommend alternatives error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send alternative recommendations',
+      error: error.message
+    });
+  }
+});
+
+// Get detailed appointment information (enhanced version)
+router.get('/appointments/:id/details', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Import models dynamically
+    const { default: Appointment } = await import('../models/Appointment.js');
+
+    const appointment = await Appointment.findOne({
+      _id: id,
+      center: req.staff.centerId
+    })
+    .populate('user', 'name email phone')
+    .populate('service', 'name category fee serviceCharge processingTime requiredDocuments')
+    .populate('center', 'name address contact location')
+    .populate('comments.author', 'name')
+    .populate('staffNotes.author', 'name')
+    .populate('statusHistory.changedBy', 'name');
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found or not accessible from your center'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: appointment
+    });
+
+  } catch (error) {
+    console.error('Get detailed appointment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch detailed appointment information',
+      error: error.message
+    });
+  }
+});

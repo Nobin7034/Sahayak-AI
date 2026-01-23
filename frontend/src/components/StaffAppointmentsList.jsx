@@ -15,10 +15,12 @@ import {
   Search,
   RefreshCw,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Shield
 } from 'lucide-react';
 import staffApiService from '../services/staffApiService';
 import { useStaffTheme } from '../contexts/StaffThemeContext';
+import StaffDocumentView from './StaffDocumentView';
 
 /**
  * AppointmentStatusBadge Component
@@ -204,6 +206,30 @@ const AppointmentCard = ({
                   </div>
                 </div>
               </div>
+
+              {/* Document Status Section */}
+              {appointment.selectedDocuments && appointment.selectedDocuments.length > 0 && (
+                <div>
+                  <h4 className={`${currentTheme.text.primary} font-medium mb-2 flex items-center space-x-2`}>
+                    <Shield className="h-4 w-4" />
+                    <span>Document Status</span>
+                    <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      {appointment.selectedDocuments.length} documents
+                    </span>
+                  </h4>
+                  <StaffDocumentView
+                    appointment={appointment}
+                    onValidationUpdate={async (appointmentId, validationData) => {
+                      // This would be handled by parent component
+                      console.log('Document validation update:', appointmentId, validationData);
+                    }}
+                    onNotifyUser={async (appointmentId, notificationData) => {
+                      // This would be handled by parent component
+                      console.log('Notify user:', appointmentId, notificationData);
+                    }}
+                  />
+                </div>
+              )}
 
               {appointment.notes && (
                 <div>

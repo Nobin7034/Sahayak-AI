@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Review Demo Images Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .service-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .document-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            gap: 15px;
+        }
+        .demo-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .no-image {
+            width: 80px;
+            height: 80px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 12px;
+            text-align: center;
+        }
+        .document-info {
+            flex: 1;
+        }
+        .document-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .alternatives {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .alt-item {
+            display: flex;
+            gap: 10px;
+            margin: 5px 0;
+            align-items: center;
+        }
+        .alt-image {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 20px;
+            text-align: center;
+            background: white;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .loading { color: #007bff; }
+    </style>
+</head>
+<body>
+    <h1>Document Review Demo Images Test</h1>
+    <div id="status" class="status loading">Loading services...</div>
+    <div id="services-container"></div>
+
+    <script>
+        async function testDocumentDemoImages() {
+            const statusDiv = document.getElementById('status');
+            const container = document.getElementById('services-container');
+
+            try {
+                // Fetch services
+                statusDiv.innerHTML = '🔍 Fetching services...';
+                const servicesResponse = await fetch('http://localhost:5000/api/services');
+                const servicesData = await servicesResponse.json();
+
+                if (!servicesData.success) {
+                    throw new Error('Failed to fetch services');
+                }
+
+                const services = servicesData.data.slice(0, 3); // Test first 3 services
+                statusDiv.innerHTML = `✅ Found ${services.length} services. Testing document requirements...`;
+
+                // Test each service
+                for (const service of services) {
+                    const serviceCard = document.createElement('div');
+                    serviceCard.className = 'service-card';
+                    serviceCard.innerHTML = `<h2>${service.name}</h2><p>Loading documents...</p>`;
+                    container.appendChild(serviceCard);
+
+                    try {
+                        // Fetch document requirements
+                        const docResponse = await fetch(`http://localhost:5000/api/documents/service/${service._id}`);
+                        const docData = await docResponse.json();
+
+                        if (docData.success && docData.data.documents) {
+                            const documents = docData.data.documents;
+                            let documentsHtml = `
+                                <h2>${service.name}</h2>
+                                <p><strong>Total Documents:</strong> ${documents.length}</p>
+                                <div class="documents">
+                            `;
+
+                            documents.forEach((doc, index) => {
+                                const hasImage = doc.referenceImage || doc.sampleUrl || doc.imageUrl;
+                                
+                                documentsHtml += `
+                                    <div class="document-card">
+                                        ${hasImage ? 
+                                            `<img src="${doc.referenceImage || doc.sampleUrl || doc.imageUrl}" 
+                                                  alt="Demo ${doc.name}" class="demo-image" 
+                                                  onerror="this.style.display='none'; this.nextSibling.style.display='flex';">
+                                             <div class="no-image" style="display:none;">No Image</div>` :
+                                            `<div class="no-image">No Demo Image</div>`
+                                        }
+                                        <div class="document-info">
+                                            <div class="document-name">${doc.name}</div>
+                                            <div>Required: ${doc.isRequired || doc.isMandatory ? 'Yes' : 'No'}</div>
+                                            <div>Category: ${doc.category || 'Not specified'}</div>
+                                            ${doc.alternatives && doc.alternatives.length > 0 ? `
+                                                <div class="alternatives">
+                                                    <strong>Alternatives (${doc.alternatives.length}):</strong>
+                                                    ${doc.alternatives.map(alt => `
+                                                        <div class="alt-item">
+                                                            ${alt.referenceImage || alt.imageUrl ? 
+                                                                `<img src="${alt.referenceImage || alt.imageUrl}" 
+                                                                      alt="Demo ${alt.name}" class="alt-image"
+                                                                      onerror="this.style.display='none';">` :
+                                                                `<div style="width:40px;height:40px;background:#eee;border-radius:4px;"></div>`
+                                                            }
+                                                            <span>${alt.name}</span>
+                                                        </div>
+                                                    `).join('')}
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+
+                            documentsHtml += '</div>';
+                            serviceCard.innerHTML = documentsHtml;
+                        } else {
+                            serviceCard.innerHTML = `
+                                <h2>${service.name}</h2>
+                                <p class="error">❌ No document requirements found</p>
+                            `;
+                        }
+                    } catch (docError) {
+                        serviceCard.innerHTML = `
+                            <h2>${service.name}</h2>
+                            <p class="error">❌ Error loading documents: ${docError.message}</p>
+                        `;
+                    }
+                }
+
+                statusDiv.innerHTML = '<span class="success">✅ Demo image test completed! Check the services above to see demo images.</span>';
+
+            } catch (error) {
+                statusDiv.innerHTML = `<span class="error">❌ Test failed: ${error.message}</span>`;
+            }
+        }
+
+        // Run the test when page loads
+        window.addEventListener('load', testDocumentDemoImages);
+    </script>
+</body>
+</html>

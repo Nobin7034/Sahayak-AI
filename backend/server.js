@@ -41,6 +41,7 @@ import centerRoutes from './routes/centers.js';
 import geocodeRoutes from './routes/geocode.js';
 import staffRoutes from './routes/staffRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
+import documentRoutes from './routes/documentRoutes.js';
 
 // Base route (dev info). In production we serve the frontend build instead.
 app.get('/', (req, res) => {
@@ -79,6 +80,7 @@ app.use('/api/centers', centerRoutes);
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/ratings', ratingRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {

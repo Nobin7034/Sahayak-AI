@@ -1,0 +1,17 @@
+<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="aadhaarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="300" height="200" fill="url(#aadhaarGrad)" stroke="#333" stroke-width="2"/>
+  <text x="150" y="40" font-family="Arial, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="white">AADHAAR CARD</text>
+  <text x="150" y="60" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="white">Government of India</text>
+  <text x="150" y="90" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">XXXX XXXX XXXX</text>
+  <text x="150" y="110" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="white">Name: [Your Name]</text>
+  <text x="150" y="125" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="white">DOB: DD/MM/YYYY</text>
+  <text x="150" y="140" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="white">Address: [Your Address]</text>
+  <rect x="20" y="160" width="40" height="30" fill="white" opacity="0.8"/>
+  <text x="40" y="178" font-family="Arial, sans-serif" font-size="8" text-anchor="middle" fill="#333">PHOTO</text>
+</svg>

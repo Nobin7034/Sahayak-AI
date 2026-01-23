@@ -13,7 +13,8 @@ import {
   AlertTriangle, 
   Loader2,
   IndianRupee,
-  Building
+  Building,
+  Shield
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,8 +57,12 @@ const BookAppointment = () => {
   const [searchParams] = useSearchParams();
   const serviceId = searchParams.get('service');
   const centerId = searchParams.get('center');
+  const documentsParam = searchParams.get('documents');
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Parse selected documents from URL
+  const selectedDocuments = documentsParam ? JSON.parse(decodeURIComponent(documentsParam)) : [];
   
   // Create authenticated axios instance
   const authAxios = createAuthenticatedAxios();
@@ -71,7 +76,8 @@ const BookAppointment = () => {
     serviceId: serviceId || '',
     appointmentDate: '',
     timeSlot: '',
-    notes: ''
+    notes: '',
+    selectedDocuments: selectedDocuments
   });
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -363,6 +369,7 @@ const BookAppointment = () => {
       appointmentDate: formData.appointmentDate,
       timeSlot: formData.timeSlot,
       notes: formData.notes,
+      selectedDocuments: formData.selectedDocuments,
       paymentId
     };
 
@@ -471,6 +478,32 @@ const BookAppointment = () => {
         {/* Booking Form */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* Selected Documents Summary */}
+            {selectedDocuments.length > 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Shield className="h-5 w-5 text-green-600" />
+                  <h3 className="font-medium text-green-900">Selected Documents</h3>
+                  <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                    {selectedDocuments.length} documents
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {selectedDocuments.map((doc, index) => (
+                    <div key={index} className="flex items-center space-x-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-green-800">
+                        {doc.isAlternative ? doc.alternativeName : doc.documentName}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-green-700 text-xs mt-2">
+                  Please bring these documents to your appointment
+                </p>
+              </div>
+            )}
             
             {/* Service Selection */}
             <div>

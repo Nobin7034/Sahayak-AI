@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -19,6 +20,7 @@ import {
 import axios from 'axios';
 
 const StaffAppointments = () => {
+  const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -340,11 +342,8 @@ const StaffAppointments = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Action
                     </th>
                   </tr>
                 </thead>
@@ -388,77 +387,15 @@ const StaffAppointments = () => {
                         </span>
                       </td>
 
-                      {/* Contact */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex items-center space-x-2">
-                          {appointment.user?.phone && (
-                            <a 
-                              href={`tel:${appointment.user.phone}`}
-                              className="text-blue-600 hover:text-blue-800"
-                              title="Call"
-                            >
-                              <Phone className="h-4 w-4" />
-                            </a>
-                          )}
-                          {appointment.user?.email && (
-                            <a 
-                              href={`mailto:${appointment.user.email}`}
-                              className="text-blue-600 hover:text-blue-800"
-                              title="Email"
-                            >
-                              <Mail className="h-4 w-4" />
-                            </a>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          
-                          {/* View Details */}
-                          <button
-                            onClick={() => handleViewDetails(appointment)}
-                            className="text-gray-400 hover:text-blue-600"
-                            title="View Details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-
-                          {/* Status Actions */}
-                          {getStatusActions(appointment).map((action) => {
-                            const Icon = action.icon;
-                            const colorClasses = {
-                              green: 'text-green-600 hover:text-green-800',
-                              red: 'text-red-600 hover:text-red-800',
-                              purple: 'text-purple-600 hover:text-purple-800',
-                              blue: 'text-blue-600 hover:text-blue-800'
-                            };
-                            return (
-                              <button
-                                key={action.action}
-                                onClick={() => {
-                                  setSelectedAppointment(appointment);
-                                  setStatusUpdate({ status: action.action, reason: '', notes: '' });
-                                  setShowStatusModal(true);
-                                }}
-                                className={colorClasses[action.color] || 'text-gray-600 hover:text-gray-800'}
-                                title={action.label}
-                              >
-                                <Icon className="h-4 w-4" />
-                              </button>
-                            );
-                          })}
-
-                          {/* Comments */}
-                          <button
-                            onClick={() => handleAddComment(appointment)}
-                            className="text-gray-400 hover:text-purple-600"
-                            title="Add Comment"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </button>
-                        </div>
+                      {/* Action */}
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <button
+                          onClick={() => navigate(`/staff/appointments/${appointment._id}`)}
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Manage
+                        </button>
                       </td>
                     </tr>
                   ))}

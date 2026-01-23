@@ -28,6 +28,7 @@ import CenterFinder from './pages/CenterFinder'
 import BookAppointment from './pages/BookAppointment'
 import StaffDashboard from './pages/staff/StaffDashboard'
 import StaffAppointments from './pages/staff/StaffAppointments'
+import AppointmentDetails from './pages/staff/AppointmentDetails'
 import StaffServices from './pages/staff/StaffServices'
 import StaffAnalytics from './pages/staff/StaffAnalytics'
 import StaffProfile from './pages/staff/StaffProfile'
@@ -222,6 +223,13 @@ function App() {
             <ProtectedRoute>
               <StaffLayout>
                 <StaffAppointments />
+              </StaffLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/staff/appointments/:appointmentId" element={
+            <ProtectedRoute>
+              <StaffLayout>
+                <AppointmentDetails />
               </StaffLayout>
             </ProtectedRoute>
           } />

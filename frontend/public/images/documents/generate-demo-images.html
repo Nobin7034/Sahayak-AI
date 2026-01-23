@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Document Images</title>
+    <style>
+        .demo-doc {
+            width: 300px;
+            height: 200px;
+            border: 2px solid #333;
+            margin: 10px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .doc-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .doc-subtitle {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .doc-content {
+            font-size: 10px;
+            color: #888;
+            line-height: 1.4;
+        }
+        .aadhaar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .passport { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .voter-id { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+        .driving-license { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; }
+        .electricity-bill { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; }
+        .bank-statement { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
+        .birth-certificate { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #333; }
+        .school-certificate { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Demo Document Images for Sahayak AI</h1>
+    <p>These are placeholder demo images for document validation workflow.</p>
+    
+    <!-- Identity Documents -->
+    <div class="demo-doc aadhaar">
+        <div class="doc-title">AADHAAR CARD</div>
+        <div class="doc-subtitle">Government of India</div>
+        <div class="doc-content">
+            XXXX XXXX XXXX<br>
+            Name: [Your Name]<br>
+            DOB: DD/MM/YYYY<br>
+            Address: [Your Address]
+        </div>
+    </div>
+    
+    <div class="demo-doc passport">
+        <div class="doc-title">PASSPORT</div>
+        <div class="doc-subtitle">Republic of India</div>
+        <div class="doc-content">
+            Passport No: XXXXXXXX<br>
+            Name: [Your Name]<br>
+            DOB: DD/MM/YYYY<br>
+            Place of Birth: [City]
+        </div>
+    </div>
+    
+    <div class="demo-doc voter-id">
+        <div class="doc-title">VOTER ID CARD</div>
+        <div class="doc-subtitle">Election Commission of India</div>
+        <div class="doc-content">
+            EPIC No: XXXXXXXXXX<br>
+            Name: [Your Name]<br>
+            Father's Name: [Father's Name]<br>
+            Address: [Your Address]
+        </div>
+    </div>
+    
+    <div class="demo-doc driving-license">
+        <div class="doc-title">DRIVING LICENSE</div>
+        <div class="doc-subtitle">Transport Department</div>
+        <div class="doc-content">
+            DL No: XXXXXXXXXXXXXX<br>
+            Name: [Your Name]<br>
+            DOB: DD/MM/YYYY<br>
+            Valid Till: DD/MM/YYYY
+        </div>
+    </div>
+    
+    <!-- Address Documents -->
+    <div class="demo-doc electricity-bill">
+        <div class="doc-title">ELECTRICITY BILL</div>
+        <div class="doc-subtitle">State Electricity Board</div>
+        <div class="doc-content">
+            Consumer No: XXXXXXXXXX<br>
+            Name: [Your Name]<br>
+            Address: [Your Address]<br>
+            Bill Date: DD/MM/YYYY
+        </div>
+    </div>
+    
+    <div class="demo-doc bank-statement">
+        <div class="doc-title">BANK STATEMENT</div>
+        <div class="doc-subtitle">[Bank Name]</div>
+        <div class="doc-content">
+            Account No: XXXXXXXXXX<br>
+            Name: [Your Name]<br>
+            Address: [Your Address]<br>
+            Statement Period: MM/YYYY
+        </div>
+    </div>
+    
+    <!-- Birth/DOB Documents -->
+    <div class="demo-doc birth-certificate">
+        <div class="doc-title">BIRTH CERTIFICATE</div>
+        <div class="doc-subtitle">Municipal Corporation</div>
+        <div class="doc-content">
+            Registration No: XXXXXXXX<br>
+            Name: [Your Name]<br>
+            DOB: DD/MM/YYYY<br>
+            Place of Birth: [City]
+        </div>
+    </div>
+    
+    <div class="demo-doc school-certificate">
+        <div class="doc-title">SCHOOL CERTIFICATE</div>
+        <div class="doc-subtitle">Board of Secondary Education</div>
+        <div class="doc-content">
+            Roll No: XXXXXXXX<br>
+            Name: [Your Name]<br>
+            DOB: DD/MM/YYYY<br>
+            Year of Passing: YYYY
+        </div>
+    </div>
+    
+    <script>
+        // Instructions for creating actual image files
+        console.log("To create actual image files:");
+        console.log("1. Take screenshots of each demo document");
+        console.log("2. Save them as JPG files with appropriate names");
+        console.log("3. Place them in the /public/images/documents/ directory");
+    </script>
+</body>
+</html>

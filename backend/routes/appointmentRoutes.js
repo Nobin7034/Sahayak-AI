@@ -4,6 +4,7 @@ import Service from '../models/Service.js';
 import AkshayaCenter from '../models/AkshayaCenter.js';
 import Staff from '../models/Staff.js';
 import Notification from '../models/Notification.js';
+import DocumentRequirement from '../models/DocumentRequirement.js';
 import { userAuth } from '../middleware/auth.js';
 import Holiday from '../models/Holiday.js';
 
@@ -55,7 +56,7 @@ router.get('/', async (req, res) => {
 // Create new appointment
 router.post('/', async (req, res) => {
   try {
-    const { service, center, appointmentDate, timeSlot, notes, paymentId } = req.body;
+    const { service, center, appointmentDate, timeSlot, notes, paymentId, selectedDocuments } = req.body;
 
     // Verify service exists and is active
     const serviceDoc = await Service.findById(service);
@@ -64,6 +65,21 @@ router.post('/', async (req, res) => {
         success: false,
         message: 'Service not found or inactive'
       });
+    }
+
+    // Validate document selection if provided
+    if (selectedDocuments && selectedDocuments.length > 0) {
+      const requirements = await DocumentRequirement.findOne({ service });
+      if (requirements) {
+        const validation = validateDocumentSelection(requirements, selectedDocuments);
+        if (!validation.canProceed) {
+          return res.status(400).json({
+            success: false,
+            message: 'Document requirements not met',
+            data: validation
+          });
+        }
+      }
     }
 
     // Verify center exists and is active
@@ -189,6 +205,8 @@ router.post('/', async (req, res) => {
       notes,
       // Auto-approve when slot free
       status: 'confirmed',
+      // Store selected documents
+      selectedDocuments: selectedDocuments || [],
       // Set payment info if provided
       ...(paymentId && {
         payment: {
@@ -668,3 +686,35 @@ router.get('/slots/:serviceId/:date', async (req, res) => {
 });
 
 export default router;
+
+// Helper function to validate document selection
+function validateDocumentSelection(requirements, selectedDocuments) {
+  const { documents, minimumRequired, validationRules } = requirements;
+  
+  // Count selected documents
+  const selectedCount = selectedDocuments.length;
+  
+  // Check if minimum requirement is met
+  const meetsMinimum = selectedCount >= minimumRequired;
+  
+  // Validate mandatory documents
+  const mandatoryDocs = documents.filter(doc => doc.isMandatory);
+  const selectedMandatoryCount = selectedDocuments.filter(selected => {
+    const doc = documents.find(d => d._id.toString() === selected.documentId);
+    return doc && doc.isMandatory;
+  }).length;
+  
+  const mandatoryRequirementMet = selectedMandatoryCount >= (validationRules?.mandatoryCount || mandatoryDocs.length);
+  
+  // Overall validation result
+  const isValid = meetsMinimum && mandatoryRequirementMet;
+  
+  return {
+    isValid,
+    selectedCount,
+    minimumRequired,
+    meetsMinimum,
+    mandatoryRequirementMet,
+    canProceed: isValid
+  };
+}

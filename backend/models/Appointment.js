@@ -88,6 +88,34 @@ const appointmentSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  // Documents selected by user during booking
+  selectedDocuments: [{
+    documentId: String, // Reference to document in DocumentRequirement
+    documentName: String,
+    isAlternative: {
+      type: Boolean,
+      default: false
+    },
+    alternativeName: String, // If alternative document was selected
+    selectedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  // Document validation status
+  documentValidation: {
+    isValidated: {
+      type: Boolean,
+      default: false
+    },
+    validatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    validatedAt: Date,
+    missingDocuments: [String],
+    staffNotes: String
+  },
   // Result documents uploaded by staff
   resultDocuments: [{
     name: String,
