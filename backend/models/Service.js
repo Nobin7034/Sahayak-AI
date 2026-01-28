@@ -50,6 +50,15 @@ const serviceSchema = new mongoose.Schema({
       imageUrl: { type: String }
     }]
   }],
+  // Minimum required documents configuration
+  minimumRequiredDocuments: {
+    type: Number,
+    default: function() {
+      // Default to total documents - 1, but at least 1
+      const totalDocs = (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
+      return Math.max(1, totalDocs - 1);
+    }
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -76,6 +85,15 @@ const serviceSchema = new mongoose.Schema({
 // Update the updatedAt field before saving
 serviceSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
+  
+  // Auto-set minimum required documents if not explicitly set
+  if (this.isNew || this.isModified('documents') || this.isModified('requiredDocuments')) {
+    const totalDocs = (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
+    if (this.minimumRequiredDocuments === undefined || this.minimumRequiredDocuments === null) {
+      this.minimumRequiredDocuments = Math.max(1, totalDocs - 1);
+    }
+  }
+  
   next();
 });
 

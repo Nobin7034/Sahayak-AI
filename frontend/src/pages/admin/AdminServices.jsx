@@ -20,6 +20,7 @@ const AdminServices = () => {
     preCheckRules: '',
     requiredDocuments: '',
     documents: [], // [{ name, imageUrl, templateId, notes }]
+    minimumRequiredDocuments: '', // New field for configurable minimum
     isActive: true
   })
 
@@ -73,6 +74,7 @@ const AdminServices = () => {
         ...formData,
         fee: parseFloat(formData.fee),
         serviceCharge: parseFloat(formData.serviceCharge || '0'),
+        minimumRequiredDocuments: parseInt(formData.minimumRequiredDocuments) || undefined,
         // Normalize preCheckRules from textarea (newline separated) to array
         preCheckRules: (formData.preCheckRules || '')
           .split('\n')
@@ -115,6 +117,9 @@ const AdminServices = () => {
 
   const handleEdit = (service) => {
     setEditingService(service)
+    const totalDocs = (service.documents?.length || 0) + (service.requiredDocuments?.length || 0)
+    const defaultMinimum = Math.max(1, totalDocs - 1)
+    
     setFormData({
       name: service.name,
       description: service.description,
@@ -124,6 +129,7 @@ const AdminServices = () => {
       processingTime: service.processingTime,
       preCheckRules: (service.preCheckRules || []).join('\n'),
       requiredDocuments: (service.requiredDocuments || []).join(', '),
+      minimumRequiredDocuments: (service.minimumRequiredDocuments ?? defaultMinimum).toString(),
       documents: (service.documents || []).map(d => ({
         name: d.name,
         requirement: d.requirement || 'mandatory',
@@ -165,6 +171,7 @@ const AdminServices = () => {
       processingTime: '',
       preCheckRules: '',
       requiredDocuments: '',
+      minimumRequiredDocuments: '',
       isActive: true
     })
     setEditingService(null)
@@ -313,6 +320,9 @@ const AdminServices = () => {
               </p>
               <p className="text-sm text-gray-600 mt-1">
                 <span className="font-medium">Visits:</span> {service.visitCount}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">
+                <span className="font-medium">Documents:</span> {service.minimumRequiredDocuments || 'Auto'} required out of {(service.documents?.length || 0) + (service.requiredDocuments?.length || 0)} total
               </p>
             </div>
 
@@ -490,6 +500,57 @@ const AdminServices = () => {
                   <div className="flex items-center justify-between mb-3">
                     <label className="block text-sm font-medium text-gray-700">Documents with sample images</label>
                     <button type="button" className="btn-secondary text-sm" onClick={addEmptyDocument}>Add Document</button>
+                  </div>
+
+                  {/* Minimum Required Documents Configuration */}
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                      <div>
+                        <label className="block text-sm font-medium text-blue-800 mb-1">
+                          Total Documents Available
+                        </label>
+                        <div className="px-3 py-2 bg-blue-100 border border-blue-300 rounded text-blue-900 font-medium">
+                          {(formData.documents?.length || 0) + (formData.requiredDocuments ? formData.requiredDocuments.split(',').filter(d => d.trim()).length : 0)}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-blue-800 mb-1">
+                          Minimum Required Documents *
+                        </label>
+                        <input
+                          type="number"
+                          name="minimumRequiredDocuments"
+                          value={formData.minimumRequiredDocuments}
+                          onChange={(e) => {
+                            const totalDocs = (formData.documents?.length || 0) + (formData.requiredDocuments ? formData.requiredDocuments.split(',').filter(d => d.trim()).length : 0);
+                            const value = Math.min(Math.max(1, parseInt(e.target.value) || 1), totalDocs);
+                            setFormData(prev => ({ ...prev, minimumRequiredDocuments: value.toString() }));
+                          }}
+                          min="1"
+                          max={(formData.documents?.length || 0) + (formData.requiredDocuments ? formData.requiredDocuments.split(',').filter(d => d.trim()).length : 0)}
+                          className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Auto-calculated"
+                        />
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const totalDocs = (formData.documents?.length || 0) + (formData.requiredDocuments ? formData.requiredDocuments.split(',').filter(d => d.trim()).length : 0);
+                            const defaultValue = Math.max(1, totalDocs - 1);
+                            setFormData(prev => ({ ...prev, minimumRequiredDocuments: defaultValue.toString() }));
+                          }}
+                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                        >
+                          Set Default (Total - 1)
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-blue-700">
+                      <strong>Rule:</strong> Users must select at least this many documents to proceed. 
+                      Default is total documents minus 1 (e.g., 4 out of 5). 
+                      This setting applies immediately to all users.
+                    </div>
                   </div>
 
                   {(formData.documents || []).length === 0 && (

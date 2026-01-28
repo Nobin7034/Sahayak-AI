@@ -183,7 +183,7 @@ const ServiceApplication = () => {
 
   const fetchDocumentRequirements = async () => {
     try {
-      const response = await axios.get(`/api/documents/service/${id}`);
+      const response = await axios.get(`/api/services/${id}/documents`);
       if (response.data.success) {
         setDocumentRequirements(response.data.data);
       }
@@ -291,7 +291,7 @@ const ServiceApplication = () => {
               </div>
               <div className="text-right">
                 <div className="text-lg font-semibold text-green-600">
-                  {service.fees === 0 ? 'Free' : `₹${service.fees}`}
+                  {service.fee === 0 ? 'Free' : `₹${service.fee}`}
                 </div>
                 <div className="text-sm text-gray-500">{service.processingTime}</div>
               </div>

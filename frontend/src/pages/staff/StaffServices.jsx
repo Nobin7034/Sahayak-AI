@@ -376,7 +376,7 @@ const StaffServices = () => {
                 <div className={`space-y-2 text-sm ${currentTheme.text.secondary} mb-4`}>
                   <div className="flex items-center">
                     <IndianRupee className="h-4 w-4 mr-2" />
-                    <span>₹{service.fees}</span>
+                    <span>₹{service.fee}</span>
                   </div>
                   <div className="flex items-center">
                     <Clock className="h-4 w-4 mr-2" />
@@ -569,7 +569,7 @@ const StaffServices = () => {
                   />
                 </div>
                 <p className={`text-xs ${currentTheme.text.tertiary} mt-1`}>
-                  Default: ₹{selectedService.fees}
+                  Default: ₹{selectedService.fee}
                 </p>
               </div>
 

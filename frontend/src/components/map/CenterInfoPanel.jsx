@@ -273,7 +273,7 @@ const CenterInfoPanel = ({
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-green-600">
-                          {service.fees === 0 || service.fees === undefined ? 'Free' : `₹${service.fees}`}
+                          {service.fee === 0 || service.fee === undefined ? 'Free' : `₹${service.fee}`}
                         </p>
                         <p className="text-xs text-gray-500">{service.processingTime}</p>
                       </div>
@@ -475,7 +475,7 @@ const CenterInfoPanel = ({
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-green-600">
-                      {selectedService.fees === 0 ? 'Free' : `₹${selectedService.fees}`}
+                      {selectedService.fee === 0 ? 'Free' : `₹${selectedService.fee}`}
                     </p>
                     <p className="text-xs text-gray-500">{selectedService.processingTime}</p>
                   </div>
@@ -498,7 +498,7 @@ const CenterInfoPanel = ({
                           <p className="text-xs text-gray-600 mt-1">{service.category}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-medium text-green-600">₹{service.fees}</p>
+                          <p className="text-sm font-medium text-green-600">₹{service.fee}</p>
                           <p className="text-xs text-gray-500">{service.processingTime}</p>
                         </div>
                       </div>

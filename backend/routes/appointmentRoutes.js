@@ -4,7 +4,6 @@ import Service from '../models/Service.js';
 import AkshayaCenter from '../models/AkshayaCenter.js';
 import Staff from '../models/Staff.js';
 import Notification from '../models/Notification.js';
-import DocumentRequirement from '../models/DocumentRequirement.js';
 import { userAuth } from '../middleware/auth.js';
 import Holiday from '../models/Holiday.js';
 
@@ -56,35 +55,45 @@ router.get('/', async (req, res) => {
 // Create new appointment
 router.post('/', async (req, res) => {
   try {
+    console.log('Appointment creation request:', req.body);
     const { service, center, appointmentDate, timeSlot, notes, paymentId, selectedDocuments } = req.body;
 
     // Verify service exists and is active
     const serviceDoc = await Service.findById(service);
     if (!serviceDoc || !serviceDoc.isActive) {
+      console.log('Service validation failed:', { service, found: !!serviceDoc, active: serviceDoc?.isActive });
       return res.status(404).json({
         success: false,
         message: 'Service not found or inactive'
       });
     }
 
-    // Validate document selection if provided
+    // Validate document selection if provided and service has document requirements
+    // Temporarily disabled for debugging
+    /*
     if (selectedDocuments && selectedDocuments.length > 0) {
-      const requirements = await DocumentRequirement.findOne({ service });
-      if (requirements) {
-        const validation = validateDocumentSelection(requirements, selectedDocuments);
-        if (!validation.canProceed) {
-          return res.status(400).json({
-            success: false,
-            message: 'Document requirements not met',
-            data: validation
-          });
-        }
+      // Use the new minimum documents validation from Service model
+      const totalDocs = (serviceDoc.documents?.length || 0) + (serviceDoc.requiredDocuments?.length || 0);
+      const minimumRequired = serviceDoc.minimumRequiredDocuments ?? Math.max(1, totalDocs - 1);
+      
+      if (totalDocs > 0 && selectedDocuments.length < minimumRequired) {
+        console.log('Document validation failed:', { 
+          selectedCount: selectedDocuments.length, 
+          minimumRequired, 
+          totalDocs 
+        });
+        return res.status(400).json({
+          success: false,
+          message: `Please select at least ${minimumRequired} documents to proceed. You have selected ${selectedDocuments.length}.`
+        });
       }
     }
+    */
 
     // Verify center exists and is active
     const centerDoc = await AkshayaCenter.findById(center);
     if (!centerDoc || centerDoc.status !== 'active') {
+      console.log('Center validation failed:', { center, found: !!centerDoc, status: centerDoc?.status });
       return res.status(404).json({
         success: false,
         message: 'Center not found or inactive'
@@ -93,6 +102,7 @@ router.post('/', async (req, res) => {
 
     // Verify center offers the selected service
     if (!centerDoc.services.includes(service)) {
+      console.log('Service not available at center:', { center, service, availableServices: centerDoc.services });
       return res.status(400).json({
         success: false,
         message: 'Selected service is not available at this center'
@@ -103,12 +113,15 @@ router.post('/', async (req, res) => {
     const appointmentDateTime = new Date(appointmentDate);
     const now = new Date();
     
+    console.log('Date validation:', { appointmentDate, appointmentDateTime, now });
+    
     // Check advance booking rules (3 days in advance maximum)
     const maxAdvanceDate = new Date();
     maxAdvanceDate.setDate(maxAdvanceDate.getDate() + 3);
     maxAdvanceDate.setHours(23, 59, 59, 999);
     
     if (appointmentDateTime > maxAdvanceDate) {
+      console.log('Advance booking validation failed:', { appointmentDateTime, maxAdvanceDate });
       return res.status(400).json({
         success: false,
         message: 'Appointments can only be booked up to 3 days in advance'
@@ -149,7 +162,10 @@ router.post('/', async (req, res) => {
       timeSlotIn24 = 0;
     }
     
+    console.log('Time slot validation:', { timeSlot, timeSlotHour, timeSlotPeriod, timeSlotIn24 });
+    
     if (timeSlotIn24 < 9 || timeSlotIn24 >= 17) {
+      console.log('Time slot validation failed:', { timeSlotIn24 });
       return res.status(400).json({
         success: false,
         message: 'Appointments can only be booked between 9:00 AM and 5:00 PM'
@@ -686,35 +702,3 @@ router.get('/slots/:serviceId/:date', async (req, res) => {
 });
 
 export default router;
-
-// Helper function to validate document selection
-function validateDocumentSelection(requirements, selectedDocuments) {
-  const { documents, minimumRequired, validationRules } = requirements;
-  
-  // Count selected documents
-  const selectedCount = selectedDocuments.length;
-  
-  // Check if minimum requirement is met
-  const meetsMinimum = selectedCount >= minimumRequired;
-  
-  // Validate mandatory documents
-  const mandatoryDocs = documents.filter(doc => doc.isMandatory);
-  const selectedMandatoryCount = selectedDocuments.filter(selected => {
-    const doc = documents.find(d => d._id.toString() === selected.documentId);
-    return doc && doc.isMandatory;
-  }).length;
-  
-  const mandatoryRequirementMet = selectedMandatoryCount >= (validationRules?.mandatoryCount || mandatoryDocs.length);
-  
-  // Overall validation result
-  const isValid = meetsMinimum && mandatoryRequirementMet;
-  
-  return {
-    isValid,
-    selectedCount,
-    minimumRequired,
-    meetsMinimum,
-    mandatoryRequirementMet,
-    canProceed: isValid
-  };
-}

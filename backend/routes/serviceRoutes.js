@@ -118,4 +118,53 @@ router.get('/search/:query', async (req, res) => {
   }
 });
 
+// Get document requirements for a service
+router.get('/:id/documents', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const service = await Service.findById(id)
+      .populate('documents.template')
+      .populate('documents.alternatives.template');
+      
+    if (!service || !service.isActive) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+
+    // Calculate total documents
+    const totalDocuments = (service.documents?.length || 0) + (service.requiredDocuments?.length || 0);
+    const minimumRequired = service.minimumRequiredDocuments ?? Math.max(1, totalDocuments - 1);
+
+    // Prepare document requirements response
+    const documentRequirements = {
+      serviceId: service._id,
+      serviceName: service.name,
+      totalDocuments,
+      minimumRequired,
+      documents: service.documents || [],
+      legacyDocuments: service.requiredDocuments || [],
+      instructions: `Please select at least ${minimumRequired} documents from the ${totalDocuments} available options to proceed with your application.`,
+      validationRules: {
+        totalRequired: totalDocuments,
+        minimumThreshold: minimumRequired
+      }
+    };
+
+    res.json({
+      success: true,
+      data: documentRequirements
+    });
+  } catch (error) {
+    console.error('Get document requirements error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch document requirements',
+      error: error.message
+    });
+  }
+});
+
 export default router;

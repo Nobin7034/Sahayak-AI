@@ -893,9 +893,9 @@ router.get('/appointments/stats/summary', staffAuth, centerAccess, requirePermis
 router.post('/appointments/:id/comments', staffAuth, centerAccess, requirePermission('add_comments'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, isVisible = true } = req.body;
+    const { comment, isVisible = true } = req.body;
 
-    if (!content || content.trim().length === 0) {
+    if (!comment || comment.trim().length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Comment content is required'
@@ -905,16 +905,16 @@ router.post('/appointments/:id/comments', staffAuth, centerAccess, requirePermis
     // Import Appointment model dynamically
     const { default: Appointment } = await import('../models/Appointment.js');
 
-    // Find appointment
+    // Find appointment - ensure it belongs to staff's center
     const appointment = await Appointment.findOne({
       _id: id,
-      ...req.centerFilter
+      center: req.staff.centerId
     });
 
     if (!appointment) {
       return res.status(404).json({
         success: false,
-        message: 'Appointment not found'
+        message: 'Appointment not found or not accessible from your center'
       });
     }
 
@@ -923,24 +923,21 @@ router.post('/appointments/:id/comments', staffAuth, centerAccess, requirePermis
       appointment.comments = [];
     }
 
-    const comment = {
+    const newComment = {
       author: req.user.userId,
       authorType: 'staff',
-      content: content.trim(),
+      content: comment.trim(),
       isVisible: Boolean(isVisible),
       createdAt: new Date()
     };
 
-    appointment.comments.push(comment);
+    appointment.comments.push(newComment);
     await appointment.save();
-
-    // TODO: Send notification to user if comment is visible
-    // This would be implemented in the notification system
 
     res.json({
       success: true,
       message: 'Comment added successfully',
-      data: comment
+      data: newComment
     });
 
   } catch (error) {
@@ -1819,29 +1816,28 @@ router.get('/center-profile', staffAuth, centerAccess, async (req, res) => {
   }
 });
 
-export default router;
-
-// Add comment to appointment
-router.post('/appointments/:id/comments', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
+// Recommend documents to user
+router.post('/appointments/:id/recommend-documents', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { comment } = req.body;
+    const { recommendedDocuments, note } = req.body;
 
-    if (!comment || comment.trim().length === 0) {
+    if (!recommendedDocuments || !Array.isArray(recommendedDocuments) || recommendedDocuments.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Comment content is required'
+        message: 'Recommended documents array is required'
       });
     }
 
-    // Import Appointment model dynamically
+    // Import models dynamically
     const { default: Appointment } = await import('../models/Appointment.js');
+    const { default: Notification } = await import('../models/Notification.js');
 
-    // Find appointment - ensure it belongs to staff's center
+    // Find appointment
     const appointment = await Appointment.findOne({
       _id: id,
       center: req.staff.centerId
-    });
+    }).populate('user', 'name email').populate('service', 'name');
 
     if (!appointment) {
       return res.status(404).json({
@@ -1850,37 +1846,75 @@ router.post('/appointments/:id/comments', staffAuth, centerAccess, requirePermis
       });
     }
 
-    // Add comment
+    // Build recommendation message
+    let recommendationText = `Document recommendations for your ${appointment.service.name} appointment:\n\n`;
+    
+    recommendedDocuments.forEach((doc, index) => {
+      recommendationText += `${index + 1}. ${doc}\n`;
+    });
+
+    if (note && note.trim()) {
+      recommendationText += `\nNote from staff: ${note.trim()}`;
+    }
+
+    recommendationText += '\n\nPlease bring these documents to your appointment for smooth processing.';
+
+    // Create notification for user
+    await Notification.create({
+      user: appointment.user._id,
+      type: 'document_recommendation',
+      title: 'Document Recommendations for Your Appointment',
+      message: recommendationText,
+      meta: {
+        appointmentId: appointment._id,
+        serviceId: appointment.service._id,
+        centerId: appointment.center,
+        recommendedDocuments,
+        note: note || '',
+        recommendedBy: req.user.name,
+        appointmentDate: appointment.appointmentDate,
+        timeSlot: appointment.timeSlot
+      },
+      priority: 'medium'
+    });
+
+    // Add comment to appointment for record keeping
     if (!appointment.comments) {
       appointment.comments = [];
     }
 
-    const newComment = {
+    appointment.comments.push({
       author: req.user.userId,
       authorType: 'staff',
-      content: comment.trim(),
+      content: `Recommended documents to user: ${recommendedDocuments.join(', ')}${note ? `\nNote: ${note}` : ''}`,
       isVisible: true,
       createdAt: new Date()
-    };
+    });
 
-    appointment.comments.push(newComment);
     await appointment.save();
 
     res.json({
       success: true,
-      message: 'Comment added successfully',
-      data: newComment
+      message: 'Document recommendations sent to user successfully',
+      data: {
+        recommendationsSent: recommendedDocuments.length,
+        notificationSent: true,
+        recommendedDocuments,
+        note
+      }
     });
 
   } catch (error) {
-    console.error('Add comment error:', error);
+    console.error('Recommend documents error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to add comment',
+      message: 'Failed to send document recommendations',
       error: error.message
     });
   }
 });
+
+export default router;
 
 // Recommend alternative documents to user
 router.post('/appointments/:id/recommend-alternatives', staffAuth, centerAccess, requirePermission('manage_appointments'), async (req, res) => {

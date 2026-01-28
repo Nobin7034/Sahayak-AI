@@ -38,9 +38,6 @@ const StaffAppointments = () => {
   });
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showCommentModal, setShowCommentModal] = useState(false);
-  const [newComment, setNewComment] = useState('');
   const [statusUpdate, setStatusUpdate] = useState({
     status: '',
     reason: '',
@@ -117,42 +114,14 @@ const StaffAppointments = () => {
   };
 
   const handleViewDetails = (appointment) => {
-    setSelectedAppointment(appointment);
-    setShowDetailsModal(true);
+    navigate(`/staff/appointments/${appointment._id}`);
   };
 
   const handleAddComment = (appointment) => {
-    setSelectedAppointment(appointment);
-    setNewComment('');
-    setShowCommentModal(true);
+    navigate(`/staff/appointments/${appointment._id}`);
   };
 
-  const handleSubmitComment = async () => {
-    if (!newComment.trim()) return;
 
-    try {
-      const response = await axios.post(
-        `/api/staff/appointments/${selectedAppointment._id}/comments`,
-        { comment: newComment },
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
-
-      if (response.data.success) {
-        // Refresh appointments list
-        loadAppointments();
-        setShowCommentModal(false);
-        setSelectedAppointment(null);
-        setNewComment('');
-      }
-    } catch (error) {
-      console.error('Comment submission error:', error);
-      setError('Failed to add comment');
-    }
-  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -343,7 +312,7 @@ const StaffAppointments = () => {
                       Status
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Action
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -387,14 +356,14 @@ const StaffAppointments = () => {
                         </span>
                       </td>
 
-                      {/* Action */}
+                      {/* Actions */}
                       <td className="px-6 py-4 whitespace-nowrap text-center">
                         <button
-                          onClick={() => navigate(`/staff/appointments/${appointment._id}`)}
-                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                          onClick={() => handleViewDetails(appointment)}
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
                           <Eye className="h-4 w-4 mr-2" />
-                          Manage
+                          View Details
                         </button>
                       </td>
                     </tr>
@@ -524,184 +493,6 @@ const StaffAppointments = () => {
         </div>
       )}
 
-      {/* Details Modal */}
-      {showDetailsModal && selectedAppointment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Appointment Details</h2>
-            </div>
-            
-            <div className="px-6 py-4 space-y-6">
-              {/* User Information */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                  <User className="w-4 h-4 mr-2" />
-                  User Information
-                </h3>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Name</p>
-                      <p className="font-medium text-gray-900">{selectedAppointment.user?.name || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Email</p>
-                      <p className="text-gray-900">{selectedAppointment.user?.email || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Phone</p>
-                      <p className="text-gray-900">{selectedAppointment.user?.phone || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">User ID</p>
-                      <p className="font-mono text-sm text-gray-700">{selectedAppointment.user?._id || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Appointment Information */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Appointment Information
-                </h3>
-                <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Service</p>
-                      <p className="font-medium text-gray-900">{selectedAppointment.service?.name || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Status</p>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(selectedAppointment.status)}`}>
-                        {selectedAppointment.status.replace('_', ' ').toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Date</p>
-                      <p className="text-gray-900">{formatDate(selectedAppointment.appointmentDate)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Time</p>
-                      <p className="text-gray-900">{formatTime(selectedAppointment.timeSlot)}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Appointment ID</p>
-                    <p className="font-mono text-sm text-gray-700">{selectedAppointment._id}</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Additional Details */}
-              {selectedAppointment.notes && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">Notes</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-gray-900">{selectedAppointment.notes}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
-              <div className="flex space-x-3">
-                {getStatusActions(selectedAppointment).map((action) => {
-                  const Icon = action.icon;
-                  const buttonClasses = {
-                    green: 'bg-green-600 hover:bg-green-700',
-                    red: 'bg-red-600 hover:bg-red-700',
-                    purple: 'bg-purple-600 hover:bg-purple-700',
-                    blue: 'bg-blue-600 hover:bg-blue-700'
-                  };
-                  return (
-                    <button
-                      key={action.action}
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        setStatusUpdate({ status: action.action, reason: '', notes: '' });
-                        setShowStatusModal(true);
-                      }}
-                      className={`flex items-center px-4 py-2 text-white rounded-lg transition ${buttonClasses[action.color] || 'bg-gray-600 hover:bg-gray-700'}`}
-                    >
-                      <Icon className="w-4 h-4 mr-2" />
-                      {action.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Comment Modal */}
-      {showCommentModal && selectedAppointment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Add Comment
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600">
-                  <strong>User:</strong> {selectedAppointment.user?.name}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <strong>Service:</strong> {selectedAppointment.service?.name}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Comment
-                </label>
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md 
-                           focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Add your comment here..."
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end space-x-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowCommentModal(false);
-                  setSelectedAppointment(null);
-                  setNewComment('');
-                }}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitComment}
-                disabled={!newComment.trim()}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add Comment
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -38,7 +38,7 @@ const DocumentValidation = ({ serviceId, onValidationComplete, onBack }) => {
   const fetchDocumentRequirements = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/api/documents/service/${serviceId}`);
+      const response = await axios.get(`/api/services/${serviceId}/documents`);
       if (response.data.success) {
         setRequirements(response.data.data);
       } else {
@@ -46,124 +46,79 @@ const DocumentValidation = ({ serviceId, onValidationComplete, onBack }) => {
       }
     } catch (error) {
       console.error('Document requirements fetch error:', error);
-      // Fallback: create basic requirements from service data if available
-      setError('Document requirements not available. Please proceed to center selection.');
-      // Allow proceeding without document validation
-      setTimeout(() => {
-        onValidationComplete([], { canProceed: true, message: 'Proceeding without document validation' });
-      }, 2000);
+      // Fallback: try to get service data directly
+      try {
+        const serviceResponse = await axios.get(`/api/services/${serviceId}`);
+        if (serviceResponse.data.success) {
+          const service = serviceResponse.data.data;
+          const totalDocuments = (service.documents?.length || 0) + (service.requiredDocuments?.length || 0);
+          const minimumRequired = service.minimumRequiredDocuments ?? Math.max(1, totalDocuments - 1);
+          
+          setRequirements({
+            serviceId: service._id,
+            serviceName: service.name,
+            totalDocuments,
+            minimumRequired,
+            documents: service.documents || [],
+            legacyDocuments: service.requiredDocuments || [],
+            instructions: `Please select at least ${minimumRequired} documents from the ${totalDocuments} available options to proceed with your application.`,
+            validationRules: {
+              totalRequired: totalDocuments,
+              minimumThreshold: minimumRequired
+            }
+          });
+        } else {
+          setError('Document requirements not available. Please proceed to center selection.');
+          setTimeout(() => {
+            onValidationComplete([], { canProceed: true, message: 'Proceeding without document validation' });
+          }, 2000);
+        }
+      } catch (fallbackError) {
+        setError('Document requirements not available. Please proceed to center selection.');
+        setTimeout(() => {
+          onValidationComplete([], { canProceed: true, message: 'Proceeding without document validation' });
+        }, 2000);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const validateSelection = async () => {
+    if (!requirements) return;
+    
     try {
-      const response = await axios.get(`/api/documents/service/${serviceId}`);
-      if (response.data.success) {
-        const requirements = response.data.data;
-        
-        // Perform client-side validation with refined rules
-        const { documents, validationRules } = requirements;
-        const { totalRequired, minimumThreshold } = validationRules;
-        const selectedCount = selectedDocuments.length;
-        const meetsThreshold = selectedCount >= minimumThreshold;
-        
-        // Check category requirements
-        let categoryRequirementsMet = true;
-        const categoryValidation = {};
-        
-        if (validationRules.categoryRequirements) {
-          validationRules.categoryRequirements.forEach(catReq => {
-            const selectedInCategory = selectedDocuments.filter(selected => {
-              const doc = documents.find(d => d._id === selected.documentId);
-              return doc && doc.category === catReq.category;
-            }).length;
-            
-            categoryValidation[catReq.category] = {
-              required: catReq.minimumRequired,
-              selected: selectedInCategory,
-              met: selectedInCategory >= catReq.minimumRequired
-            };
-            
-            if (selectedInCategory < catReq.minimumRequired) {
-              categoryRequirementsMet = false;
-            }
-          });
-        }
-        
-        // Check priority requirements
-        let priorityRequirementsMet = true;
-        const priorityValidation = {};
-        
-        if (validationRules.priorityRequirements) {
-          validationRules.priorityRequirements.forEach(priReq => {
-            const selectedInPriority = selectedDocuments.filter(selected => {
-              const doc = documents.find(d => d._id === selected.documentId);
-              return doc && doc.priority === priReq.priority;
-            }).length;
-            
-            priorityValidation[priReq.priority] = {
-              required: priReq.minimumRequired,
-              selected: selectedInPriority,
-              met: selectedInPriority >= priReq.minimumRequired
-            };
-            
-            if (selectedInPriority < priReq.minimumRequired) {
-              priorityRequirementsMet = false;
-            }
-          });
-        }
-        
-        const isValid = meetsThreshold && categoryRequirementsMet && priorityRequirementsMet;
-        const completionPercentage = Math.round((selectedCount / totalRequired) * 100);
-        
-        // Generate user-friendly message
-        let message = '';
-        if (isValid) {
-          message = `Great! You have selected ${selectedCount} documents which meets the minimum requirement. You can proceed to center selection.`;
-        } else {
-          const issues = [];
-          if (!meetsThreshold) {
-            issues.push(`You need at least ${minimumThreshold} documents (currently have ${selectedCount})`);
-          }
-          
-          Object.entries(categoryValidation).forEach(([category, validation]) => {
-            if (!validation.met) {
-              const needed = validation.required - validation.selected;
-              issues.push(`Need ${needed} more ${category} document(s)`);
-            }
-          });
-          
-          Object.entries(priorityValidation).forEach(([priority, validation]) => {
-            if (!validation.met) {
-              const needed = validation.required - validation.selected;
-              const priorityName = priority === '1' ? 'high priority' : priority === '2' ? 'medium priority' : 'low priority';
-              issues.push(`Need ${needed} more ${priorityName} document(s)`);
-            }
-          });
-          
-          message = `Please select additional documents: ${issues.join(', ')}.`;
-        }
-        
-        setValidation({
-          isValid,
-          selectedCount,
-          totalRequired,
-          minimumThreshold,
-          meetsThreshold,
-          categoryValidation,
-          priorityValidation,
-          categoryRequirementsMet,
-          priorityRequirementsMet,
-          canProceed: isValid,
-          message,
-          completionPercentage
-        });
+      // Use the simplified validation logic based on minimum required documents
+      const { validationRules } = requirements;
+      const { totalRequired, minimumThreshold } = validationRules;
+      const selectedCount = selectedDocuments.length;
+      const meetsThreshold = selectedCount >= minimumThreshold;
+      
+      const isValid = meetsThreshold;
+      const completionPercentage = Math.round((selectedCount / totalRequired) * 100);
+      
+      // Generate user-friendly message
+      let message = '';
+      if (isValid) {
+        message = `Great! You have selected ${selectedCount} documents which meets the minimum requirement of ${minimumThreshold}. You can proceed to center selection.`;
+      } else {
+        const needed = minimumThreshold - selectedCount;
+        message = `Please select ${needed} more document${needed > 1 ? 's' : ''} to meet the minimum requirement of ${minimumThreshold} documents.`;
       }
+      
+      setValidation({
+        isValid,
+        selectedCount,
+        totalRequired,
+        minimumThreshold,
+        meetsThreshold,
+        canProceed: isValid,
+        message,
+        completionPercentage
+      });
     } catch (error) {
       console.error('Document validation error:', error);
-      // Fallback validation for when API is not available
+      // Fallback validation
       if (requirements && selectedDocuments.length >= 0) {
         const meetsThreshold = selectedDocuments.length >= requirements.validationRules.minimumThreshold;
         setValidation({
@@ -261,7 +216,7 @@ const DocumentValidation = ({ serviceId, onValidationComplete, onBack }) => {
     );
   }
 
-  const { documents, validationRules, instructions } = requirements;
+  const { validationRules, instructions } = requirements;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -311,7 +266,8 @@ const DocumentValidation = ({ serviceId, onValidationComplete, onBack }) => {
 
       {/* Document List */}
       <div className="space-y-4 mb-8">
-        {documents.map((document, index) => (
+        {/* Render new structured documents */}
+        {requirements.documents && requirements.documents.map((document, index) => (
           <EnhancedDocumentCard
             key={document._id || index}
             document={document}
@@ -319,6 +275,35 @@ const DocumentValidation = ({ serviceId, onValidationComplete, onBack }) => {
             onToggle={handleDocumentToggle}
             onPreview={handlePreview}
           />
+        ))}
+        
+        {/* Render legacy documents if no structured documents exist */}
+        {(!requirements.documents || requirements.documents.length === 0) && requirements.legacyDocuments && requirements.legacyDocuments.map((docName, index) => (
+          <div key={`legacy-${index}`} className="border rounded-lg p-4 hover:border-gray-300">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <button
+                    onClick={() => handleDocumentToggle({ _id: `legacy-${index}`, name: docName })}
+                    className={`flex items-center justify-center w-5 h-5 rounded border-2 ${
+                      isDocumentSelected(`legacy-${index}`) 
+                        ? 'bg-blue-600 border-blue-600' 
+                        : 'border-gray-300 hover:border-blue-500'
+                    }`}
+                  >
+                    {isDocumentSelected(`legacy-${index}`) && <CheckCircle className="h-3 w-3 text-white" />}
+                  </button>
+                  
+                  <div className="flex-1">
+                    <h3 className="font-medium text-gray-900">{docName}</h3>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 mt-1">
+                      Required Document
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -354,23 +339,6 @@ const DocumentValidation = ({ serviceId, onValidationComplete, onBack }) => {
               </span>
             </div>
           </div>
-
-          {/* Category Requirements Status */}
-          {validation.categoryValidation && Object.keys(validation.categoryValidation).length > 0 && (
-            <div className="mt-3 p-3 bg-white border border-gray-200 rounded">
-              <p className="text-sm font-medium text-gray-800 mb-2">Category Requirements:</p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {Object.entries(validation.categoryValidation).map(([category, catValidation]) => (
-                  <div key={category} className="flex justify-between">
-                    <span className="capitalize">{category}:</span>
-                    <span className={catValidation.met ? 'text-green-600' : 'text-red-600'}>
-                      {catValidation.selected}/{catValidation.required} {catValidation.met ? '✓' : '✗'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 

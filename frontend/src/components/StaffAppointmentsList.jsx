@@ -201,7 +201,7 @@ const AppointmentCard = ({
                       <span className={currentTheme.text.secondary}>{appointment.service?.category}</span>
                     </div>
                     <div className={currentTheme.text.secondary}>
-                      Fee: ₹{appointment.service?.fees || 'N/A'}
+                      Fee: ₹{appointment.service?.fee || 'N/A'}
                     </div>
                   </div>
                 </div>

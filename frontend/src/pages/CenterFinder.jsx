@@ -36,7 +36,7 @@ const CenterFinder = () => {
 
   const loadServiceDetails = async () => {
     try {
-      const response = await axios.get(`/services/${serviceId}`);
+      const response = await axios.get(`/api/services/${serviceId}`);
       if (response.data.success) {
         setSelectedService(response.data.data);
       }
@@ -202,7 +202,7 @@ const CenterFinder = () => {
                     <div>
                       <h2 className="text-lg font-semibold text-blue-900">{selectedService.name}</h2>
                       <p className="text-sm text-blue-700">
-                        Select a center that offers this service • Fee: {selectedService.fees === 0 ? 'Free' : `₹${selectedService.fees}`}
+                        Select a center that offers this service • Fee: {selectedService.fee === 0 ? 'Free' : `₹${selectedService.fee}`}
                       </p>
                     </div>
                     <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
