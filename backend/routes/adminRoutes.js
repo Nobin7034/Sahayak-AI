@@ -8,7 +8,9 @@ import Service from '../models/Service.js';
 import News from '../models/News.js';
 import Appointment from '../models/Appointment.js';
 import DocumentTemplate from '../models/DocumentTemplate.js';
+import SystemSettings from '../models/SystemSettings.js';
 import { adminAuth } from '../middleware/auth.js';
+import { clearSettingsCache } from '../middleware/maintenanceMode.js';
 import Notification from '../models/Notification.js';
 import Holiday from '../models/Holiday.js';
 import paymentRoutes from './paymentRoutes.js';
@@ -43,7 +45,51 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
 
-// Apply admin authentication middleware to all routes
+// Public settings endpoint (no auth required)
+router.get('/settings/public', async (req, res) => {
+  try {
+    const settings = await SystemSettings.getSettings();
+    
+    // Only return public settings that are safe to expose
+    const publicSettings = {
+      siteName: settings.siteName,
+      siteDescription: settings.siteDescription,
+      contactEmail: settings.contactEmail,
+      contactPhone: settings.contactPhone,
+      officeHours: settings.officeHours,
+      address: settings.address,
+      maintenanceMode: settings.maintenanceMode,
+      maintenanceMessage: settings.maintenanceMessage,
+      allowUserRegistration: settings.allowUserRegistration,
+      allowGoogleSignIn: settings.allowGoogleSignIn,
+      welcomeMessage: settings.welcomeMessage,
+      footerText: settings.footerText,
+      workingHours: settings.workingHours,
+      workingDays: settings.workingDays,
+      appointmentAdvanceDays: settings.appointmentAdvanceDays,
+      enableCenterRatings: settings.enableCenterRatings,
+      enableAppointmentRescheduling: settings.enableAppointmentRescheduling,
+      enableDocumentUpload: settings.enableDocumentUpload,
+      enableChatSupport: settings.enableChatSupport,
+      privacyPolicyUrl: settings.privacyPolicyUrl,
+      termsOfServiceUrl: settings.termsOfServiceUrl
+    };
+    
+    res.json({
+      success: true,
+      data: publicSettings
+    });
+  } catch (error) {
+    console.error('Get public settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch public settings',
+      error: error.message
+    });
+  }
+});
+
+// Apply admin authentication middleware to all routes below this point
 router.use(adminAuth);
 
 // Document Template Management
@@ -133,6 +179,46 @@ router.get('/dashboard-stats', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard statistics',
+      error: error.message
+    });
+  }
+});
+
+// System Settings Management
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await SystemSettings.getSettings();
+    res.json({
+      success: true,
+      data: settings
+    });
+  } catch (error) {
+    console.error('Get settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch settings',
+      error: error.message
+    });
+  }
+});
+
+router.put('/settings', async (req, res) => {
+  try {
+    const settings = await SystemSettings.updateSettings(req.body, req.user.userId);
+    
+    // Clear the maintenance mode cache so changes take effect immediately
+    clearSettingsCache();
+    
+    res.json({
+      success: true,
+      message: 'Settings updated successfully',
+      data: settings
+    });
+  } catch (error) {
+    console.error('Update settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update settings',
       error: error.message
     });
   }

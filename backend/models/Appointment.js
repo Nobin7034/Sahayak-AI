@@ -116,6 +116,24 @@ const appointmentSchema = new mongoose.Schema({
     missingDocuments: [String],
     staffNotes: String
   },
+  // Staff document recommendations
+  staffDocumentRecommendations: [{
+    recommendedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    recommendedAt: {
+      type: Date,
+      default: Date.now
+    },
+    documents: [String],
+    note: String,
+    isAcknowledged: {
+      type: Boolean,
+      default: false
+    },
+    acknowledgedAt: Date
+  }],
   // Result documents uploaded by staff
   resultDocuments: [{
     name: String,

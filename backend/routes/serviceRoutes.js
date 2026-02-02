@@ -134,8 +134,8 @@ router.get('/:id/documents', async (req, res) => {
       });
     }
 
-    // Calculate total documents
-    const totalDocuments = (service.documents?.length || 0) + (service.requiredDocuments?.length || 0);
+    // Use configured total documents or calculate from actual documents
+    const totalDocuments = service.totalDocumentsAvailable || (service.documents?.length || 0) + (service.requiredDocuments?.length || 0);
     const minimumRequired = service.minimumRequiredDocuments ?? Math.max(1, totalDocuments - 1);
 
     // Prepare document requirements response

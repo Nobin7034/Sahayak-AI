@@ -18,7 +18,3 @@ holidaySchema.pre('save', function(next) {
 const Holiday = mongoose.model('Holiday', holidaySchema);
 
 export default Holiday;
-
-
-
-

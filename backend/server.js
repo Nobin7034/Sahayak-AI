@@ -43,6 +43,9 @@ import staffRoutes from './routes/staffRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 
+// Import Middleware
+import maintenanceMode from './middleware/maintenanceMode.js';
+
 // Base route (dev info). In production we serve the frontend build instead.
 app.get('/', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
@@ -66,6 +69,9 @@ app.get('/', (req, res) => {
     }
   });
 });
+
+// Apply maintenance mode middleware before routes
+app.use(maintenanceMode);
 
 // Use Routes
 app.use('/api/test', testRoutes);

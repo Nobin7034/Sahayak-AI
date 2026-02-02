@@ -7,14 +7,11 @@ import {
   FileText, 
   IndianRupee,
   Clock,
-  Users,
   AlertCircle,
   CheckCircle,
   RefreshCw,
   Eye,
-  EyeOff,
-  Trash2,
-  Filter
+  EyeOff
 } from 'lucide-react';
 import staffApiService from '../../services/staffApiService';
 import { useStaffTheme } from '../../contexts/StaffThemeContext';
@@ -22,18 +19,16 @@ import { useStaffTheme } from '../../contexts/StaffThemeContext';
 const StaffServices = () => {
   const { theme } = useStaffTheme();
   const [availableServices, setAvailableServices] = useState([]);
-  const [centerServices, setCenterServices] = useState([]);
-  const [hiddenServices, setHiddenServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [viewFilter, setViewFilter] = useState('available'); // available, enabled, hidden
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [serviceSettings, setServiceSettings] = useState({
     availabilityNotes: '',
-    customFees: '',
     estimatedDuration: ''
   });
 
@@ -94,14 +89,6 @@ const StaffServices = () => {
 
       if (availableResponse.success) {
         setAvailableServices(availableResponse.data);
-        
-        // Extract center services and hidden services from the available services
-        const enabled = availableResponse.data.filter(service => service.isEnabled);
-        const hidden = availableResponse.data.filter(service => service.isHidden);
-        
-        setCenterServices(enabled);
-        setHiddenServices(hidden);
-        
         setError('');
       } else {
         setError(availableResponse.message || 'Failed to load services');
@@ -150,20 +137,6 @@ const StaffServices = () => {
       console.error('Service settings error:', error);
       setError('Failed to update service settings');
     }
-  };
-
-  const getServiceStatus = (serviceId) => {
-    return availableServices.find(s => s._id === serviceId);
-  };
-
-  const isServiceEnabled = (serviceId) => {
-    const service = getServiceStatus(serviceId);
-    return service && service.isEnabled;
-  };
-
-  const isServiceHidden = (serviceId) => {
-    const service = getServiceStatus(serviceId);
-    return service && service.isHidden;
   };
 
   const getDisplayServices = () => {
@@ -382,19 +355,6 @@ const StaffServices = () => {
                     <Clock className="h-4 w-4 mr-2" />
                     <span>{service.processingTime}</span>
                   </div>
-                  {/* Admin Control Status */}
-                  {service.centerStatus && (
-                    <div className="flex items-center">
-                      <div className={`w-2 h-2 rounded-full mr-2 ${
-                        service.centerStatus.isGloballyActive ? 'bg-green-500' : 'bg-red-500'
-                      }`}></div>
-                      <span className={`text-xs ${
-                        service.centerStatus.isGloballyActive ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {service.centerStatus.isGloballyActive ? 'Available globally' : 'Disabled by admin'}
-                      </span>
-                    </div>
-                  )}
                   {service.description && (
                     <p className={`${currentTheme.text.secondary} text-sm mt-2 line-clamp-2`}>
                       {service.description}
@@ -403,17 +363,11 @@ const StaffServices = () => {
                 </div>
 
                 {/* Center-specific Settings */}
-                {isEnabled && service.centerStatus && (
+                {isEnabled && (service.availabilityNotes || service.estimatedDuration) && (
                   <div className={`${currentTheme.card} rounded-md border p-3 mb-4`}>
-                    <h4 className={`text-sm font-medium ${currentTheme.text.primary} mb-2`}>Center Settings</h4>
                     {service.availabilityNotes && (
                       <p className={`text-xs ${currentTheme.text.secondary} mb-1`}>
                         <strong>Notes:</strong> {service.availabilityNotes}
-                      </p>
-                    )}
-                    {service.customFees && (
-                      <p className={`text-xs ${currentTheme.text.secondary} mb-1`}>
-                        <strong>Custom Fees:</strong> ₹{service.customFees}
                       </p>
                     )}
                     {service.estimatedDuration && (
@@ -432,7 +386,6 @@ const StaffServices = () => {
                         setSelectedService(service);
                         setServiceSettings({
                           availabilityNotes: service.availabilityNotes || '',
-                          customFees: service.customFees || '',
                           estimatedDuration: service.estimatedDuration || ''
                         });
                         setShowSettingsModal(true);
@@ -444,6 +397,10 @@ const StaffServices = () => {
                     </button>
                     
                     <button
+                      onClick={() => {
+                        setSelectedService(service);
+                        setShowDetailsModal(true);
+                      }}
                       className={`p-2 ${currentTheme.text.tertiary} hover:${currentTheme.text.primary}`}
                       title="View Details"
                     >
@@ -474,7 +431,7 @@ const StaffServices = () => {
                     )}
 
                     {/* Enable/Disable Button */}
-                    {!isHidden && service.centerStatus?.isGloballyActive && (
+                    {!isHidden && (
                       <button
                         onClick={() => handleServiceToggle(service._id, !isEnabled)}
                         className={`flex items-center px-3 py-1 rounded-md text-sm font-medium transition-colors ${
@@ -493,14 +450,6 @@ const StaffServices = () => {
                           </>
                         )}
                       </button>
-                    )}
-                    
-                    {/* Admin Disabled Message */}
-                    {!isHidden && !service.centerStatus?.isGloballyActive && (
-                      <div className="flex items-center px-3 py-1 text-xs text-red-600 bg-red-50 rounded-md">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        Admin disabled
-                      </div>
                     )}
                   </div>
                 </div>
@@ -523,6 +472,131 @@ const StaffServices = () => {
           </div>
         )}
       </div>
+
+      {/* Service Details Modal */}
+      {showDetailsModal && selectedService && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${currentTheme.card} rounded-lg max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-xl font-semibold ${currentTheme.text.primary}`}>
+                {selectedService.name}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedService(null);
+                }}
+                className={`p-2 ${currentTheme.text.tertiary} hover:${currentTheme.text.primary}`}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-1`}>
+                    Category
+                  </label>
+                  <p className={`text-sm ${currentTheme.text.secondary}`}>{selectedService.category}</p>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-1`}>
+                    Fee
+                  </label>
+                  <p className={`text-sm ${currentTheme.text.secondary}`}>₹{selectedService.fee}</p>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-1`}>
+                    Processing Time
+                  </label>
+                  <p className={`text-sm ${currentTheme.text.secondary}`}>{selectedService.processingTime}</p>
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-1`}>
+                    Status
+                  </label>
+                  <p className={`text-sm ${
+                    selectedService.isEnabled ? 'text-green-600' : 
+                    selectedService.isHidden ? 'text-red-600' : 
+                    'text-gray-600'
+                  }`}>
+                    {selectedService.isEnabled ? 'Enabled' : 
+                     selectedService.isHidden ? 'Hidden' : 'Available'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedService.description && (
+                <div>
+                  <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-1`}>
+                    Description
+                  </label>
+                  <p className={`text-sm ${currentTheme.text.secondary}`}>{selectedService.description}</p>
+                </div>
+              )}
+
+              {/* Required Documents */}
+              {selectedService.requiredDocuments && selectedService.requiredDocuments.length > 0 && (
+                <div>
+                  <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-2`}>
+                    Required Documents
+                  </label>
+                  <ul className={`text-sm ${currentTheme.text.secondary} space-y-1`}>
+                    {selectedService.requiredDocuments.map((doc, index) => (
+                      <li key={index} className="flex items-center">
+                        <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                        {doc}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Center Settings */}
+              {selectedService.isEnabled && (
+                <div>
+                  <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-2`}>
+                    Center-Specific Settings
+                  </label>
+                  <div className={`${currentTheme.card} rounded-md border p-3`}>
+                    {selectedService.availabilityNotes ? (
+                      <p className={`text-sm ${currentTheme.text.secondary} mb-2`}>
+                        <strong>Notes:</strong> {selectedService.availabilityNotes}
+                      </p>
+                    ) : (
+                      <p className={`text-sm ${currentTheme.text.tertiary} mb-2`}>No special notes</p>
+                    )}
+                    {selectedService.estimatedDuration ? (
+                      <p className={`text-sm ${currentTheme.text.secondary}`}>
+                        <strong>Estimated Duration:</strong> {selectedService.estimatedDuration} minutes
+                      </p>
+                    ) : (
+                      <p className={`text-sm ${currentTheme.text.tertiary}`}>Using default processing time</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedService(null);
+                }}
+                className={`px-4 py-2 rounded-md ${currentTheme.button.secondary}`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Service Settings Modal */}
       {showSettingsModal && selectedService && (
@@ -548,29 +622,6 @@ const StaffServices = () => {
                   className={`w-full px-3 py-2 border rounded-md focus:ring-2 ${currentTheme.input}`}
                   placeholder="Special requirements, equipment needed, etc."
                 />
-              </div>
-
-              {/* Custom Fees */}
-              <div>
-                <label className={`block text-sm font-medium ${currentTheme.text.primary} mb-1`}>
-                  Custom Fees (Optional)
-                </label>
-                <div className="relative">
-                  <IndianRupee className={`h-4 w-4 absolute left-3 top-3 ${currentTheme.text.tertiary}`} />
-                  <input
-                    type="number"
-                    value={serviceSettings.customFees}
-                    onChange={(e) => setServiceSettings(prev => ({ 
-                      ...prev, 
-                      customFees: e.target.value 
-                    }))}
-                    className={`w-full pl-10 pr-4 py-2 border rounded-md focus:ring-2 ${currentTheme.input}`}
-                    placeholder="Override default fees"
-                  />
-                </div>
-                <p className={`text-xs ${currentTheme.text.tertiary} mt-1`}>
-                  Default: ₹{selectedService.fee}
-                </p>
               </div>
 
               {/* Estimated Duration */}

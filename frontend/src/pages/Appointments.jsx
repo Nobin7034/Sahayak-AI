@@ -11,6 +11,8 @@ const Appointments = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
 
+  console.log('Appointments component - user:', user, 'serviceId:', serviceId)
+
   const [service, setService] = useState(null)
   const [formData, setFormData] = useState({
     appointmentDate: '',
@@ -34,12 +36,16 @@ const Appointments = () => {
   const [deleting, setDeleting] = useState(null) // appointmentId when deleting
 
   useEffect(() => {
+    console.log('Appointments useEffect - serviceId:', serviceId, 'user:', user)
     if (serviceId) {
       fetchService()
     } else {
       // Only fetch appointments if user is authenticated
       if (user) {
+        console.log('User is authenticated, fetching appointments...')
         fetchAppointments()
+      } else {
+        console.log('User not authenticated yet, waiting...')
       }
     }
   }, [serviceId, user])
@@ -87,22 +93,23 @@ const Appointments = () => {
   const fetchAppointments = async () => {
     try {
       setAppointmentsLoading(true)
-      const token = localStorage.getItem('token')
-      console.log('Fetching appointments with token:', token ? 'Token exists' : 'No token')
+      console.log('Fetching appointments for user:', user?.email)
       
       const response = await axios.get('/api/appointments')
       if (response.data.success) {
         console.log('Fetched appointments:', response.data.data)
         setAppointments(response.data.data)
+      } else {
+        console.log('Failed to fetch appointments:', response.data.message)
       }
     } catch (error) {
       console.error('Appointments fetch error:', error)
       console.error('Error response:', error.response?.data)
       console.error('Error status:', error.response?.status)
       
-      // If 403, might be authentication issue
-      if (error.response?.status === 403) {
-        console.error('403 Forbidden - Check if user is logged in and token is valid')
+      // If 401/403, might be authentication issue
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        console.error('Authentication issue - user may need to sign in again')
       }
     } finally {
       setAppointmentsLoading(false)
@@ -298,6 +305,7 @@ const Appointments = () => {
 
     try {
       setDeleting(appointmentId)
+
       const response = await axios.delete(`/api/appointments/${appointmentId}`)
       
       if (response.data.success) {
@@ -311,6 +319,37 @@ const Appointments = () => {
       setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to cancel appointment' })
     } finally {
       setDeleting(null)
+    }
+  }
+
+  // Handle acknowledge document recommendation
+  const handleAcknowledgeRecommendation = async (appointmentId, recommendationId) => {
+    try {
+      const response = await axios.put(`/api/appointments/${appointmentId}/acknowledge-recommendations`, {
+        recommendationId
+      })
+      
+      if (response.data.success) {
+        // Update the appointment in the list to mark recommendation as acknowledged
+        setAppointments(prev => prev.map(apt => {
+          if (apt._id === appointmentId) {
+            return {
+              ...apt,
+              staffDocumentRecommendations: apt.staffDocumentRecommendations.map(rec => 
+                rec._id === recommendationId 
+                  ? { ...rec, isAcknowledged: true, acknowledgedAt: new Date() }
+                  : rec
+              )
+            }
+          }
+          return apt
+        }))
+        setMessage({ type: 'success', text: 'Thank you for acknowledging the document recommendation!' })
+      } else {
+        setMessage({ type: 'error', text: response.data.message || 'Failed to acknowledge recommendation' })
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Failed to acknowledge recommendation' })
     }
   }
 
@@ -399,14 +438,16 @@ const Appointments = () => {
           </div>
 
           {/* Appointments List */}
-          {appointmentsLoading ? (
-            <div className="text-center py-8">
-              <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
-              <p className="text-gray-600">Loading appointments...</p>
-            </div>
-          ) : appointments.length > 0 ? (
-            <div className="space-y-4">
-              {appointments.map((appointment) => (
+          {(() => {
+            console.log('Rendering appointments - loading:', appointmentsLoading, 'appointments count:', appointments.length, 'appointments:', appointments)
+            return appointmentsLoading ? (
+              <div className="text-center py-8">
+                <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+                <p className="text-gray-600">Loading appointments...</p>
+              </div>
+            ) : appointments.length > 0 ? (
+              <div className="space-y-4">
+                {appointments.map((appointment) => (
                 <div
                   key={appointment._id}
                   className="card p-6"
@@ -598,6 +639,52 @@ const Appointments = () => {
                           </div>
                         </div>
 
+                        {/* Document Recommendations Alert */}
+                        {appointment.staffDocumentRecommendations && appointment.staffDocumentRecommendations.length > 0 && (
+                          <div className="space-y-3">
+                            {appointment.staffDocumentRecommendations
+                              .filter(rec => !rec.isAcknowledged)
+                              .map((recommendation, index) => (
+                                <div key={index} className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                  <div className="flex items-start space-x-3">
+                                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1">
+                                      <h4 className="text-sm font-semibold text-amber-800 mb-2">
+                                        📋 Additional Documents Recommended by Staff
+                                      </h4>
+                                      <div className="text-sm text-amber-700 mb-3">
+                                        <p className="mb-2">Please bring these additional documents to your appointment:</p>
+                                        <ul className="list-disc list-inside space-y-1 ml-2">
+                                          {recommendation.documents.map((doc, docIndex) => (
+                                            <li key={docIndex} className="font-medium">{doc}</li>
+                                          ))}
+                                        </ul>
+                                        {recommendation.note && (
+                                          <div className="mt-3 p-2 bg-amber-100 rounded border-l-4 border-amber-400">
+                                            <p className="text-sm text-amber-800">
+                                              <strong>Staff Note:</strong> {recommendation.note}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <p className="text-xs text-amber-600">
+                                          Recommended on {new Date(recommendation.recommendedAt).toLocaleDateString()}
+                                        </p>
+                                        <button
+                                          onClick={() => handleAcknowledgeRecommendation(appointment._id, recommendation._id)}
+                                          className="text-xs bg-amber-600 text-white px-3 py-1 rounded hover:bg-amber-700 transition-colors"
+                                        >
+                                          Got it, thanks!
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+
                         {/* Center Information Section */}
                         {appointment.center && (
                           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -686,7 +773,8 @@ const Appointments = () => {
                 Book Your First Appointment
               </button>
             </div>
-          )}
+          )
+          })()}
         </div>
       </div>
     )

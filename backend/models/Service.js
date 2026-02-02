@@ -55,8 +55,16 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     default: function() {
       // Default to total documents - 1, but at least 1
-      const totalDocs = (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
+      const totalDocs = this.totalDocumentsAvailable || (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
       return Math.max(1, totalDocs - 1);
+    }
+  },
+  // Total documents available (manually configurable)
+  totalDocumentsAvailable: {
+    type: Number,
+    default: function() {
+      // Default to actual document count
+      return (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
     }
   },
   isActive: {
@@ -86,12 +94,21 @@ const serviceSchema = new mongoose.Schema({
 serviceSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   
-  // Auto-set minimum required documents if not explicitly set
+  // Auto-set totalDocumentsAvailable if not explicitly set
   if (this.isNew || this.isModified('documents') || this.isModified('requiredDocuments')) {
-    const totalDocs = (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
+    if (this.totalDocumentsAvailable === undefined || this.totalDocumentsAvailable === null) {
+      this.totalDocumentsAvailable = (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
+    }
+  }
+  
+  // Auto-set minimum required documents if not explicitly set
+  if (this.isNew || this.isModified('documents') || this.isModified('requiredDocuments') || this.isModified('totalDocumentsAvailable')) {
+    const totalDocs = this.totalDocumentsAvailable || (this.documents?.length || 0) + (this.requiredDocuments?.length || 0);
     if (this.minimumRequiredDocuments === undefined || this.minimumRequiredDocuments === null) {
       this.minimumRequiredDocuments = Math.max(1, totalDocs - 1);
     }
+    // Ensure minimum doesn't exceed total
+    this.minimumRequiredDocuments = Math.min(this.minimumRequiredDocuments, totalDocs);
   }
   
   next();

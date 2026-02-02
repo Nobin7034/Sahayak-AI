@@ -51,7 +51,7 @@ const DocumentValidation = ({ serviceId, onValidationComplete, onBack }) => {
         const serviceResponse = await axios.get(`/api/services/${serviceId}`);
         if (serviceResponse.data.success) {
           const service = serviceResponse.data.data;
-          const totalDocuments = (service.documents?.length || 0) + (service.requiredDocuments?.length || 0);
+          const totalDocuments = service.totalDocumentsAvailable || (service.documents?.length || 0) + (service.requiredDocuments?.length || 0);
           const minimumRequired = service.minimumRequiredDocuments ?? Math.max(1, totalDocuments - 1);
           
           setRequirements({

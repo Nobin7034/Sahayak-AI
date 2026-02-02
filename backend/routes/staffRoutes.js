@@ -1019,6 +1019,9 @@ router.get('/services/available', staffAuth, async (req, res) => {
         fees: service.fee, // Map fee to fees for frontend compatibility
         isHidden: isHidden,
         isEnabled: isEnabled, // Only true if staff manually enabled it
+        // Add center-specific settings
+        availabilityNotes: center?.serviceSettings?.[serviceId]?.availabilityNotes || '',
+        estimatedDuration: center?.serviceSettings?.[serviceId]?.estimatedDuration || '',
         // Add center-specific status
         centerStatus: {
           isHidden: isHidden,
@@ -1076,7 +1079,6 @@ router.get('/services/center', staffAuth, centerAccess, requirePermission('manag
       isEnabled: true,
       // Add any center-specific settings here
       availabilityNotes: center.serviceSettings?.[service._id]?.availabilityNotes || '',
-      customFees: center.serviceSettings?.[service._id]?.customFees || '',
       estimatedDuration: center.serviceSettings?.[service._id]?.estimatedDuration || ''
     }));
 
@@ -1178,7 +1180,7 @@ router.put('/services/:id/toggle', staffAuth, centerAccess, requirePermission('m
 router.put('/services/:id/settings', staffAuth, centerAccess, requirePermission('manage_services'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { availabilityNotes, customFees, estimatedDuration } = req.body;
+    const { availabilityNotes, estimatedDuration } = req.body;
 
     // Import models dynamically
     const { default: AkshayaCenter } = await import('../models/AkshayaCenter.js');
@@ -1200,7 +1202,6 @@ router.put('/services/:id/settings', staffAuth, centerAccess, requirePermission(
     // Update service settings
     center.serviceSettings[id] = {
       availabilityNotes: availabilityNotes || '',
-      customFees: customFees ? parseFloat(customFees) : null,
       estimatedDuration: estimatedDuration ? parseInt(estimatedDuration) : null,
       updatedAt: new Date(),
       updatedBy: req.user.userId
@@ -1846,6 +1847,21 @@ router.post('/appointments/:id/recommend-documents', staffAuth, centerAccess, re
       });
     }
 
+    // Add document recommendation to appointment record
+    if (!appointment.staffDocumentRecommendations) {
+      appointment.staffDocumentRecommendations = [];
+    }
+
+    const recommendation = {
+      recommendedBy: req.user.userId,
+      recommendedAt: new Date(),
+      documents: recommendedDocuments,
+      note: note || '',
+      isAcknowledged: false
+    };
+
+    appointment.staffDocumentRecommendations.push(recommendation);
+
     // Build recommendation message
     let recommendationText = `Document recommendations for your ${appointment.service.name} appointment:\n\n`;
     
@@ -1900,7 +1916,8 @@ router.post('/appointments/:id/recommend-documents', staffAuth, centerAccess, re
         recommendationsSent: recommendedDocuments.length,
         notificationSent: true,
         recommendedDocuments,
-        note
+        note,
+        recommendation
       }
     });
 

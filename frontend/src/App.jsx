@@ -38,7 +38,7 @@ import StaffLayout from './components/StaffLayout'
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_relativeSplatPath: true }}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={

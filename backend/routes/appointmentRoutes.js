@@ -18,6 +18,7 @@ router.get('/', async (req, res) => {
     const appointments = await Appointment.find({ user: req.user.userId })
       .populate('service', 'name category fee processingTime serviceCharge')
       .populate('center', 'name address contact location')
+      .populate('staffDocumentRecommendations.recommendedBy', 'name')
       .sort({ createdAt: -1 });
 
     // Add canEdit and canCancel flags to each appointment
@@ -73,7 +74,7 @@ router.post('/', async (req, res) => {
     /*
     if (selectedDocuments && selectedDocuments.length > 0) {
       // Use the new minimum documents validation from Service model
-      const totalDocs = (serviceDoc.documents?.length || 0) + (serviceDoc.requiredDocuments?.length || 0);
+      const totalDocs = serviceDoc.totalDocumentsAvailable || (serviceDoc.documents?.length || 0) + (serviceDoc.requiredDocuments?.length || 0);
       const minimumRequired = serviceDoc.minimumRequiredDocuments ?? Math.max(1, totalDocs - 1);
       
       if (totalDocs > 0 && selectedDocuments.length < minimumRequired) {
@@ -287,7 +288,9 @@ router.get('/:id', async (req, res) => {
     const appointment = await Appointment.findOne({
       _id: id,
       user: req.user.userId
-    }).populate('service', 'name category fee processingTime requiredDocuments');
+    })
+    .populate('service', 'name category fee processingTime requiredDocuments')
+    .populate('staffDocumentRecommendations.recommendedBy', 'name');
 
     if (!appointment) {
       return res.status(404).json({
@@ -318,6 +321,52 @@ router.get('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch appointment',
+      error: error.message
+    });
+  }
+});
+
+// Acknowledge document recommendations
+router.put('/:id/acknowledge-recommendations', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recommendationId } = req.body;
+
+    const appointment = await Appointment.findOne({
+      _id: id,
+      user: req.user.userId
+    });
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    // Find and acknowledge the specific recommendation
+    const recommendation = appointment.staffDocumentRecommendations.id(recommendationId);
+    if (!recommendation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document recommendation not found'
+      });
+    }
+
+    recommendation.isAcknowledged = true;
+    recommendation.acknowledgedAt = new Date();
+
+    await appointment.save();
+
+    res.json({
+      success: true,
+      message: 'Document recommendation acknowledged successfully'
+    });
+  } catch (error) {
+    console.error('Acknowledge recommendation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to acknowledge recommendation',
       error: error.message
     });
   }
