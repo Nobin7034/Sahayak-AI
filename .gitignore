@@ -27,3 +27,9 @@ dist-ssr
 # Documentation files
 *.md
 !README.md
+
+# Uploads - exclude user uploaded files but keep directory structure
+backend/uploads/**/*
+!backend/uploads/.gitkeep
+!backend/uploads/avatars/.gitkeep
+!backend/uploads/document-locker/.gitkeep
