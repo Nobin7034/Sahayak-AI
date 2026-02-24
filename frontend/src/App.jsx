@@ -34,6 +34,7 @@ import StaffAnalytics from './pages/staff/StaffAnalytics'
 import StaffProfile from './pages/staff/StaffProfile'
 import StaffSettings from './pages/staff/StaffSettings'
 import StaffLayout from './components/StaffLayout'
+import DocumentLocker from './pages/DocumentLocker'
 
 function App() {
   return (
@@ -146,6 +147,15 @@ function App() {
               <div className="min-h-screen bg-gray-50">
                 <Navbar />
                 <Profile />
+                <Footer />
+              </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/document-locker" element={
+            <ProtectedRoute>
+              <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <DocumentLocker />
                 <Footer />
               </div>
             </ProtectedRoute>

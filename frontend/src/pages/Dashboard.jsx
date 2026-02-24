@@ -496,6 +496,12 @@ const Dashboard = () => {
                 >
                   Read Latest News
                 </Link>
+                <Link
+                  to="/document-locker"
+                  className="block w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-center"
+                >
+                  Document Locker
+                </Link>
               </div>
             </div>
 

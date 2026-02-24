@@ -2,7 +2,7 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
-import { Menu, X, User, LogOut, Bell, Languages } from 'lucide-react'
+import { Menu, X, User, LogOut, Bell, Languages, Lock } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 
@@ -96,6 +96,13 @@ const Navbar = ({ showPublic = false }) => {
                 </Link>
                 <Link to="/news" className="text-gray-700 hover:text-primary transition-colors">
                   News
+                </Link>
+                <Link 
+                  to="/document-locker" 
+                  className="text-gray-700 hover:text-primary transition-colors p-2 rounded-lg hover:bg-gray-50"
+                  title="Document Locker"
+                >
+                  <Lock className="w-5 h-5" />
                 </Link>
                 {/* Notifications */}
                 <div className="relative">
@@ -233,6 +240,15 @@ const Navbar = ({ showPublic = false }) => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     News
+                  </Link>
+                  <Link
+                    to="/document-locker"
+                    className="flex items-center px-3 py-2 text-gray-700 hover:text-primary transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                    title="Document Locker"
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    Document Locker
                   </Link>
                   <Link
                     to="/profile"

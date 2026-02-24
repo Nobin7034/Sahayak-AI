@@ -42,6 +42,7 @@ import geocodeRoutes from './routes/geocode.js';
 import staffRoutes from './routes/staffRoutes.js';
 import ratingRoutes from './routes/ratingRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
+import documentLockerRoutes from './routes/documentLockerRoutes.js';
 
 // Import Middleware
 import maintenanceMode from './middleware/maintenanceMode.js';
@@ -87,6 +88,7 @@ app.use('/api/geocode', geocodeRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/document-locker', documentLockerRoutes);
 
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {
