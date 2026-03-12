@@ -8,7 +8,18 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest --run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:firefox": "playwright test --project=firefox",
+    "test:e2e:webkit": "playwright test --project=webkit",
+    "test:e2e:mobile": "playwright test --project=mobile-chrome --project=mobile-safari",
+    "test:report": "playwright show-report",
+    "test:allure": "allure generate allure-results --clean && allure open",
+    "test:summary": "node tests/generate-summary.js"
   },
   "dependencies": {
     "@react-oauth/google": "^0.12.1",
@@ -27,8 +38,12 @@
     "vite": "^5.4.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
+    "allure-commandline": "^2.36.0",
+    "allure-playwright": "^3.4.5",
     "fast-check": "^4.5.3",
     "jsdom": "^27.4.0",
     "vitest": "^4.0.16"

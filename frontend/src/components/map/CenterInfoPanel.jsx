@@ -309,20 +309,7 @@ const CenterInfoPanel = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t bg-gray-50 p-4 flex-shrink-0">
-          <button
-            onClick={handleBookAppointment}
-            disabled={operatingStatus.status === 'closed'}
-            className={`w-full py-3 px-4 rounded-lg font-medium transition-colors duration-200 ${
-              operatingStatus.status !== 'closed'
-                ? 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {operatingStatus.status === 'closed' ? 'Center Closed' : 'Book Appointment'}
-          </button>
-        </div>
+        {/* Footer - Removed Book Appointment button as Continue to Processing Mode handles this */}
       </div>
     );
   }
@@ -541,26 +528,7 @@ const CenterInfoPanel = ({
         )}
       </div>
 
-      {/* Footer - Book Appointment Button */}
-      <div className="border-t bg-gray-50 p-4">
-        <button
-          onClick={handleBookAppointment}
-          disabled={operatingStatus.status === 'closed'}
-          className={`w-full py-3 px-4 rounded-lg font-medium transition-colors duration-200 ${
-            operatingStatus.status !== 'closed'
-              ? 'bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {operatingStatus.status === 'closed' ? 'Center Closed' : 'Book Appointment'}
-        </button>
-        
-        {operatingStatus.status === 'closed' && (
-          <p className="text-xs text-gray-500 text-center mt-2">
-            Center is currently closed
-          </p>
-        )}
-      </div>
+      {/* Footer - Removed Book Appointment button as Continue to Processing Mode handles this */}
     </div>
   );
 };

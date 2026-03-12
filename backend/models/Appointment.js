@@ -18,11 +18,15 @@ const appointmentSchema = new mongoose.Schema({
   },
   appointmentDate: {
     type: Date,
-    required: true
+    required: function() {
+      return this.processingMode === 'physical';
+    }
   },
   timeSlot: {
     type: String,
-    required: true
+    required: function() {
+      return this.processingMode === 'physical';
+    }
   },
   status: {
     type: String,
@@ -88,6 +92,57 @@ const appointmentSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  // Processing mode
+  processingMode: {
+    type: String,
+    enum: ['physical', 'online'],
+    default: 'physical'
+  },
+  // Structured document data for online processing
+  structuredDocumentData: {
+    documents: [{
+      documentType: String,
+      documentId: mongoose.Schema.Types.ObjectId,
+      extractedData: mongoose.Schema.Types.Mixed,
+      isVerified: Boolean,
+      verifiedAt: Date
+    }],
+    userProfile: {
+      fullName: String,
+      dateOfBirth: Date,
+      gender: String,
+      address: mongoose.Schema.Types.Mixed,
+      phone: String,
+      email: String
+    }
+  },
+  // Staff access tracking for online processing
+  staffAccess: [{
+    staffId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    accessedAt: {
+      type: Date,
+      default: Date.now
+    },
+    action: String,
+    ipAddress: String
+  }],
+  // Online processing status
+  onlineProcessing: {
+    status: {
+      type: String,
+      enum: ['pending', 'in_review', 'data_verified', 'processing', 'completed'],
+      default: 'pending'
+    },
+    dataVerifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    dataVerifiedAt: Date,
+    processingNotes: String
+  },
   // Documents selected by user during booking
   selectedDocuments: [{
     documentId: String, // Reference to document in DocumentRequirement

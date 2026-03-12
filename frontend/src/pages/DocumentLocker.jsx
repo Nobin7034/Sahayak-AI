@@ -45,6 +45,12 @@ const DocumentLocker = () => {
   const [detailsSearchTerm, setDetailsSearchTerm] = useState('');
   const [editingField, setEditingField] = useState(null);
   const [editingValue, setEditingValue] = useState('');
+  const [showReplaceDocument, setShowReplaceDocument] = useState(false);
+  const [replaceDocumentData, setReplaceDocumentData] = useState(null);
+  const [replaceForm, setReplaceForm] = useState({
+    file: null,
+    performOCR: true
+  });
 
   // Form states
   const [createForm, setCreateForm] = useState({ pin: '', confirmPin: '' });
@@ -276,7 +282,26 @@ const DocumentLocker = () => {
       const response = await axios.post(`/api/document-locker/documents/${documentId}`, {
         pin: currentPin
       });
-      setSelectedDocument(response.data.data);
+      
+      const documentData = response.data.data;
+      
+      // Fetch the document file as blob for preview
+      try {
+        const fileResponse = await axios.post(
+          `/api/document-locker/documents/${documentId}/view`,
+          { pin: currentPin },
+          { responseType: 'blob' }
+        );
+        
+        // Create object URL for the blob
+        const fileUrl = URL.createObjectURL(fileResponse.data);
+        documentData.fileUrl = fileUrl;
+      } catch (fileError) {
+        console.error('Failed to load document file:', fileError);
+        // Continue without file preview
+      }
+      
+      setSelectedDocument(documentData);
       setShowDocumentDetails(true);
     } catch (error) {
       setError('Failed to load document details');
@@ -318,6 +343,60 @@ const DocumentLocker = () => {
       loadStats();
     } catch (error) {
       setError('Failed to delete document');
+    }
+  };
+
+  const openReplaceDocument = (document) => {
+    setReplaceDocumentData(document);
+    setReplaceForm({ file: null, performOCR: true });
+    setShowReplaceDocument(true);
+  };
+
+  const replaceDocument = async (e) => {
+    e.preventDefault();
+    
+    if (!replaceForm.file) {
+      setError('Please select a file to upload');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      setError('');
+
+      const formData = new FormData();
+      formData.append('document', replaceForm.file);
+      formData.append('pin', currentPin);
+      formData.append('performOCR', replaceForm.performOCR.toString());
+
+      const response = await axios.put(
+        `/api/document-locker/documents/${replaceDocumentData._id}/replace`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      setSuccess('Document replaced successfully! OCR processing completed.');
+      setShowReplaceDocument(false);
+      setReplaceDocumentData(null);
+      setReplaceForm({ file: null, performOCR: true });
+      
+      // Reload documents
+      loadDocuments();
+      loadStats();
+      
+      // Show verification modal if OCR was performed
+      if (replaceForm.performOCR && response.data.data) {
+        setOCRVerificationData(response.data.data);
+        setShowOCRVerification(true);
+      }
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to replace document');
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -906,15 +985,24 @@ const DocumentLocker = () => {
                             )}
                           </button>
                           <button
-                            onClick={() => downloadDocument(document._id, document.originalName)}
-                            className="flex-1 bg-green-50 text-green-600 py-2 px-3 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center"
+                            onClick={() => openReplaceDocument(document)}
+                            className="flex-1 bg-orange-50 text-orange-600 py-2 px-3 rounded-lg hover:bg-orange-100 transition-colors flex items-center justify-center"
+                            title="Replace document file"
                           >
-                            <Download className="w-4 h-4 mr-1" />
-                            Download
+                            <Upload className="w-4 h-4 mr-1" />
+                            Replace
+                          </button>
+                          <button
+                            onClick={() => downloadDocument(document._id, document.originalName)}
+                            className="bg-green-50 text-green-600 py-2 px-3 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center"
+                            title="Download document"
+                          >
+                            <Download className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => deleteDocument(document._id)}
                             className="bg-red-50 text-red-600 py-2 px-3 rounded-lg hover:bg-red-100 transition-colors"
+                            title="Delete document"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1116,10 +1204,148 @@ const DocumentLocker = () => {
           </div>
         )}
 
+        {/* Replace Document Modal */}
+        {showReplaceDocument && replaceDocumentData && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Replace Document</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Upload a new version of: {replaceDocumentData.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowReplaceDocument(false);
+                    setReplaceDocumentData(null);
+                    setReplaceForm({ file: null, performOCR: true });
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={replaceDocument}>
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-start">
+                    <AlertTriangle className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">Important:</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>The old document file will be replaced</li>
+                        <li>Document type and name will remain the same</li>
+                        <li>OCR will be re-run on the new file</li>
+                        <li>You'll need to verify the extracted data again</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Document File *
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,.pdf"
+                    onChange={(e) => setReplaceForm({ ...replaceForm, file: e.target.files[0] })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Supported formats: JPEG, PNG, PDF (Max 10MB)
+                  </p>
+                  {replaceForm.file && (
+                    <p className="text-sm text-green-600 mt-2">
+                      ✓ Selected: {replaceForm.file.name} ({(replaceForm.file.size / 1024 / 1024).toFixed(2)} MB)
+                    </p>
+                  )}
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    OCR Processing
+                  </label>
+                  <div className="space-y-2">
+                    <label className={`flex items-start p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                      replaceForm.performOCR 
+                        ? 'border-orange-600 bg-orange-50' 
+                        : 'border-gray-300 bg-white hover:border-gray-400'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="performOCR"
+                        checked={replaceForm.performOCR}
+                        onChange={() => setReplaceForm({ ...replaceForm, performOCR: true })}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">Process with OCR</p>
+                        <p className="text-sm text-gray-600">Extract text and data from the document</p>
+                      </div>
+                    </label>
+                    
+                    <label className={`flex items-start p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                      !replaceForm.performOCR 
+                        ? 'border-gray-600 bg-gray-50' 
+                        : 'border-gray-300 bg-white hover:border-gray-400'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="performOCR"
+                        checked={!replaceForm.performOCR}
+                        onChange={() => setReplaceForm({ ...replaceForm, performOCR: false })}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">Skip OCR</p>
+                        <p className="text-sm text-gray-600">Just replace the file, keep existing data</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReplaceDocument(false);
+                      setReplaceDocumentData(null);
+                      setReplaceForm({ file: null, performOCR: true });
+                    }}
+                    className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={processing || !replaceForm.file}
+                    className="flex-1 bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                  >
+                    {processing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {replaceForm.performOCR ? 'Replacing & Processing...' : 'Replacing...'}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Replace Document
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Document Details Modal */}
         {showDocumentDetails && selectedDocument && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-8 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900">Document Details</h2>
                 <button
@@ -1129,6 +1355,31 @@ const DocumentLocker = () => {
                   <X className="w-6 h-6" />
                 </button>
               </div>
+              
+              {/* Document Image Preview */}
+              {selectedDocument.fileUrl && (
+                <div className="mb-6 bg-gray-100 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-3">Document Preview</h3>
+                  <div className="bg-white rounded-lg overflow-hidden shadow-inner">
+                    <img 
+                      src={selectedDocument.fileUrl} 
+                      alt={selectedDocument.name}
+                      className="w-full h-auto max-h-[500px] object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                    <div className="hidden items-center justify-center p-8 text-gray-500">
+                      <div className="text-center">
+                        <FileText className="w-16 h-16 mx-auto mb-2 text-gray-400" />
+                        <p>Preview not available</p>
+                        <p className="text-sm">Use the download button to view the document</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Document Info */}
@@ -1625,92 +1876,45 @@ const DocumentLocker = () => {
               </div>
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Original OCR Data - Read Only */}
+                {/* Raw OCR Text - Read Only */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 text-blue-600">Original OCR Extracted Data</h3>
-                  <div className="bg-blue-50 rounded-lg p-4 space-y-3 max-h-96 overflow-y-auto">
+                  <h3 className="text-lg font-semibold mb-4 text-blue-600">Raw OCR Extracted Text</h3>
+                  <div className="bg-blue-50 rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
                     {/* Document Type */}
                     <div>
                       <label className="text-sm font-medium text-gray-600">Document Type:</label>
                       <p className="text-gray-900 capitalize">{ocrVerificationData.documentType.replace('_', ' ')}</p>
                     </div>
                     
-                    {/* Display only relevant fields */}
-                    {getRelevantFields(ocrVerificationData.documentType).map(fieldName => {
-                      if (fieldName === 'address') {
-                        const address = ocrVerificationData.extractedData?.address;
-                        if (!address) return null;
-                        
-                        return (
-                          <div key="address">
-                            <label className="text-sm font-medium text-gray-600">Address:</label>
-                            <div className="ml-4 space-y-1">
-                              {address.line1 && (
-                                <div>
-                                  <span className="text-xs text-gray-500">Line 1:</span>
-                                  <p className="text-gray-900 text-sm">{address.line1}</p>
-                                </div>
-                              )}
-                              {address.line2 && (
-                                <div>
-                                  <span className="text-xs text-gray-500">Line 2:</span>
-                                  <p className="text-gray-900 text-sm">{address.line2}</p>
-                                </div>
-                              )}
-                              {address.city && (
-                                <div>
-                                  <span className="text-xs text-gray-500">City:</span>
-                                  <p className="text-gray-900 text-sm">{address.city}</p>
-                                </div>
-                              )}
-                              {address.state && (
-                                <div>
-                                  <span className="text-xs text-gray-500">State:</span>
-                                  <p className="text-gray-900 text-sm">{address.state}</p>
-                                </div>
-                              )}
-                              {address.pincode && (
-                                <div>
-                                  <span className="text-xs text-gray-500">PIN Code:</span>
-                                  <p className="text-gray-900 text-sm">{address.pincode}</p>
-                                </div>
-                              )}
-                              {address.country && (
-                                <div>
-                                  <span className="text-xs text-gray-500">Country:</span>
-                                  <p className="text-gray-900 text-sm">{address.country}</p>
-                                </div>
-                              )}
-                              {!address.line1 && !address.line2 && !address.city && (
-                                <p className="text-gray-500 text-sm">Not available</p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      }
-                      
-                      const value = ocrVerificationData.extractedData?.[fieldName];
-                      let displayValue = value;
-                      
-                      if (fieldName.includes('Date') && value) {
-                        displayValue = new Date(value).toLocaleDateString();
-                      }
-                      
-                      return (
-                        <div key={fieldName}>
-                          <label className="text-sm font-medium text-gray-600">{getFieldLabel(fieldName)}:</label>
-                          <p className="text-gray-900">{displayValue || 'Not available'}</p>
-                        </div>
-                      );
-                    })}
-                    
                     {/* OCR Confidence */}
                     {ocrVerificationData.extractedData?.confidence && (
                       <div>
                         <label className="text-sm font-medium text-gray-600">OCR Confidence:</label>
-                        <p className="text-gray-900">{ocrVerificationData.extractedData.confidence.toFixed(1)}%</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-gray-900">{ocrVerificationData.extractedData.confidence.toFixed(1)}%</p>
+                          {ocrVerificationData.extractedData.confidence >= 75 ? (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">High</span>
+                          ) : ocrVerificationData.extractedData.confidence >= 60 ? (
+                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Medium</span>
+                          ) : (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Low</span>
+                          )}
+                        </div>
                       </div>
                     )}
+                    
+                    {/* Raw Text Display */}
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 mb-2 block">
+                        Extracted Text from Document:
+                      </label>
+                      <div className="bg-white border border-gray-300 rounded p-3 font-mono text-sm text-gray-800 whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        {ocrVerificationData.extractedData?.rawText || 'No text extracted'}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        This is the raw text extracted from your document. Use the form on the right to correct any errors.
+                      </p>
+                    </div>
                     
                     {/* Verification Status */}
                     {ocrVerificationData.extractedData?.isVerified && (

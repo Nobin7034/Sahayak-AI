@@ -22,6 +22,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import axios from 'axios';
+import SecureDocumentViewer from '../../components/SecureDocumentViewer';
 
 const AppointmentDetails = () => {
   const { appointmentId } = useParams();
@@ -48,6 +49,7 @@ const AppointmentDetails = () => {
   // Comment state
   const [newComment, setNewComment] = useState('');
   const [showCommentForm, setShowCommentForm] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState(null); // For secure document viewer
 
   useEffect(() => {
     loadAppointmentDetails();
@@ -210,6 +212,60 @@ const AppointmentDetails = () => {
 
   const formatTime = (timeSlot) => {
     return timeSlot || 'Not specified';
+  };
+
+  const formatProfileValue = (key, value) => {
+    // Handle null or undefined
+    if (!value) return 'N/A';
+    
+    // Handle date fields
+    if (key.toLowerCase().includes('date') || key.toLowerCase().includes('birth')) {
+      try {
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+        }
+      } catch (e) {
+        return value;
+      }
+    }
+    
+    // Handle address objects
+    if (key.toLowerCase().includes('address') && typeof value === 'object') {
+      const parts = [];
+      if (value.line1) parts.push(value.line1);
+      if (value.line2) parts.push(value.line2);
+      if (value.city) parts.push(value.city);
+      if (value.state) parts.push(value.state);
+      if (value.pincode) parts.push(value.pincode);
+      if (value.country) parts.push(value.country);
+      return parts.join(', ');
+    }
+    
+    // Handle other objects
+    if (typeof value === 'object') {
+      return JSON.stringify(value, null, 2);
+    }
+    
+    return value;
+  };
+
+  const formatExtractedValue = (key, value) => {
+    // Skip internal fields
+    if (['rawText', 'confidence', 'isVerified', 'verifiedAt', 'verifiedBy'].includes(key)) {
+      return null;
+    }
+    
+    return formatProfileValue(key, value);
+  };
+
+  const canViewDocuments = () => {
+    // Staff can only view documents if appointment is not completed or cancelled
+    return appointment && !['completed', 'cancelled'].includes(appointment.status);
   };
 
   if (loading) {
@@ -431,7 +487,103 @@ const AppointmentDetails = () => {
                   </button>
                 </div>
                 
-                {appointment.selectedDocuments && appointment.selectedDocuments.length > 0 ? (
+                {/* Online Mode - Show Structured Document Data */}
+                {appointment.processingMode === 'online' && appointment.structuredDocumentData?.documents ? (
+                  <div className="space-y-4">
+                    {appointment.structuredDocumentData.documents.map((doc, index) => (
+                      <div key={index} className="border border-purple-200 rounded-lg p-4 bg-purple-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <FileText className="h-5 w-5 text-purple-600" />
+                            <div>
+                              <p className="font-medium text-gray-900 capitalize">
+                                {doc.documentType.replace(/_/g, ' ')}
+                              </p>
+                              <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                                Online Processing
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {doc.isVerified && (
+                              <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full flex items-center">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Verified
+                              </span>
+                            )}
+                            {canViewDocuments() && doc.documentId && (
+                              <button
+                                onClick={() => setViewingDocument(doc)}
+                                className="text-xs px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center"
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View Document
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Extracted Data */}
+                        {doc.extractedData && Object.keys(doc.extractedData).length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-purple-200">
+                            <p className="text-sm font-medium text-gray-700 mb-2">Extracted Information:</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {Object.entries(doc.extractedData)
+                                .filter(([key]) => !['rawText', 'confidence', 'isVerified', 'verifiedAt', 'verifiedBy'].includes(key))
+                                .map(([key, value]) => {
+                                  const formattedValue = formatExtractedValue(key, value);
+                                  if (!formattedValue) return null;
+                                  return (
+                                    <div key={key} className="bg-white rounded p-2 break-words">
+                                      <p className="text-xs text-gray-500 capitalize mb-1">
+                                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                                      </p>
+                                      <p className="text-sm text-gray-900 font-medium break-words whitespace-pre-wrap">
+                                        {formattedValue}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {!canViewDocuments() && (
+                          <div className="mt-3 pt-3 border-t border-purple-200">
+                            <p className="text-xs text-gray-500 italic">
+                              Document access restricted - Service {appointment.status}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {/* User Profile Data from Online Processing */}
+                    {appointment.structuredDocumentData.userProfile && (
+                      <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                        <div className="flex items-center space-x-3 mb-3">
+                          <User className="h-5 w-5 text-blue-600" />
+                          <p className="font-medium text-gray-900">User Profile Information</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {Object.entries(appointment.structuredDocumentData.userProfile)
+                            .filter(([key, value]) => value)
+                            .map(([key, value]) => (
+                              <div key={key} className="bg-white rounded p-2 break-words">
+                                <p className="text-xs text-gray-500 capitalize mb-1">
+                                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                                </p>
+                                <p className="text-sm text-gray-900 font-medium break-words whitespace-pre-wrap">
+                                  {formatProfileValue(key, value)}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : appointment.selectedDocuments && appointment.selectedDocuments.length > 0 ? (
+                  /* Physical Mode - Show Selected Document Names */
                   <div className="space-y-3">
                     {appointment.selectedDocuments.map((doc, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -789,6 +941,14 @@ const AppointmentDetails = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Secure Document Viewer */}
+      {viewingDocument && (
+        <SecureDocumentViewer
+          document={viewingDocument}
+          onClose={() => setViewingDocument(null)}
+        />
       )}
     </div>
   );

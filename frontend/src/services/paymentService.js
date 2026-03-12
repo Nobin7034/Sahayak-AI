@@ -52,12 +52,19 @@ class PaymentService {
   }
 
   // Create payment order
-  async createOrder(serviceId, centerId) {
+  async createOrder(serviceId, centerId, amount = null) {
     try {
-      const response = await this.api.post('/api/payments/create-order', {
+      const requestData = {
         serviceId,
         centerId
-      });
+      };
+      
+      // If amount is specified, include it (for custom payment amounts)
+      if (amount !== null) {
+        requestData.amount = amount;
+      }
+      
+      const response = await this.api.post('/api/payments/create-order', requestData);
       
       if (response.data?.success) {
         return response.data.data;

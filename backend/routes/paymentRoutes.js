@@ -64,7 +64,7 @@ router.post('/create-order', authenticate, async (req, res) => {
       });
     }
 
-    const { serviceId, centerId } = req.body;
+    const { serviceId, centerId, amount } = req.body;
 
     if (!serviceId || !centerId) {
       return res.status(400).json({
@@ -91,11 +91,24 @@ router.post('/create-order', authenticate, async (req, res) => {
       });
     }
 
-    // Check if service has charges
-    if (service.fee <= 0) {
+    // Determine payment amount
+    // If amount is provided (for custom payment), use it
+    // Otherwise use service fee
+    const paymentAmount = amount !== undefined ? amount : service.fee;
+
+    // Check if payment is required
+    if (paymentAmount <= 0) {
       return res.status(400).json({
         success: false,
         message: 'This service does not require payment'
+      });
+    }
+
+    // Validate amount doesn't exceed service fee
+    if (paymentAmount > service.fee) {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment amount cannot exceed service fee'
       });
     }
 
@@ -103,7 +116,7 @@ router.post('/create-order', authenticate, async (req, res) => {
     const receipt = `${Date.now().toString().slice(-10)}_${req.user.userId.slice(-8)}`;
     
     const orderOptions = {
-      amount: service.fee * 100, // Amount in paise
+      amount: paymentAmount * 100, // Amount in paise
       currency: 'INR',
       receipt: receipt,
       notes: {
@@ -111,7 +124,8 @@ router.post('/create-order', authenticate, async (req, res) => {
         centerId: centerId,
         userId: req.user.userId,
         serviceName: service.name,
-        centerName: center.name
+        centerName: center.name,
+        paymentType: amount !== undefined ? 'custom' : 'full'
       }
     };
 
@@ -129,7 +143,8 @@ router.post('/create-order', authenticate, async (req, res) => {
         service: {
           id: service._id,
           name: service.name,
-          fee: service.fee
+          fee: service.fee,
+          paidAmount: paymentAmount
         },
         center: {
           id: center._id,

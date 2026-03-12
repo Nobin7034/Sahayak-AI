@@ -398,10 +398,12 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
     const { 
       page = 1, 
       limit = 20, 
-      dateRange = 'today', 
+      selectedDate = '', // Specific date from calendar picker
       status = 'all', 
       serviceType = 'all', 
-      searchTerm = '' 
+      searchTerm = '',
+      processingMode = 'all', // 'all', 'physical', 'online'
+      sortBy = 'newest' // 'newest', 'oldest' - for online requests
     } = req.query;
 
     // Import Appointment model dynamically to avoid circular dependency
@@ -409,53 +411,16 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
 
     // Build date filter
     let dateFilter = {};
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    switch (dateRange) {
-      case 'today':
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        dateFilter = { appointmentDate: { $gte: today, $lt: tomorrow } };
-        break;
-      case 'tomorrow':
-        const dayAfterTomorrow = new Date(today);
-        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-        const tomorrowStart = new Date(today);
-        tomorrowStart.setDate(tomorrowStart.getDate() + 1);
-        dateFilter = { appointmentDate: { $gte: tomorrowStart, $lt: dayAfterTomorrow } };
-        break;
-      case 'week':
-        // Get the start of the current week (Sunday)
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay()); // Go back to Sunday
-        weekStart.setHours(0, 0, 0, 0);
-        // Get the end of the current week (Saturday)
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 7); // Next Sunday (exclusive)
-        weekEnd.setHours(0, 0, 0, 0);
-        dateFilter = { appointmentDate: { $gte: weekStart, $lt: weekEnd } };
-        break;
-      case 'month':
-        // Start of current month
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        monthStart.setHours(0, 0, 0, 0);
-        // Start of next month
-        const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-        monthEnd.setHours(0, 0, 0, 0);
-        dateFilter = { appointmentDate: { $gte: monthStart, $lt: monthEnd } };
-        break;
-      case 'all':
-        // No date filter for 'all' - shows all appointments for this center
-        dateFilter = {};
-        break;
-      default:
-        // Default to today if invalid dateRange
-        const defaultTomorrow = new Date(today);
-        defaultTomorrow.setDate(defaultTomorrow.getDate() + 1);
-        dateFilter = { appointmentDate: { $gte: today, $lt: defaultTomorrow } };
-        break;
+    
+    if (selectedDate) {
+      // If a specific date is selected, filter for that exact date
+      const selectedDay = new Date(selectedDate);
+      selectedDay.setHours(0, 0, 0, 0);
+      const nextDay = new Date(selectedDay);
+      nextDay.setDate(nextDay.getDate() + 1);
+      dateFilter = { appointmentDate: { $gte: selectedDay, $lt: nextDay } };
     }
+    // If no date selected, show all appointments (no date filter)
 
     // Build query - CRITICAL: Only appointments for this staff's center
     const query = {
@@ -466,6 +431,11 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
     // Add status filter
     if (status !== 'all') {
       query.status = status;
+    }
+
+    // Add processing mode filter
+    if (processingMode !== 'all') {
+      query.processingMode = processingMode;
     }
 
     // Build aggregation pipeline for search and filtering
@@ -522,10 +492,19 @@ router.get('/appointments', staffAuth, centerAccess, requirePermission('manage_a
       });
     }
 
-    // Add sorting
-    pipeline.push({
-      $sort: { appointmentDate: 1, timeSlot: 1 }
-    });
+    // Add sorting - Different logic for online vs physical appointments
+    if (processingMode === 'online') {
+      // For online requests, sort by booking time (createdAt)
+      const sortOrder = sortBy === 'oldest' ? 1 : -1; // Default to newest first
+      pipeline.push({
+        $sort: { createdAt: sortOrder }
+      });
+    } else {
+      // For physical appointments, sort by appointment date and time
+      pipeline.push({
+        $sort: { appointmentDate: 1, timeSlot: 1 }
+      });
+    }
 
     // Execute aggregation for total count
     const totalPipeline = [...pipeline, { $count: 'total' }];
@@ -2077,6 +2056,186 @@ router.get('/appointments/:id/details', staffAuth, centerAccess, requirePermissi
     res.status(500).json({
       success: false,
       message: 'Failed to fetch detailed appointment information',
+      error: error.message
+    });
+  }
+});
+
+
+// Secure document viewing for staff - Only for active appointments
+router.get('/documents/:documentId/secure-view', staffAuth, centerAccess, async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    
+    // Import models
+    const { default: Appointment } = await import('../models/Appointment.js');
+    const { default: LockerDocument } = await import('../models/LockerDocument.js');
+    const path = await import('path');
+    const fs = await import('fs');
+    
+    // Find the document
+    const document = await LockerDocument.findById(documentId);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found in locker'
+      });
+    }
+    
+    // Find appointment that references this document
+    const appointment = await Appointment.findOne({
+      'structuredDocumentData.documents.documentId': documentId,
+      center: req.staff.centerId,
+      status: { $nin: ['completed', 'cancelled'] } // Only allow for active appointments
+    });
+    
+    if (!appointment) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Document can only be viewed for active appointments at your center.'
+      });
+    }
+    
+    // Log access for security audit
+    await Appointment.updateOne(
+      { _id: appointment._id },
+      {
+        $push: {
+          staffAccess: {
+            staffId: req.user.userId,
+            accessedAt: new Date(),
+            action: 'viewed_document',
+            ipAddress: req.ip
+          }
+        }
+      }
+    );
+    
+    // Serve the document image
+    if (document.filePath) {
+      // Check if file exists
+      const absolutePath = path.default.resolve(document.filePath);
+      
+      if (fs.default.existsSync(absolutePath)) {
+        // Set headers to prevent caching and indicate it's an image
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        res.setHeader('Content-Type', document.mimeType || 'image/jpeg');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        
+        // Send the file
+        return res.sendFile(absolutePath);
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: 'Document file not found on server'
+        });
+      }
+    } else {
+      return res.status(404).json({
+        success: false,
+        message: 'Document file path not available'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Secure document view error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load document',
+      error: error.message
+    });
+  }
+});
+
+
+// Download photo document - Only for photo documents
+router.get('/documents/:documentId/download', staffAuth, centerAccess, async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    
+    // Import models
+    const { default: Appointment } = await import('../models/Appointment.js');
+    const { default: LockerDocument } = await import('../models/LockerDocument.js');
+    const path = await import('path');
+    const fs = await import('fs');
+    
+    // Find the document
+    const document = await LockerDocument.findById(documentId);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found in locker'
+      });
+    }
+    
+    // Check if it's a photo document
+    const isPhotoDocument = document.documentType?.toLowerCase() === 'photo' || 
+                           document.documentType?.toLowerCase() === 'passport_photo';
+    
+    if (!isPhotoDocument) {
+      return res.status(403).json({
+        success: false,
+        message: 'Download is only allowed for photo documents'
+      });
+    }
+    
+    // Find appointment that references this document
+    const appointment = await Appointment.findOne({
+      'structuredDocumentData.documents.documentId': documentId,
+      center: req.staff.centerId,
+      status: { $nin: ['completed', 'cancelled'] }
+    });
+    
+    if (!appointment) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Photo can only be downloaded for active appointments at your center.'
+      });
+    }
+    
+    // Log download for security audit
+    await Appointment.updateOne(
+      { _id: appointment._id },
+      {
+        $push: {
+          staffAccess: {
+            staffId: req.user.userId,
+            accessedAt: new Date(),
+            action: 'downloaded_photo',
+            ipAddress: req.ip
+          }
+        }
+      }
+    );
+    
+    // Serve the photo for download
+    if (document.filePath) {
+      const absolutePath = path.default.resolve(document.filePath);
+      
+      if (fs.default.existsSync(absolutePath)) {
+        // Set headers for download
+        res.setHeader('Content-Disposition', `attachment; filename="user-photo-${documentId}.jpg"`);
+        res.setHeader('Content-Type', document.mimeType || 'image/jpeg');
+        
+        return res.sendFile(absolutePath);
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: 'Photo file not found on server'
+        });
+      }
+    } else {
+      return res.status(404).json({
+        success: false,
+        message: 'Photo file path not available'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Photo download error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to download photo',
       error: error.message
     });
   }

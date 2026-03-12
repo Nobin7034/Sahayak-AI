@@ -57,7 +57,17 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     console.log('Appointment creation request:', req.body);
-    const { service, center, appointmentDate, timeSlot, notes, paymentId, selectedDocuments } = req.body;
+    const { 
+      service, 
+      center, 
+      appointmentDate, 
+      timeSlot, 
+      notes, 
+      paymentId, 
+      selectedDocuments,
+      processingMode = 'physical',
+      structuredDocumentData
+    } = req.body;
 
     // Verify service exists and is active
     const serviceDoc = await Service.findById(service);
@@ -110,117 +120,121 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Validate appointment timing rules
-    const appointmentDateTime = new Date(appointmentDate);
-    const now = new Date();
-    
-    console.log('Date validation:', { appointmentDate, appointmentDateTime, now });
-    
-    // Check advance booking rules (3 days in advance maximum)
-    const maxAdvanceDate = new Date();
-    maxAdvanceDate.setDate(maxAdvanceDate.getDate() + 3);
-    maxAdvanceDate.setHours(23, 59, 59, 999);
-    
-    if (appointmentDateTime > maxAdvanceDate) {
-      console.log('Advance booking validation failed:', { appointmentDateTime, maxAdvanceDate });
-      return res.status(400).json({
-        success: false,
-        message: 'Appointments can only be booked up to 3 days in advance'
-      });
-    }
-
-    // Check minimum booking time (cannot book for today if center is closed or after hours)
-    const isToday = appointmentDateTime.toDateString() === now.toDateString();
-    if (isToday) {
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      const currentTime = currentHour * 100 + currentMinute;
+    // Only validate date/time for physical appointments
+    if (processingMode === 'physical') {
+      // Validate appointment timing rules
+      const appointmentDateTime = new Date(appointmentDate);
+      const now = new Date();
       
-      // Center working hours: 9:00 AM to 5:00 PM (900 to 1700)
-      if (currentTime >= 1700) {
+      console.log('Date validation:', { appointmentDate, appointmentDateTime, now });
+      
+      // Check advance booking rules (3 days in advance maximum)
+      const maxAdvanceDate = new Date();
+      maxAdvanceDate.setDate(maxAdvanceDate.getDate() + 3);
+      maxAdvanceDate.setHours(23, 59, 59, 999);
+      
+      if (appointmentDateTime > maxAdvanceDate) {
+        console.log('Advance booking validation failed:', { appointmentDateTime, maxAdvanceDate });
         return res.status(400).json({
           success: false,
-          message: 'Cannot book appointments for today after 5:00 PM. Please book for tomorrow.'
+          message: 'Appointments can only be booked up to 3 days in advance'
         });
+      }
+
+      // Check minimum booking time (cannot book for today if center is closed or after hours)
+      const isToday = appointmentDateTime.toDateString() === now.toDateString();
+      if (isToday) {
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentTime = currentHour * 100 + currentMinute;
+        
+        // Center working hours: 9:00 AM to 5:00 PM (900 to 1700)
+        if (currentTime >= 1700) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cannot book appointments for today after 5:00 PM. Please book for tomorrow.'
+          });
+        }
+        
+        if (currentTime < 900) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cannot book appointments before center opening hours (9:00 AM)'
+          });
+        }
+      }
+
+      // Validate time slot is within working hours (9:00 AM to 5:00 PM)
+      const timeSlotHour = parseInt(timeSlot.split(':')[0]);
+      const timeSlotPeriod = timeSlot.includes('PM') ? 'PM' : 'AM';
+      let timeSlotIn24 = timeSlotHour;
+      
+      if (timeSlotPeriod === 'PM' && timeSlotHour !== 12) {
+        timeSlotIn24 += 12;
+      } else if (timeSlotPeriod === 'AM' && timeSlotHour === 12) {
+        timeSlotIn24 = 0;
       }
       
-      if (currentTime < 900) {
+      console.log('Time slot validation:', { timeSlot, timeSlotHour, timeSlotPeriod, timeSlotIn24 });
+      
+      if (timeSlotIn24 < 9 || timeSlotIn24 >= 17) {
+        console.log('Time slot validation failed:', { timeSlotIn24 });
         return res.status(400).json({
           success: false,
-          message: 'Cannot book appointments before center opening hours (9:00 AM)'
+          message: 'Appointments can only be booked between 9:00 AM and 5:00 PM'
+        });
+      }
+
+      // Block Sundays, second Saturdays and manual holidays
+      const dateObj = new Date(appointmentDate);
+      const day = dateObj.getDay(); // 0=Sun, 6=Sat
+      if (day === 0) {
+        return res.status(400).json({ success: false, message: 'Bookings are not available on Sundays.' });
+      }
+      // second Saturday check
+      if (day === 6) {
+        const d = new Date(dateObj);
+        d.setDate(1);
+        const firstSatOffset = (6 - d.getDay() + 7) % 7;
+        const firstSat = 1 + firstSatOffset;
+        const secondSat = firstSat + 7;
+        if (dateObj.getDate() === secondSat) {
+          return res.status(400).json({ success: false, message: 'Bookings are not available on second Saturdays.' });
+        }
+      }
+      // manual holiday
+      const start = new Date(dateObj); start.setHours(0,0,0,0);
+      const end = new Date(start); end.setDate(end.getDate() + 1);
+      const manualHoliday = await Holiday.findOne({ date: { $gte: start, $lt: end } });
+      if (manualHoliday) {
+        return res.status(400).json({ success: false, message: `Bookings are not available on this holiday: ${manualHoliday.reason || 'Holiday'}.` });
+      }
+    }
+    
+    // Check if appointment slot is already taken at the specific center (only for physical appointments)
+    if (processingMode === 'physical') {
+      const existingAppointment = await Appointment.findOne({
+        center: center,
+        appointmentDate: appointmentDate,
+        timeSlot,
+        status: { $in: ['pending', 'confirmed'] }
+      });
+
+      if (existingAppointment) {
+        return res.status(400).json({
+          success: false,
+          message: 'This time slot is already booked'
         });
       }
     }
 
-    // Validate time slot is within working hours (9:00 AM to 5:00 PM)
-    const timeSlotHour = parseInt(timeSlot.split(':')[0]);
-    const timeSlotPeriod = timeSlot.includes('PM') ? 'PM' : 'AM';
-    let timeSlotIn24 = timeSlotHour;
-    
-    if (timeSlotPeriod === 'PM' && timeSlotHour !== 12) {
-      timeSlotIn24 += 12;
-    } else if (timeSlotPeriod === 'AM' && timeSlotHour === 12) {
-      timeSlotIn24 = 0;
-    }
-    
-    console.log('Time slot validation:', { timeSlot, timeSlotHour, timeSlotPeriod, timeSlotIn24 });
-    
-    if (timeSlotIn24 < 9 || timeSlotIn24 >= 17) {
-      console.log('Time slot validation failed:', { timeSlotIn24 });
-      return res.status(400).json({
-        success: false,
-        message: 'Appointments can only be booked between 9:00 AM and 5:00 PM'
-      });
-    }
-
-    // Block Sundays, second Saturdays and manual holidays
-    const dateObj = new Date(appointmentDate);
-    const day = dateObj.getDay(); // 0=Sun, 6=Sat
-    if (day === 0) {
-      return res.status(400).json({ success: false, message: 'Bookings are not available on Sundays.' });
-    }
-    // second Saturday check
-    if (day === 6) {
-      const d = new Date(dateObj);
-      d.setDate(1);
-      const firstSatOffset = (6 - d.getDay() + 7) % 7;
-      const firstSat = 1 + firstSatOffset;
-      const secondSat = firstSat + 7;
-      if (dateObj.getDate() === secondSat) {
-        return res.status(400).json({ success: false, message: 'Bookings are not available on second Saturdays.' });
-      }
-    }
-    // manual holiday
-    const start = new Date(dateObj); start.setHours(0,0,0,0);
-    const end = new Date(start); end.setDate(end.getDate() + 1);
-    const manualHoliday = await Holiday.findOne({ date: { $gte: start, $lt: end } });
-    if (manualHoliday) {
-      return res.status(400).json({ success: false, message: `Bookings are not available on this holiday: ${manualHoliday.reason || 'Holiday'}.` });
-    }
-
-    // Check if appointment slot is already taken at the specific center
-    const existingAppointment = await Appointment.findOne({
-      center: center,
-      appointmentDate: dateObj,
-      timeSlot,
-      status: { $in: ['pending', 'confirmed'] }
-    });
-
-    if (existingAppointment) {
-      return res.status(400).json({
-        success: false,
-        message: 'This time slot is already booked'
-      });
-    }
-
-    const appointment = new Appointment({
+    const appointmentData = {
       user: req.user.userId,
       service: service,
       center: center,
-      appointmentDate: dateObj,
-      timeSlot,
       notes,
-      // Auto-approve when slot free
+      processingMode,
+      // Auto-approve when slot free or online mode
       status: 'confirmed',
       // Store selected documents
       selectedDocuments: selectedDocuments || [],
@@ -232,24 +246,44 @@ router.post('/', async (req, res) => {
           paymentId: paymentId
         }
       })
-    });
+    };
+
+    // Only add date/time for physical appointments
+    if (processingMode === 'physical') {
+      appointmentData.appointmentDate = new Date(appointmentDate);
+      appointmentData.timeSlot = timeSlot;
+    }
+
+    // Add structured document data for online appointments
+    if (processingMode === 'online' && structuredDocumentData) {
+      appointmentData.structuredDocumentData = structuredDocumentData;
+    }
+
+    const appointment = new Appointment(appointmentData);
 
     await appointment.save();
 
     // Notify staff at the selected center
     try {
       const centerStaff = await Staff.findByCenter(center, true);
+      const notificationMessage = processingMode === 'online'
+        ? `New online request for ${serviceDoc.name} - Process when available`
+        : `New appointment for ${serviceDoc.name} on ${new Date(appointmentDate).toLocaleDateString()} at ${timeSlot}`;
+      
       const staffNotifications = centerStaff.map(staff => ({
         user: staff.userId._id,
         type: 'appointment',
-        title: 'New Appointment Booked',
-        message: `New appointment for ${serviceDoc.name} on ${dateObj.toLocaleDateString()} at ${timeSlot}`,
+        title: processingMode === 'online' ? 'New Online Request' : 'New Appointment Booked',
+        message: notificationMessage,
         meta: {
           appointmentId: appointment._id,
           serviceId: service,
           centerId: center,
-          appointmentDate: dateObj,
-          timeSlot
+          processingMode,
+          ...(processingMode === 'physical' && {
+            appointmentDate: new Date(appointmentDate),
+            timeSlot
+          })
         }
       }));
 

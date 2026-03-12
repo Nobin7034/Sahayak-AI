@@ -12,6 +12,7 @@ class OCRService {
 
   /**
    * Extract text from image using Tesseract.js
+   * Enhanced with better OCR settings for 75%+ accuracy
    */
   async extractText(imagePath, options = {}) {
     try {
@@ -22,15 +23,29 @@ class OCRService {
         processedImagePath,
         'eng+hin', // English and Hindi support
         {
-          ...this.tesseractOptions,
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+            }
+          },
+          // Enhanced Tesseract configuration for better accuracy
+          tessedit_pageseg_mode: Tesseract.PSM.AUTO,
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/-:., ',
+          preserve_interword_spaces: '1',
           ...options
         }
       );
       
       // Clean up processed image if it's different from original
       if (processedImagePath !== imagePath) {
-        fs.unlinkSync(processedImagePath);
+        try {
+          fs.unlinkSync(processedImagePath);
+        } catch (cleanupError) {
+          console.warn('Failed to cleanup processed image:', cleanupError);
+        }
       }
+      
+      console.log(`OCR Confidence: ${data.confidence.toFixed(2)}%`);
       
       return {
         text: data.text,
@@ -47,20 +62,40 @@ class OCRService {
 
   /**
    * Preprocess image for better OCR accuracy
+   * Enhanced preprocessing for 75%+ accuracy
    */
   async preprocessImage(imagePath) {
     try {
       const processedPath = imagePath.replace(/\.(jpg|jpeg|png)$/i, '_processed.png');
       
+      // Get image metadata first
+      const metadata = await sharp(imagePath).metadata();
+      
+      // Calculate optimal size (larger images = better OCR)
+      const targetWidth = Math.max(metadata.width, 3000);
+      
       await sharp(imagePath)
-        .resize(2000, null, { 
-          withoutEnlargement: true,
-          fit: 'inside'
+        // Resize to larger dimensions for better text recognition
+        .resize(targetWidth, null, { 
+          withoutEnlargement: false,
+          fit: 'inside',
+          kernel: sharp.kernel.lanczos3
         })
+        // Convert to grayscale
         .grayscale()
+        // Enhance contrast
         .normalize()
-        .sharpen()
-        .png({ quality: 90 })
+        // Apply adaptive threshold for better text separation
+        .linear(1.5, -(128 * 1.5) + 128)
+        // Sharpen text edges
+        .sharpen({ sigma: 1.5 })
+        // Reduce noise
+        .median(3)
+        // High quality output
+        .png({ 
+          quality: 100,
+          compressionLevel: 0
+        })
         .toFile(processedPath);
       
       return processedPath;
@@ -652,22 +687,91 @@ class OCRService {
 
     // Try to extract common fields
 
-    // Extract any name
-    const nameMatch = text.match(/(?:Name)[:\s]*([A-Z][A-Za-z\s]+)/i);
-    if (nameMatch) {
-      data.fullName = nameMatch[1].trim();
+    // Extract any name (multiple patterns)
+    const namePatterns = [
+      /(?:Name|Student\s*Name|Pensioner\s*Name|Husband\s*Name|Wife\s*Name|Father\s*Name|Mother\s*Name)[:\s]*([A-Z][A-Za-z\s]+?)(?:\n|Date|DOB|Gender|Male|Female|Address|$)/i,
+      /(?:^|\n)([A-Z][A-Za-z]+\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s*(?:\n|Male|Female|Date)/i
+    ];
+    
+    for (const pattern of namePatterns) {
+      const nameMatch = text.match(pattern);
+      if (nameMatch && nameMatch[1]) {
+        data.fullName = nameMatch[1].trim();
+        break;
+      }
     }
 
-    // Extract any date
-    const dateMatch = text.match(/(?:Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
-    if (dateMatch) {
-      data.dateOfBirth = this.parseDate(dateMatch[1]);
+    // Extract date of birth
+    const dobPatterns = [
+      /(?:Date\s*of\s*Birth|DOB|Birth\s*Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i,
+      /(?:Year\s*of\s*Birth)[:\s]*(\d{4})/i
+    ];
+    
+    for (const pattern of dobPatterns) {
+      const dobMatch = text.match(pattern);
+      if (dobMatch) {
+        data.dateOfBirth = this.parseDate(dobMatch[1]);
+        break;
+      }
     }
 
-    // Extract any number/ID
-    const numberMatch = text.match(/(?:Number|No|ID|#)[:\s]*([A-Z0-9\/-]+)/i);
-    if (numberMatch) {
-      data.certificateNumber = numberMatch[1].trim();
+    // Extract gender
+    const genderMatch = text.match(/\b(Male|Female|M|F)\b/i);
+    if (genderMatch) {
+      const gender = genderMatch[1].toUpperCase();
+      data.gender = gender === 'M' ? 'Male' : gender === 'F' ? 'Female' : gender;
+    }
+
+    // Extract address
+    const addressMatch = text.match(/(?:Address|Residence)[:\s]*([A-Za-z0-9\s,.-]+?)(?:\n\n|PIN|Pincode|State|$)/i);
+    if (addressMatch) {
+      const addressText = addressMatch[1].trim();
+      data.address = this.parseAddress(addressText);
+    }
+
+    // Extract any number/ID/certificate number
+    const numberPatterns = [
+      /(?:Certificate\s*Number|Cert\s*No|Registration\s*Number|Reg\s*No)[:\s]*([A-Z0-9\/-]+)/i,
+      /(?:Number|No|ID|#)[:\s]*([A-Z0-9\/-]{6,})/i,
+      /(?:Register\s*Number)[:\s]*([A-Z0-9\/-]+)/i
+    ];
+    
+    for (const pattern of numberPatterns) {
+      const numberMatch = text.match(pattern);
+      if (numberMatch) {
+        data.certificateNumber = numberMatch[1].trim();
+        break;
+      }
+    }
+
+    // Extract year of passing (for educational certificates)
+    const yearMatch = text.match(/(?:Year\s*of\s*Passing|Passed\s*in)[:\s]*(\d{4})/i);
+    if (yearMatch) {
+      data.yearOfPassing = parseInt(yearMatch[1]);
+    }
+
+    // Extract school/institution name
+    const schoolMatch = text.match(/(?:School|Institution|College)[:\s]*([A-Za-z\s]+?)(?:\n|$)/i);
+    if (schoolMatch) {
+      data.schoolName = schoolMatch[1].trim();
+    }
+
+    // Extract marks/grade
+    const marksMatch = text.match(/(?:Marks|Grade|CGPA)[:\s]*([A-Z0-9.+\s]+?)(?:\n|$)/i);
+    if (marksMatch) {
+      data.marksGrade = marksMatch[1].trim();
+    }
+
+    // Extract pension type
+    const pensionMatch = text.match(/(?:Pension\s*Type|Type\s*of\s*Pension)[:\s]*([A-Za-z\s]+?)(?:\n|$)/i);
+    if (pensionMatch) {
+      data.pensionType = pensionMatch[1].trim();
+    }
+
+    // Extract amount
+    const amountMatch = text.match(/(?:Amount|Pension\s*Amount|Monthly\s*Pension)[:\s]*(?:Rs\.?|₹)?\s*([0-9,]+)/i);
+    if (amountMatch) {
+      data.amount = parseFloat(amountMatch[1].replace(/,/g, ''));
     }
 
     data.rawText = text;

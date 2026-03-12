@@ -24,13 +24,15 @@ import SearchBar from '../components/map/SearchBar'
 import CenterInfoPanel from '../components/map/CenterInfoPanel'
 import DocumentReview from '../components/DocumentReview'
 import DocumentValidation from '../components/DocumentValidation'
+import ProcessingModeSelection from '../components/ProcessingModeSelection'
+import OnlineDocumentReview from '../components/OnlineDocumentReview'
 
 const ServiceApplication = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   
   // State management
-  const [currentStep, setCurrentStep] = useState(1) // 1: Review Documents, 2: Select Documents, 3: Center Selection, 4: Appointment
+  const [currentStep, setCurrentStep] = useState(1) // 1: Review Documents, 2: Select Documents, 3: Center Selection, 4: Processing Mode, 5: Appointment
   const [service, setService] = useState(null)
   const [centers, setCenters] = useState([])
   const [filteredCenters, setFilteredCenters] = useState([])
@@ -38,6 +40,8 @@ const ServiceApplication = () => {
   const [selectedDocuments, setSelectedDocuments] = useState([])
   const [documentValidation, setDocumentValidation] = useState(null)
   const [documentRequirements, setDocumentRequirements] = useState(null)
+  const [processingMode, setProcessingMode] = useState(null) // 'physical' or 'online'
+  const [structuredDocumentData, setStructuredDocumentData] = useState(null)
   const [userLocation, setUserLocation] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -201,6 +205,29 @@ const ServiceApplication = () => {
     }
   };
 
+  const handleCenterConfirm = () => {
+    if (selectedCenter) {
+      setCurrentStep(4); // Go to processing mode selection
+    }
+  };
+
+  const handleModeSelect = (mode) => {
+    setProcessingMode(mode);
+    if (mode === 'physical') {
+      // Go directly to appointment booking
+      handleBookAppointment();
+    } else {
+      // Go to online document review
+      setCurrentStep(5);
+    }
+  };
+
+  const handleOnlineDataConfirm = (structuredData) => {
+    setStructuredDocumentData(structuredData);
+    // Now proceed to appointment booking with structured data
+    handleBookAppointmentWithData(structuredData);
+  };
+
   const handleReviewComplete = () => {
     setCurrentStep(2); // Go to document selection
   };
@@ -233,15 +260,30 @@ const ServiceApplication = () => {
 
   const handleBookAppointment = () => {
     if (selectedCenter) {
-      // Include selected documents in the booking URL
+      // Include selected documents and processing mode in the booking URL
       const params = new URLSearchParams({
         service: service._id,
         center: selectedCenter._id,
-        documents: JSON.stringify(selectedDocuments)
+        documents: JSON.stringify(selectedDocuments),
+        processingMode: processingMode || 'physical'
       });
       navigate(`/book-appointment?${params.toString()}`);
     }
-  }
+  };
+
+  const handleBookAppointmentWithData = (structuredData) => {
+    if (selectedCenter) {
+      // Include structured data for online processing
+      const params = new URLSearchParams({
+        service: service._id,
+        center: selectedCenter._id,
+        documents: JSON.stringify(selectedDocuments),
+        processingMode: 'online',
+        structuredData: JSON.stringify(structuredData)
+      });
+      navigate(`/book-appointment?${params.toString()}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -276,11 +318,17 @@ const ServiceApplication = () => {
         {/* Header */}
         <div className="mb-6">
           <button
-            onClick={() => navigate('/services')}
+            onClick={() => {
+              if (currentStep > 1) {
+                setCurrentStep(currentStep - 1);
+              } else {
+                navigate('/services');
+              }
+            }}
             className="inline-flex items-center text-primary hover:text-blue-700 font-medium mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Services
+            {currentStep > 1 ? 'Back' : 'Back to Services'}
           </button>
           
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -302,47 +350,77 @@ const ServiceApplication = () => {
         {/* Progress Steps */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between">
-            <div className={`flex items-center ${currentStep >= 1 ? 'text-primary' : 'text-gray-400'}`}>
+            <button
+              onClick={() => setCurrentStep(1)}
+              className={`flex items-center ${currentStep >= 1 ? 'text-primary' : 'text-gray-400'} hover:opacity-80 transition-opacity`}
+            >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                 currentStep >= 1 ? 'bg-primary text-white' : 'bg-gray-200'
               }`}>
                 1
               </div>
-              <span className="ml-2 font-medium">Review Documents</span>
-            </div>
+              <span className="ml-2 font-medium text-sm">Review</span>
+            </button>
             
-            <div className={`flex-1 h-1 mx-4 ${currentStep >= 2 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+            <div className={`flex-1 h-1 mx-2 ${currentStep >= 2 ? 'bg-primary' : 'bg-gray-200'}`}></div>
             
-            <div className={`flex items-center ${currentStep >= 2 ? 'text-primary' : 'text-gray-400'}`}>
+            <button
+              onClick={() => currentStep >= 2 && setCurrentStep(2)}
+              disabled={currentStep < 2}
+              className={`flex items-center ${currentStep >= 2 ? 'text-primary' : 'text-gray-400'} ${currentStep >= 2 ? 'hover:opacity-80 cursor-pointer' : 'cursor-not-allowed'} transition-opacity`}
+            >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                 currentStep >= 2 ? 'bg-primary text-white' : 'bg-gray-200'
               }`}>
                 2
               </div>
-              <span className="ml-2 font-medium">Select Documents</span>
-            </div>
+              <span className="ml-2 font-medium text-sm">Select Docs</span>
+            </button>
             
-            <div className={`flex-1 h-1 mx-4 ${currentStep >= 3 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+            <div className={`flex-1 h-1 mx-2 ${currentStep >= 3 ? 'bg-primary' : 'bg-gray-200'}`}></div>
             
-            <div className={`flex items-center ${currentStep >= 3 ? 'text-primary' : 'text-gray-400'}`}>
+            <button
+              onClick={() => currentStep >= 3 && setCurrentStep(3)}
+              disabled={currentStep < 3}
+              className={`flex items-center ${currentStep >= 3 ? 'text-primary' : 'text-gray-400'} ${currentStep >= 3 ? 'hover:opacity-80 cursor-pointer' : 'cursor-not-allowed'} transition-opacity`}
+            >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                 currentStep >= 3 ? 'bg-primary text-white' : 'bg-gray-200'
               }`}>
                 3
               </div>
-              <span className="ml-2 font-medium">Select Center</span>
-            </div>
+              <span className="ml-2 font-medium text-sm">Center</span>
+            </button>
             
-            <div className={`flex-1 h-1 mx-4 ${currentStep >= 4 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+            <div className={`flex-1 h-1 mx-2 ${currentStep >= 4 ? 'bg-primary' : 'bg-gray-200'}`}></div>
             
-            <div className={`flex items-center ${currentStep >= 4 ? 'text-primary' : 'text-gray-400'}`}>
+            <button
+              onClick={() => currentStep >= 4 && setCurrentStep(4)}
+              disabled={currentStep < 4}
+              className={`flex items-center ${currentStep >= 4 ? 'text-primary' : 'text-gray-400'} ${currentStep >= 4 ? 'hover:opacity-80 cursor-pointer' : 'cursor-not-allowed'} transition-opacity`}
+            >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                 currentStep >= 4 ? 'bg-primary text-white' : 'bg-gray-200'
               }`}>
                 4
               </div>
-              <span className="ml-2 font-medium">Book Appointment</span>
-            </div>
+              <span className="ml-2 font-medium text-sm">Mode</span>
+            </button>
+            
+            <div className={`flex-1 h-1 mx-2 ${currentStep >= 5 ? 'bg-primary' : 'bg-gray-200'}`}></div>
+            
+            <button
+              onClick={() => currentStep >= 5 && setCurrentStep(5)}
+              disabled={currentStep < 5}
+              className={`flex items-center ${currentStep >= 5 ? 'text-primary' : 'text-gray-400'} ${currentStep >= 5 ? 'hover:opacity-80 cursor-pointer' : 'cursor-not-allowed'} transition-opacity`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                currentStep >= 5 ? 'bg-primary text-white' : 'bg-gray-200'
+              }`}>
+                5
+              </div>
+              <span className="ml-2 font-medium text-sm">Book</span>
+            </button>
           </div>
         </div>
 
@@ -563,16 +641,36 @@ const ServiceApplication = () => {
                   Back to Documents
                 </button>
                 <button
-                  onClick={handleBookAppointment}
+                  onClick={handleCenterConfirm}
                   disabled={!selectedCenter}
                   className="btn-primary flex items-center disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  <Calendar className="mr-2 w-4 h-4" />
-                  Book Appointment
+                  Continue to Processing Mode
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </button>
               </div>
             </div>
+          )}
+
+          {/* Step 4: Processing Mode Selection */}
+          {currentStep === 4 && (
+            <ProcessingModeSelection
+              service={service}
+              center={selectedCenter}
+              selectedDocuments={selectedDocuments}
+              onModeSelect={handleModeSelect}
+              onBack={() => setCurrentStep(3)}
+            />
+          )}
+
+          {/* Step 5: Online Document Review (only for online mode) */}
+          {currentStep === 5 && processingMode === 'online' && (
+            <OnlineDocumentReview
+              selectedDocuments={selectedDocuments}
+              serviceId={service._id}
+              onDataConfirm={handleOnlineDataConfirm}
+              onBack={() => setCurrentStep(4)}
+            />
           )}
 
         </div>

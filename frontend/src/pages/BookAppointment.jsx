@@ -14,7 +14,8 @@ import {
   Loader2,
   IndianRupee,
   Building,
-  Shield
+  Shield,
+  Wifi
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -58,11 +59,15 @@ const BookAppointment = () => {
   const serviceId = searchParams.get('service');
   const centerId = searchParams.get('center');
   const documentsParam = searchParams.get('documents');
+  const processingModeParam = searchParams.get('processingMode');
+  const structuredDataParam = searchParams.get('structuredData');
   const navigate = useNavigate();
   const { user } = useAuth();
   
   // Parse selected documents from URL
   const selectedDocuments = documentsParam ? JSON.parse(decodeURIComponent(documentsParam)) : [];
+  const processingMode = processingModeParam || 'physical';
+  const structuredData = structuredDataParam ? JSON.parse(decodeURIComponent(structuredDataParam)) : null;
   
   // Create authenticated axios instance
   const authAxios = createAuthenticatedAxios();
@@ -281,9 +286,18 @@ const BookAppointment = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.centerId || !formData.serviceId || !formData.appointmentDate || !formData.timeSlot) {
-      setError('Please fill in all required fields');
-      return;
+    // Validation based on processing mode
+    if (processingMode === 'physical') {
+      if (!formData.centerId || !formData.serviceId || !formData.appointmentDate || !formData.timeSlot) {
+        setError('Please fill in all required fields');
+        return;
+      }
+    } else {
+      // Online mode - only need center and service
+      if (!formData.centerId || !formData.serviceId) {
+        setError('Please select a service and center');
+        return;
+      }
     }
 
     setLoading(true);
@@ -291,9 +305,14 @@ const BookAppointment = () => {
     setSuccess('');
 
     try {
-      // If service has charges, handle payment first
-      if (service && service.fee > 0) {
-        await handlePaymentFlow();
+      // Determine payment amount based on processing mode
+      const paymentRequired = processingMode === 'online' 
+        ? service.fee  // Full amount for online
+        : service.serviceCharge;  // Service charge for physical
+      
+      // If payment is required, handle payment first
+      if (paymentRequired > 0) {
+        await handlePaymentFlow(paymentRequired);
       } else {
         await createAppointment();
       }
@@ -306,12 +325,16 @@ const BookAppointment = () => {
     }
   };
 
-  const handlePaymentFlow = async () => {
+  const handlePaymentFlow = async (amount) => {
     setIsPaying(true);
     
     try {
-      // Create payment order
-      const orderData = await paymentService.createOrder(formData.serviceId, formData.centerId);
+      // Create payment order with the specified amount
+      const orderData = await paymentService.createOrder(
+        formData.serviceId, 
+        formData.centerId,
+        amount  // Pass the amount based on processing mode
+      );
       const order = orderData.order;
 
       // Open Razorpay checkout
@@ -319,7 +342,7 @@ const BookAppointment = () => {
         amount: order.amount,
         currency: order.currency,
         name: 'Sahayak AI',
-        description: `${service.name} - ${center?.name}`,
+        description: `${service.name} - ${center?.name}${processingMode === 'online' ? ' (Full Payment)' : ' (Booking Fee)'}`,
         order_id: order.id,
         prefill: {
           name: user?.name,
@@ -328,7 +351,8 @@ const BookAppointment = () => {
         },
         notes: {
           serviceId: formData.serviceId,
-          centerId: formData.centerId
+          centerId: formData.centerId,
+          processingMode: processingMode
         },
         handler: async (response) => {
           try {
@@ -366,17 +390,27 @@ const BookAppointment = () => {
     const appointmentData = {
       service: formData.serviceId,
       center: formData.centerId,
-      appointmentDate: formData.appointmentDate,
-      timeSlot: formData.timeSlot,
       notes: formData.notes,
       selectedDocuments: formData.selectedDocuments,
+      processingMode: processingMode,
+      structuredDocumentData: structuredData,
       paymentId
     };
+
+    // Only add date/time for physical appointments
+    if (processingMode === 'physical') {
+      appointmentData.appointmentDate = formData.appointmentDate;
+      appointmentData.timeSlot = formData.timeSlot;
+    }
 
     const response = await authAxios.post('/api/appointments', appointmentData);
     
     if (response.data.success) {
-      setSuccess('Appointment booked successfully!');
+      setSuccess(
+        processingMode === 'online' 
+          ? 'Request submitted successfully! Staff will process it when available.'
+          : 'Appointment booked successfully!'
+      );
       setTimeout(() => {
         navigate('/appointments');
       }, 2000);
@@ -478,6 +512,59 @@ const BookAppointment = () => {
         {/* Booking Form */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* Processing Mode Indicator */}
+            {processingMode === 'online' && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center space-x-2">
+                  <Wifi className="h-5 w-5 text-purple-600" />
+                  <div className="flex-1">
+                    <h3 className="font-medium text-purple-900">Online Processing Mode</h3>
+                    <p className="text-sm text-purple-700 mt-1">
+                      Your documents and data will be securely shared with authorized staff for remote processing
+                    </p>
+                    {service && service.fee > 0 && (
+                      <div className="mt-3 pt-3 border-t border-purple-200">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-purple-900">Full Payment Required:</span>
+                          <span className="text-lg font-bold text-purple-900">₹{service.fee}</span>
+                        </div>
+                        <p className="text-xs text-purple-600 mt-1">
+                          Complete payment upfront for online processing
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {structuredData && (
+                  <div className="mt-3 pt-3 border-t border-purple-200">
+                    <p className="text-sm text-purple-800">
+                      ✓ {structuredData.documents?.length || 0} documents with structured data attached
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {processingMode === 'physical' && service && service.serviceCharge > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center space-x-2">
+                  <Building className="h-5 w-5 text-blue-600" />
+                  <div className="flex-1">
+                    <h3 className="font-medium text-blue-900">Walk-in Appointment</h3>
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-blue-900">Booking Fee:</span>
+                        <span className="text-lg font-bold text-blue-900">₹{service.serviceCharge}</span>
+                      </div>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Pay remaining ₹{service.fee - service.serviceCharge} at the center
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Selected Documents Summary */}
             {selectedDocuments.length > 0 && (
@@ -587,90 +674,115 @@ const BookAppointment = () => {
               )}
             </div>
 
-            {/* Date Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Appointment Date *
-              </label>
-              
-              {/* Booking Rules Info */}
-              <div className="mb-3 bg-blue-50 border border-blue-200 rounded-md p-3">
+            {/* Date Selection - Only for Physical Mode */}
+            {processingMode === 'physical' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Appointment Date *
+                </label>
+                
+                {/* Booking Rules Info */}
+                <div className="mb-3 bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <div className="flex items-start">
+                    <Clock className="h-4 w-4 text-blue-500 mr-2 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">Booking Rules:</p>
+                      <ul className="text-xs space-y-1">
+                        <li>• Appointments available: 9:00 AM - 5:00 PM</li>
+                        <li>• Book up to 3 days in advance</li>
+                        <li>• Cancel until 9:00 AM on appointment day</li>
+                        <li>• After 5:00 PM today, book for tomorrow</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                
+                <input
+                  type="date"
+                  name="appointmentDate"
+                  value={formData.appointmentDate}
+                  onChange={handleInputChange}
+                  min={getMinDate()}
+                  max={getMaxDate()}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  required
+                />
+                
+                {holidayInfo.isHoliday && (
+                  <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                    <div className="flex items-center">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2" />
+                      <span className="text-yellow-800 text-sm">
+                        {holidayInfo.reason || 'This date is a holiday. Please select another date.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Time Slot Selection - Only for Physical Mode */}
+            {processingMode === 'physical' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time Slot *
+                </label>
+                {availableSlots.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {availableSlots.map((slot) => (
+                      <label
+                        key={slot}
+                        className={`flex items-center justify-center p-2 border rounded-md cursor-pointer transition-colors ${
+                          formData.timeSlot === slot
+                            ? 'bg-blue-100 border-blue-500 text-blue-700'
+                            : 'bg-white border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="timeSlot"
+                          value={slot}
+                          checked={formData.timeSlot === slot}
+                          onChange={handleInputChange}
+                          className="sr-only"
+                        />
+                        <Clock className="h-4 w-4 mr-1" />
+                        {slot}
+                      </label>
+                    ))}
+                  </div>
+                ) : formData.appointmentDate && !holidayInfo.isHoliday ? (
+                  <div className="text-sm text-gray-500 bg-gray-50 border rounded-md p-3">
+                    No available slots for the selected date. Please choose another date.
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 bg-gray-50 border rounded-md p-3">
+                    Please select a date to view available time slots.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Online Mode Info */}
+            {processingMode === 'online' && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <div className="flex items-start">
-                  <Clock className="h-4 w-4 text-blue-500 mr-2 mt-0.5" />
-                  <div className="text-sm text-blue-800">
-                    <p className="font-medium mb-1">Booking Rules:</p>
-                    <ul className="text-xs space-y-1">
-                      <li>• Appointments available: 9:00 AM - 5:00 PM</li>
-                      <li>• Book up to 3 days in advance</li>
-                      <li>• Cancel until 9:00 AM on appointment day</li>
-                      <li>• After 5:00 PM today, book for tomorrow</li>
-                    </ul>
+                  <Clock className="h-5 w-5 text-purple-600 mr-3 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-purple-900 mb-1">
+                      No Appointment Time Required
+                    </h4>
+                    <p className="text-sm text-purple-800">
+                      For online processing, staff will handle your request when they're available. 
+                      This allows them to prioritize walk-in customers while processing your documents remotely.
+                    </p>
+                    <p className="text-sm text-purple-700 mt-2">
+                      You'll receive notifications about your application status.
+                    </p>
                   </div>
                 </div>
               </div>
-              
-              <input
-                type="date"
-                name="appointmentDate"
-                value={formData.appointmentDate}
-                onChange={handleInputChange}
-                min={getMinDate()}
-                max={getMaxDate()}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-              
-              {holidayInfo.isHoliday && (
-                <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500 mr-2" />
-                    <span className="text-yellow-800 text-sm">
-                      {holidayInfo.reason || 'This date is a holiday. Please select another date.'}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Time Slot Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Time Slot *
-              </label>
-              {availableSlots.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2">
-                  {availableSlots.map((slot) => (
-                    <label
-                      key={slot}
-                      className={`flex items-center justify-center p-2 border rounded-md cursor-pointer transition-colors ${
-                        formData.timeSlot === slot
-                          ? 'bg-blue-100 border-blue-500 text-blue-700'
-                          : 'bg-white border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="timeSlot"
-                        value={slot}
-                        checked={formData.timeSlot === slot}
-                        onChange={handleInputChange}
-                        className="sr-only"
-                      />
-                      <Clock className="h-4 w-4 mr-1" />
-                      {slot}
-                    </label>
-                  ))}
-                </div>
-              ) : formData.appointmentDate && !holidayInfo.isHoliday ? (
-                <div className="text-sm text-gray-500 bg-gray-50 border rounded-md p-3">
-                  No available slots for the selected date. Please choose another date.
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500 bg-gray-50 border rounded-md p-3">
-                  Please select a date to view available time slots.
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Notes */}
             <div>
@@ -691,7 +803,7 @@ const BookAppointment = () => {
             <div className="pt-4">
               <button
                 type="submit"
-                disabled={loading || isPaying || holidayInfo.isHoliday}
+                disabled={loading || isPaying || (processingMode === 'physical' && holidayInfo.isHoliday)}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-md font-medium
                          hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500
                          disabled:bg-gray-300 disabled:cursor-not-allowed
@@ -700,15 +812,27 @@ const BookAppointment = () => {
                 {loading || isPaying ? (
                   <div className="flex items-center justify-center">
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    {isPaying ? 'Processing Payment...' : 'Booking Appointment...'}
+                    {isPaying ? 'Processing Payment...' : processingMode === 'online' ? 'Submitting Request...' : 'Booking Appointment...'}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    {service && service.fee > 0 
-                      ? `Pay ₹${service.fee} & Book Appointment`
-                      : 'Book Appointment'
-                    }
+                    {processingMode === 'online' ? (
+                      <>
+                        <Wifi className="h-4 w-4 mr-2" />
+                        {service && service.fee > 0 
+                          ? `Pay ₹${service.fee} & Submit Request`
+                          : 'Submit Online Request'
+                        }
+                      </>
+                    ) : (
+                      <>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {service && service.serviceCharge > 0 
+                          ? `Pay ₹${service.serviceCharge} & Book Appointment`
+                          : 'Book Appointment'
+                        }
+                      </>
+                    )}
                   </div>
                 )}
               </button>

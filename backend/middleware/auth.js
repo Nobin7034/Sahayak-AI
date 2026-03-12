@@ -21,25 +21,24 @@ export const authenticate = async (req, res, next) => {
       try {
         decoded = await admin.auth().verifyIdToken(token);
       } catch (adminErr) {
+        // Silently fall back to REST API
         const apiKey = process.env.FIREBASE_WEB_API_KEY;
         if (!apiKey) throw adminErr;
-        try {
-          const resp = await axios.post(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
-            { idToken: token },
-            { headers: { 'Content-Type': 'application/json' } }
-          );
-          const users = resp?.data?.users || [];
-          if (!users.length) throw adminErr;
-          const u = users[0];
-          decoded = {
-            uid: u.localId,
-            email: u.email,
-            name: u.displayName || (u.email ? u.email.split('@')[0] : 'User'),
-            picture: u.photoUrl
-          };
-        } catch (restErr) {
-          throw adminErr;
-        }
+        
+        const resp = await axios.post(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`,
+          { idToken: token },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        const users = resp?.data?.users || [];
+        if (!users.length) throw adminErr;
+        
+        const u = users[0];
+        decoded = {
+          uid: u.localId,
+          email: u.email,
+          name: u.displayName || (u.email ? u.email.split('@')[0] : 'User'),
+          picture: u.photoUrl
+        };
       }
 
       let user = await User.findOne({ email: decoded.email });

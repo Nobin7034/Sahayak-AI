@@ -242,7 +242,12 @@ router.post('/documents', authenticate, verifyLockerPin, async (req, res) => {
 // Upload document
 router.post('/upload', authenticate, upload.single('document'), async (req, res) => {
   try {
-    const { pin, documentType, name, tags } = req.body;
+    const { pin, documentType, name, tags, performOCR } = req.body;
+    
+    console.log('=== Document Upload Request ===');
+    console.log('Document type:', documentType);
+    console.log('Perform OCR:', performOCR);
+    console.log('File:', req.file?.originalname);
     
     if (!req.file) {
       return res.status(400).json({
@@ -281,35 +286,56 @@ router.post('/upload', authenticate, upload.single('document'), async (req, res)
       });
     }
     
-    // Process document with OCR (only for images)
+    // Process document with OCR based on user choice
     let extractedData = {
       rawText: '',
       confidence: 0
     };
     
-    // Temporarily disable OCR to isolate the issue
-    const OCR_ENABLED = false; // Set to true once Tesseract is confirmed working
+    const shouldPerformOCR = performOCR === 'true' || performOCR === true;
     
-    if (OCR_ENABLED && req.file.mimetype.startsWith('image/')) {
+    console.log('OCR Decision Logic:');
+    console.log('  performOCR param:', performOCR);
+    console.log('  performOCR type:', typeof performOCR);
+    console.log('  shouldPerformOCR:', shouldPerformOCR);
+    console.log('  File mimetype:', req.file.mimetype);
+    console.log('  Is image:', req.file.mimetype.startsWith('image/'));
+    
+    if (shouldPerformOCR && req.file.mimetype.startsWith('image/')) {
       try {
-        console.log(`Processing OCR for document type: ${documentType}`);
+        console.log(`✅ Starting OCR for document type: ${documentType}`);
         const ocrResult = await ocrService.processDocument(req.file.path, documentType);
         extractedData = ocrResult || extractedData;
-        console.log('OCR processing completed successfully');
+        console.log('✅ OCR processing completed successfully');
+        console.log('   Confidence:', extractedData.confidence?.toFixed(2) + '%');
+        console.log('   Extracted fields:', Object.keys(extractedData).filter(k => k !== 'rawText' && k !== 'confidence'));
       } catch (ocrError) {
-        console.error('OCR processing failed:', ocrError);
+        console.error('❌ OCR processing failed:', ocrError);
         console.error('OCR Error stack:', ocrError.stack);
         // Continue with default extractedData
         console.log('Continuing without OCR data');
+        extractedData.rawText = 'OCR processing failed - please verify data manually';
+        extractedData.ocrError = ocrError.message;
       }
     } else {
-      if (req.file.mimetype.startsWith('image/')) {
-        console.log(`OCR disabled - skipping for image file`);
-        extractedData.rawText = 'OCR temporarily disabled - please verify data manually';
-      } else {
-        console.log(`Skipping OCR for non-image file: ${req.file.mimetype}`);
+      if (!shouldPerformOCR) {
+        console.log(`ℹ️  User chose to skip OCR`);
+        extractedData.rawText = 'OCR skipped by user - raw image attached';
+      } else if (!req.file.mimetype.startsWith('image/')) {
+        console.log(`ℹ️  Skipping OCR for non-image file: ${req.file.mimetype}`);
         extractedData.rawText = 'PDF document - OCR not performed';
+      } else {
+        console.log(`⚠️  OCR should have been performed but wasn't - check logic`);
+        extractedData.rawText = 'OCR was not performed - please try again';
       }
+    }
+    
+    // Log final OCR result
+    if (extractedData.confidence) {
+      const confidenceLevel = extractedData.confidence >= 75 ? '✅ High' : 
+                             extractedData.confidence >= 60 ? '⚠️  Medium' : 
+                             '❌ Low';
+      console.log(`OCR Result: ${confidenceLevel} confidence (${extractedData.confidence.toFixed(2)}%)`);
     }
     
     // Auto-fill with existing profile data
@@ -327,7 +353,7 @@ router.post('/upload', authenticate, upload.single('document'), async (req, res)
         existingDocuments.forEach(doc => {
           if (doc.extractedData) {
             Object.entries(doc.extractedData).forEach(([key, value]) => {
-              if (value && key !== 'rawText' && key !== 'confidence' && key !== 'isVerified' && key !== 'verifiedAt' && key !== 'verifiedBy') {
+              if (value && key !== 'rawText' && key !== 'confidence' && key !== 'isVerified' && key !== 'verifiedAt' && key !== 'verifiedBy' && key !== 'ocrError') {
                 if (key === 'address' && typeof value === 'object') {
                   if (!profileData.address) profileData.address = {};
                   Object.entries(value).forEach(([addrKey, addrValue]) => {
@@ -365,13 +391,22 @@ router.post('/upload', authenticate, upload.single('document'), async (req, res)
       };
     }
     
-    // Ensure extractedData is always an object
-    if (!extractedData || typeof extractedData !== 'object') {
-      extractedData = {
-        rawText: '',
-        confidence: 0
-      };
-    }
+    // Add empty fields for the document type so users can fill them
+    const relevantFields = getRelevantFieldsForDocument(documentType);
+    relevantFields.forEach(field => {
+      if (field === 'address' && !extractedData.address) {
+        extractedData.address = {
+          line1: '',
+          line2: '',
+          city: '',
+          state: '',
+          pincode: '',
+          country: 'India'
+        };
+      } else if (!extractedData[field]) {
+        extractedData[field] = '';
+      }
+    });
     
     // Create document record
     let document;
@@ -458,6 +493,192 @@ router.post('/upload', authenticate, upload.single('document'), async (req, res)
   }
 });
 
+// Helper function to normalize document names to types
+function normalizeDocumentNameToType(documentName) {
+  if (!documentName) return null;
+  
+  const nameToTypeMap = {
+    // Exact matches
+    'aadhaar card': 'aadhaar_card',
+    'aadhar card': 'aadhaar_card',
+    'pan card': 'pan_card',
+    'voter id': 'voter_id',
+    'voter id card': 'voter_id',
+    'driving license': 'driving_license',
+    'driving licence': 'driving_license',
+    'passport': 'passport',
+    'ration card': 'ration_card',
+    'birth certificate': 'birth_certificate',
+    'death certificate': 'death_certificate',
+    'income certificate': 'income_certificate',
+    'caste certificate': 'caste_certificate',
+    'community certificate': 'community_certificate',
+    'domicile certificate': 'domicile_certificate',
+    'residence certificate': 'residence_certificate',
+    'marriage certificate': 'marriage_certificate',
+    'sslc certificate': 'sslc_certificate',
+    'pension certificate': 'pension_certificate',
+    'bank passbook': 'bank_passbook',
+    'salary slip': 'salary_slip',
+    'property document': 'property_document',
+    'educational certificate': 'educational_certificate',
+    'medical certificate': 'medical_certificate',
+    
+    // Common variations
+    'photo': 'photo',
+    'photograph': 'photo',
+    'passport photo': 'photo',
+    'passport size photo': 'photo',
+    'address proof': 'address_proof',
+    'id proof': 'id_proof',
+    'age proof': 'age_proof',
+    'income proof': 'income_proof'
+  };
+  
+  const normalized = documentName.toLowerCase().trim();
+  return nameToTypeMap[normalized] || normalized.replace(/\s+/g, '_');
+}
+
+// Get documents for a specific service (MUST come before /documents/:id)
+router.post('/documents/for-service', authenticate, verifyLockerPin, async (req, res) => {
+  try {
+    const { serviceId, requiredDocuments } = req.body;
+    
+    console.log('=== Documents for Service Request ===');
+    console.log('User:', req.user?.userId, req.user?.email);
+    console.log('Locker ID:', req.locker?._id);
+    console.log('Service ID:', serviceId);
+    console.log('Required documents received:', JSON.stringify(requiredDocuments, null, 2));
+    
+    // Validate input
+    if (!requiredDocuments || !Array.isArray(requiredDocuments)) {
+      console.log('❌ Invalid requiredDocuments format');
+      return res.status(400).json({
+        success: false,
+        message: 'requiredDocuments must be an array'
+      });
+    }
+    
+    // Get all documents from locker
+    let allDocuments = [];
+    try {
+      allDocuments = await LockerDocument.find({
+        locker: req.locker._id,
+        isActive: true
+      });
+      console.log(`Found ${allDocuments.length} documents in locker`);
+      if (allDocuments.length > 0) {
+        console.log('Available document types:', allDocuments.map(d => d.documentType).join(', '));
+      }
+    } catch (dbError) {
+      console.error('Database error fetching documents:', dbError);
+      allDocuments = [];
+    }
+    
+    // Map required documents to available documents
+    const availableDocuments = [];
+    const missingDocuments = [];
+    
+    if (requiredDocuments.length === 0) {
+      console.log('No required documents specified');
+    } else {
+      requiredDocuments.forEach((reqDoc, index) => {
+        try {
+          console.log(`Processing required doc ${index}:`, JSON.stringify(reqDoc));
+          
+          // Get document name from the required document
+          const docName = reqDoc.documentName || reqDoc.name;
+          console.log(`  Document name: ${docName}`);
+          
+          if (!docName) {
+            console.log(`  ⚠️  No document name found, skipping`);
+            missingDocuments.push(reqDoc);
+            return;
+          }
+          
+          // Normalize the document name to a type
+          const normalizedType = normalizeDocumentNameToType(docName);
+          console.log(`  Normalized type: ${normalizedType}`);
+          
+          // Try to find matching document in locker
+          // Match by documentType or by name similarity
+          const found = allDocuments.find(doc => {
+            const typeMatch = doc.documentType === normalizedType;
+            const nameMatch = doc.name && doc.name.toLowerCase().includes(docName.toLowerCase());
+            const reverseNameMatch = docName.toLowerCase().includes(doc.documentType?.replace(/_/g, ' '));
+            
+            return typeMatch || nameMatch || reverseNameMatch;
+          });
+          
+          if (found) {
+            console.log(`  ✅ Found in locker: ${found.name} (type: ${found.documentType})`);
+            availableDocuments.push(found);
+          } else {
+            console.log(`  ❌ Not found in locker`);
+            missingDocuments.push(reqDoc);
+          }
+        } catch (docError) {
+          console.error(`  Error processing document ${index}:`, docError);
+          missingDocuments.push(reqDoc);
+        }
+      });
+    }
+    
+    console.log(`Available: ${availableDocuments.length}, Missing: ${missingDocuments.length}`);
+    
+    // Aggregate user profile from available documents
+    const userProfile = {};
+    try {
+      availableDocuments.forEach(doc => {
+        if (doc.extractedData) {
+          if (doc.extractedData.fullName && !userProfile.fullName) {
+            userProfile.fullName = doc.extractedData.fullName;
+          }
+          if (doc.extractedData.dateOfBirth && !userProfile.dateOfBirth) {
+            userProfile.dateOfBirth = doc.extractedData.dateOfBirth;
+          }
+          if (doc.extractedData.gender && !userProfile.gender) {
+            userProfile.gender = doc.extractedData.gender;
+          }
+          if (doc.extractedData.address && !userProfile.address) {
+            userProfile.address = doc.extractedData.address;
+          }
+        }
+      });
+    } catch (profileError) {
+      console.error('Error aggregating profile:', profileError);
+    }
+    
+    // Log access
+    try {
+      req.locker.logAccess('view_document', req);
+      await req.locker.save();
+    } catch (logError) {
+      console.error('Error logging access:', logError);
+      // Continue anyway
+    }
+    
+    console.log('=== Request successful ===');
+    
+    res.json({
+      success: true,
+      availableDocuments,
+      missingDocuments,
+      userProfile
+    });
+  } catch (error) {
+    console.error('❌ Get documents for service error:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch documents for service',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // Get specific document
 router.post('/documents/:id', authenticate, verifyLockerPin, async (req, res) => {
   try {
@@ -530,6 +751,161 @@ router.post('/documents/:id/download', authenticate, verifyLockerPin, async (req
     res.status(500).json({
       success: false,
       message: 'Failed to download document'
+    });
+  }
+});
+
+// View document file (for display in browser)
+router.post('/documents/:id/view', authenticate, verifyLockerPin, async (req, res) => {
+  try {
+    const document = await LockerDocument.findOne({
+      _id: req.params.id,
+      locker: req.locker._id,
+      isActive: true
+    });
+    
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+    
+    if (!fs.existsSync(document.filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document file not found'
+      });
+    }
+    
+    document.recordAccess();
+    document.logAudit('viewed', 'Document file viewed', req.ip);
+    await document.save();
+    
+    req.locker.logAccess('view_document', req, true, document._id);
+    await req.locker.save();
+    
+    // Set appropriate content type
+    const ext = path.extname(document.filePath).toLowerCase();
+    const contentTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+      '.pdf': 'application/pdf'
+    };
+    
+    const contentType = contentTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', 'inline');
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(document.filePath);
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('Document view error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to view document'
+    });
+  }
+});
+
+// Replace document file
+router.put('/documents/:id/replace', authenticate, verifyLockerPin, upload.single('document'), async (req, res) => {
+  try {
+    const { performOCR } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No document file uploaded'
+      });
+    }
+
+    const document = await LockerDocument.findOne({
+      _id: req.params.id,
+      locker: req.locker._id,
+      isActive: true
+    });
+    
+    if (!document) {
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Delete old file
+    if (fs.existsSync(document.filePath)) {
+      fs.unlinkSync(document.filePath);
+    }
+
+    // Update document with new file
+    document.filePath = req.file.path;
+    document.originalName = req.file.originalname;
+    document.fileSize = req.file.size;
+    document.mimeType = req.file.mimetype;
+    
+    // Process OCR if requested
+    const shouldPerformOCR = performOCR === 'true' || performOCR === true;
+    
+    if (shouldPerformOCR && req.file.mimetype.startsWith('image/')) {
+      try {
+        console.log(`✅ Starting OCR for replaced document: ${document.documentType}`);
+        const ocrResult = await ocrService.processDocument(req.file.path, document.documentType);
+        
+        // Reset verification status since it's a new file
+        document.extractedData = {
+          ...ocrResult,
+          isVerified: false,
+          verifiedAt: null,
+          verifiedBy: null
+        };
+        
+        console.log('✅ OCR processing completed');
+        console.log('   Confidence:', ocrResult.confidence?.toFixed(2) + '%');
+      } catch (ocrError) {
+        console.error('❌ OCR processing failed:', ocrError);
+        document.extractedData = {
+          rawText: 'OCR processing failed - please verify data manually',
+          ocrError: ocrError.message,
+          confidence: 0,
+          isVerified: false
+        };
+      }
+    } else if (!shouldPerformOCR) {
+      // Keep existing extracted data but mark as unverified
+      if (document.extractedData) {
+        document.extractedData.isVerified = false;
+        document.extractedData.verifiedAt = null;
+        document.extractedData.verifiedBy = null;
+      }
+    }
+
+    document.logAudit('replaced', 'Document file replaced', req.ip);
+    await document.save();
+
+    req.locker.logAccess('replace_document', req, true, document._id);
+    await req.locker.save();
+
+    res.json({
+      success: true,
+      message: 'Document replaced successfully',
+      data: document
+    });
+  } catch (error) {
+    console.error('Document replace error:', error);
+    // Clean up uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Failed to replace document'
     });
   }
 });

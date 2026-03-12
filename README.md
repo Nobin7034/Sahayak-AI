@@ -200,25 +200,81 @@ sahayak_ai/
 
 ## 🧪 Testing
 
-### Run Playwright Tests
+### Playwright E2E Tests (80+ Tests)
+
+The project includes a comprehensive Playwright E2E test suite with 80+ tests covering all core functionalities.
+
+#### Quick Start
 ```bash
 cd frontend
-
-# Run all tests
-npm test
-
-# Run tests in headed mode
-npm run test:headed
-
-# Run tests with UI
-npm run test:ui
-
-# Debug tests
-npm run test:debug
-
-# View test report
-npm run test:report
+npm install
+npx playwright install
+npm run test:e2e
 ```
+
+#### Test Commands
+```bash
+# Run all tests
+npm run test:e2e
+
+# Interactive UI mode (Recommended)
+npm run test:e2e:ui
+
+# Run with visible browser
+npm run test:e2e:headed
+
+# Debug mode
+npm run test:e2e:debug
+
+# Specific browser
+npm run test:e2e:chromium
+npm run test:e2e:firefox
+npm run test:e2e:webkit
+
+# Mobile tests
+npm run test:e2e:mobile
+
+# View HTML report
+npm run test:report
+
+# Generate Allure report
+npm run test:allure
+
+# Generate test summary
+npm run test:summary
+```
+
+#### Test Coverage
+- ✅ Landing Page & Navigation (8 tests)
+- ✅ Authentication (13 tests)
+- ✅ Services Management (13 tests)
+- ✅ Appointments (12 tests)
+- ✅ User Dashboard (9 tests)
+- ✅ News & Content (10 tests)
+- ✅ Admin Dashboard (11 tests)
+- ✅ Admin User Management (13 tests)
+- ✅ Admin Services (8 tests)
+- ✅ Admin Appointments (5 tests)
+- ✅ Admin Centers (8 tests)
+- ✅ Admin Staff (10 tests)
+- ✅ Staff Dashboard (14 tests)
+- ✅ Document Management (11 tests)
+- ✅ Center Finder (12 tests)
+- ✅ Navigation (11 tests)
+- ✅ Responsive Design (13 tests)
+- ✅ Accessibility (13 tests)
+- ✅ Performance (11 tests)
+- ✅ Error Handling (12 tests)
+
+#### Documentation
+- **START_TESTING.md** - Quick start guide
+- **QUICK_TEST_REFERENCE.md** - Command reference
+- **frontend/TESTING_GUIDE.md** - Complete testing guide
+- **frontend/TEST_DOCUMENTATION.md** - Detailed test docs
+- **TEST_SETUP_COMPLETE.md** - Setup summary
+
+#### Windows Users
+Double-click **`run-tests.bat`** for an interactive test menu.
 
 ## 📝 API Endpoints
 

@@ -33,3 +33,11 @@ backend/uploads/**/*
 !backend/uploads/.gitkeep
 !backend/uploads/avatars/.gitkeep
 !backend/uploads/document-locker/.gitkeep
+
+# Playwright test results
+frontend/test-results/
+frontend/playwright-report/
+frontend/allure-results/
+frontend/allure-report/
+frontend/TEST_SUMMARY.md
+frontend/.playwright/

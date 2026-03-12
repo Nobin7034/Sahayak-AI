@@ -15,7 +15,9 @@ import {
   AlertCircle,
   RefreshCw,
   Download,
-  MessageSquare
+  MessageSquare,
+  Wifi,
+  Building
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -25,10 +27,12 @@ const StaffAppointments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({
-    dateRange: 'today',
+    selectedDate: '', // Specific date selected from calendar
     status: 'all',
     serviceType: 'all',
-    searchTerm: ''
+    searchTerm: '',
+    processingMode: 'all', // 'all', 'physical', 'online'
+    sortBy: 'newest' // 'newest', 'oldest' - for online requests
   });
   const [pagination, setPagination] = useState({
     page: 1,
@@ -221,6 +225,40 @@ const StaffAppointments = () => {
       {/* Filters */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          {/* Processing Mode Tabs */}
+          <div className="flex space-x-2 mb-4 border-b">
+            <button
+              onClick={() => handleFilterChange('processingMode', 'all')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                filters.processingMode === 'all'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              All Appointments ({pagination.total})
+            </button>
+            <button
+              onClick={() => handleFilterChange('processingMode', 'physical')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                filters.processingMode === 'physical'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Walk-in Appointments
+            </button>
+            <button
+              onClick={() => handleFilterChange('processingMode', 'online')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                filters.processingMode === 'online'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Online Requests
+            </button>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             
             {/* Search */}
@@ -236,19 +274,45 @@ const StaffAppointments = () => {
               />
             </div>
 
-            {/* Date Range */}
-            <select
-              value={filters.dateRange}
-              onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md 
-                       focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="today">Today</option>
-              <option value="tomorrow">Tomorrow</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="all">All Time</option>
-            </select>
+            {/* Date Picker - Only for physical appointments */}
+            {filters.processingMode !== 'online' && (
+              <div className="relative">
+                <Calendar className="h-4 w-4 absolute left-3 top-3 text-gray-400 pointer-events-none" />
+                <input
+                  type="date"
+                  value={filters.selectedDate}
+                  onChange={(e) => handleFilterChange('selectedDate', e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md 
+                           focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Select date"
+                />
+                {filters.selectedDate && (
+                  <button
+                    onClick={() => handleFilterChange('selectedDate', '')}
+                    className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
+                    title="Clear date"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Sort by Booking Time - Only for online requests */}
+            {filters.processingMode === 'online' && (
+              <div className="relative">
+                <Clock className="h-4 w-4 absolute left-3 top-3 text-gray-400 pointer-events-none" />
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md 
+                           focus:ring-2 focus:ring-purple-500 focus:border-purple-500 appearance-none"
+                >
+                  <option value="newest">Newest First (Priority)</option>
+                  <option value="oldest">Oldest First</option>
+                </select>
+              </div>
+            )}
 
             {/* Status Filter */}
             <select
@@ -265,6 +329,24 @@ const StaffAppointments = () => {
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
+          
+          {/* Online Requests Info Banner */}
+          {filters.processingMode === 'online' && (
+            <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <div className="flex items-start space-x-2">
+                <Wifi className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-purple-900">
+                    Online Processing Requests
+                  </p>
+                  <p className="text-xs text-purple-700 mt-1">
+                    Showing requests sorted by booking time. Process newest requests first to minimize user wait time.
+                    {appointments.length > 0 && ` (${appointments.length} pending requests)`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -306,7 +388,7 @@ const StaffAppointments = () => {
                       User & Service
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date & Time
+                      Mode & Date/Time
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -339,14 +421,45 @@ const StaffAppointments = () => {
                         </div>
                       </td>
 
-                      {/* Date & Time */}
+                      {/* Mode & Date/Time */}
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {formatDate(appointment.appointmentDate)}
+                        <div className="flex items-center space-x-2 mb-1">
+                          {appointment.processingMode === 'online' ? (
+                            <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                              <Wifi className="h-3 w-3 mr-1" />
+                              Online
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                              <Building className="h-3 w-3 mr-1" />
+                              Walk-in
+                            </span>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {formatTime(appointment.timeSlot)}
-                        </div>
+                        {appointment.processingMode === 'physical' && appointment.appointmentDate ? (
+                          <>
+                            <div className="text-sm text-gray-900">
+                              {formatDate(appointment.appointmentDate)}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatTime(appointment.timeSlot)}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-xs text-purple-600 font-medium">
+                              Booked: {new Date(appointment.createdAt).toLocaleDateString('en-IN', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Process when available
+                            </div>
+                          </>
+                        )}
                       </td>
 
                       {/* Status */}
