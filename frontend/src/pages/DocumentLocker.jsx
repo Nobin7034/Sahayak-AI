@@ -63,9 +63,15 @@ const DocumentLocker = () => {
     tags: '',
     pin: ''
   });
+  const [documentValidation, setDocumentValidation] = useState({
+    isValidating: false,
+    isValid: null,
+    message: ''
+  });
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [warning, setWarning] = useState('');
   const [processing, setProcessing] = useState(false);
 
   const documentTypes = [
@@ -239,13 +245,72 @@ const DocumentLocker = () => {
     }
   };
 
+  const validateDocumentFile = async (file) => {
+    if (!file) {
+      setDocumentValidation({ isValidating: false, isValid: null, message: '' });
+      return;
+    }
+
+    setDocumentValidation({ isValidating: true, isValid: null, message: 'Validating document authenticity...' });
+
+    try {
+      const formData = new FormData();
+      formData.append('document', file);
+
+      const response = await axios.post('/api/document-locker/validate-document', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.isAuthentic) {
+        setDocumentValidation({
+          isValidating: false,
+          isValid: true,
+          message: 'Document appears to be authentic'
+        });
+      } else {
+        setDocumentValidation({
+          isValidating: false,
+          isValid: false,
+          message: response.data.message || 'This document appears to be fake or not a valid government document'
+        });
+      }
+    } catch (error) {
+      console.error('Document validation error:', error);
+      // If validation service is unavailable, allow upload
+      setDocumentValidation({
+        isValidating: false,
+        isValid: true,
+        message: 'Validation service unavailable - proceeding without validation'
+      });
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    setUploadForm({ ...uploadForm, file });
+    
+    // Validate the document immediately
+    if (file) {
+      validateDocumentFile(file);
+    } else {
+      setDocumentValidation({ isValidating: false, isValid: null, message: '' });
+    }
+  };
+
   const uploadDocument = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setWarning('');
 
     if (!uploadForm.file || !uploadForm.documentType || !uploadForm.pin) {
       setError('Please fill all required fields');
+      return;
+    }
+
+    // Double-check validation before upload
+    if (documentValidation.isValid === false) {
+      setError('Cannot upload fake documents. Please select an authentic government document.');
       return;
     }
 
@@ -265,6 +330,7 @@ const DocumentLocker = () => {
       setSuccess('Document uploaded and processed successfully!');
       setShowUpload(false);
       setUploadForm({ file: null, documentType: '', name: '', tags: '', pin: '' });
+      setDocumentValidation({ isValidating: false, isValid: null, message: '' });
       
       // Update current PIN if upload was successful
       setCurrentPin(uploadForm.pin);
@@ -774,12 +840,28 @@ const DocumentLocker = () => {
           </div>
         </div>
 
-        {/* Error/Success Messages */}
+        {/* Error/Success/Warning Messages */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center">
               <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
               <p className="text-red-800">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {warning && (
+          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+              <div>
+                <p className="text-yellow-800 font-semibold">Warning: Fake Document Detected</p>
+                <p className="text-yellow-700 text-sm mt-1">{warning}</p>
+                <p className="text-yellow-600 text-xs mt-2">
+                  This document has been uploaded but may not be accepted for official purposes. 
+                  Please verify the authenticity of this document.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -1104,13 +1186,43 @@ const DocumentLocker = () => {
                   <input
                     type="file"
                     accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,.pdf"
-                    onChange={(e) => setUploadForm({ ...uploadForm, file: e.target.files[0] })}
+                    onChange={handleFileSelect}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Supported formats: JPEG, PNG, PDF (Max 10MB)
                   </p>
+                  
+                  {/* Document Validation Status */}
+                  {documentValidation.isValidating && (
+                    <div className="mt-2 flex items-center text-blue-600">
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      <span className="text-sm">{documentValidation.message}</span>
+                    </div>
+                  )}
+                  
+                  {documentValidation.isValid === true && !documentValidation.isValidating && (
+                    <div className="mt-2 flex items-center text-green-600">
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      <span className="text-sm">{documentValidation.message}</span>
+                    </div>
+                  )}
+                  
+                  {documentValidation.isValid === false && !documentValidation.isValidating && (
+                    <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertTriangle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-red-800">Fake Document Detected</p>
+                          <p className="text-xs text-red-700 mt-1">{documentValidation.message}</p>
+                          <p className="text-xs text-red-600 mt-2">
+                            This document cannot be uploaded. Please provide an authentic government document.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="mb-4">
@@ -1176,20 +1288,29 @@ const DocumentLocker = () => {
                 <div className="flex space-x-3">
                   <button
                     type="button"
-                    onClick={() => setShowUpload(false)}
+                    onClick={() => {
+                      setShowUpload(false);
+                      setDocumentValidation({ isValidating: false, isValid: null, message: '' });
+                    }}
                     className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={processing}
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                    disabled={processing || documentValidation.isValidating || documentValidation.isValid === false}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    title={documentValidation.isValid === false ? 'Cannot upload fake documents' : ''}
                   >
                     {processing ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                         Processing...
+                      </>
+                    ) : documentValidation.isValidating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Validating...
                       </>
                     ) : (
                       <>

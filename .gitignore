@@ -41,3 +41,12 @@ frontend/allure-results/
 frontend/allure-report/
 frontend/TEST_SUMMARY.md
 frontend/.playwright/
+
+
+# ML Service
+ml-service/venv/
+ml-service/__pycache__/
+ml-service/*.pyc
+ml-service/.pytest_cache/
+ml-service/models/*.h5
+ml-service/m

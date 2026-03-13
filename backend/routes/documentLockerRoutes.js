@@ -239,6 +239,96 @@ router.post('/documents', authenticate, verifyLockerPin, async (req, res) => {
   }
 });
 
+// Validate document before upload (pre-check)
+router.post('/validate-document', authenticate, upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No document file provided'
+      });
+    }
+
+    console.log('=== Document Validation Request ===');
+    console.log('File:', req.file.originalname);
+    console.log('Size:', req.file.size);
+    console.log('Type:', req.file.mimetype);
+
+    // ML Document Authentication Check
+    let mlVerification = null;
+    try {
+      console.log('🔍 Starting ML document authentication...');
+      const mlService = (await import('../services/mlService.js')).default;
+      mlVerification = await mlService.verifyDocument(req.file.path);
+      
+      console.log('ML Verification Result:', {
+        prediction: mlVerification.prediction,
+        confidence: mlVerification.confidence,
+        isAuthentic: mlVerification.isAuthentic
+      });
+      
+    } catch (mlError) {
+      console.error('ML verification error:', mlError);
+      // If ML service fails, allow upload (graceful degradation)
+      mlVerification = {
+        prediction: 'unverified',
+        confidence: 0,
+        isAuthentic: true,
+        warning: 'ML service unavailable'
+      };
+    }
+
+    // Clean up the temporary file
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    // Return validation result
+    if (!mlVerification.isAuthentic && mlVerification.prediction !== 'unverified') {
+      return res.json({
+        success: true,
+        isAuthentic: false,
+        message: 'This document appears to be fake or not a valid government document',
+        details: {
+          prediction: mlVerification.prediction,
+          confidence: mlVerification.confidence,
+          interpretation: mlVerification.details?.interpretation
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      isAuthentic: true,
+      message: 'Document appears to be authentic',
+      details: {
+        prediction: mlVerification.prediction,
+        confidence: mlVerification.confidence
+      }
+    });
+
+  } catch (error) {
+    console.error('Document validation error:', error);
+    
+    // Clean up uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Failed to clean up file:', cleanupError);
+      }
+    }
+    
+    // Return success with warning if validation fails (graceful degradation)
+    res.json({
+      success: true,
+      isAuthentic: true,
+      message: 'Validation service unavailable - proceeding without validation',
+      warning: error.message
+    });
+  }
+});
+
 // Upload document
 router.post('/upload', authenticate, upload.single('document'), async (req, res) => {
   try {
@@ -284,6 +374,45 @@ router.post('/upload', authenticate, upload.single('document'), async (req, res)
         success: false,
         message: 'Invalid PIN'
       });
+    }
+    
+    // ML Document Authentication Check
+    let mlVerification = null;
+    try {
+      console.log('🔍 Starting ML document authentication...');
+      const mlService = (await import('../services/mlService.js')).default;
+      mlVerification = await mlService.verifyDocument(req.file.path);
+      
+      console.log('ML Verification Result:', {
+        prediction: mlVerification.prediction,
+        confidence: mlVerification.confidence,
+        isAuthentic: mlVerification.isAuthentic
+      });
+      
+      // Reject fake documents (should not reach here if frontend validation works)
+      if (!mlVerification.isAuthentic && mlVerification.prediction !== 'unverified') {
+        fs.unlinkSync(req.file.path); // Clean up uploaded file
+        console.error('⚠️  Fake document reached upload endpoint - frontend validation bypassed');
+        return res.status(400).json({
+          success: false,
+          message: 'Document authentication failed',
+          reason: 'The uploaded document appears to be fake or tampered',
+          details: {
+            prediction: mlVerification.prediction,
+            confidence: mlVerification.confidence,
+            interpretation: mlVerification.details?.interpretation
+          }
+        });
+      }
+      
+      if (mlVerification.warning) {
+        console.warn('⚠️  ML Service Warning:', mlVerification.warning);
+      }
+      
+    } catch (mlError) {
+      console.error('ML verification error:', mlError);
+      // Continue with upload if ML service fails (graceful degradation)
+      console.warn('⚠️  Continuing without ML verification');
     }
     
     // Process document with OCR based on user choice

@@ -20,14 +20,76 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
   const [error, setError] = useState('');
   const [uploadMethod, setUploadMethod] = useState('file'); // 'file', 'camera', 'qr'
   const [performOCR, setPerformOCR] = useState(true); // User choice: perform OCR or skip
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState(null); // { isAuthentic: boolean, message: string }
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+
+  const validateDocument = async (fileToValidate) => {
+    setValidating(true);
+    setValidationResult(null);
+    setError('');
+
+    try {
+      // Get fresh token
+      let token = localStorage.getItem('token');
+      if (!token && auth.currentUser) {
+        token = await auth.currentUser.getIdToken(true);
+      }
+
+      if (!token) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      const formData = new FormData();
+      formData.append('document', fileToValidate);
+
+      const response = await axios.post(
+        '/api/document-locker/validate-document',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data.success) {
+        setValidationResult({
+          isAuthentic: response.data.isAuthentic,
+          message: response.data.message,
+          details: response.data.details
+        });
+
+        // If document is fake, show error and popup alert
+        if (!response.data.isAuthentic) {
+          const errorMsg = 'This document appears to be fake or not a valid government document. Please provide an authentic document.';
+          setError(errorMsg);
+          
+          // Show popup alert to ensure user sees the warning
+          alert('⚠️ FAKE DOCUMENT DETECTED\n\n' + errorMsg + '\n\nThis document cannot be uploaded.');
+        }
+      }
+    } catch (error) {
+      console.error('Document validation error:', error);
+      // If validation fails, allow upload (graceful degradation)
+      setValidationResult({
+        isAuthentic: true,
+        message: 'Validation service unavailable - proceeding without validation',
+        warning: true
+      });
+    } finally {
+      setValidating(false);
+    }
+  };
 
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
       setFile(selectedFile);
       setError('');
+      setValidationResult(null);
       
       // Create preview for images
       if (selectedFile.type.startsWith('image/')) {
@@ -39,6 +101,9 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
       } else {
         setPreview(null);
       }
+
+      // Validate the document
+      validateDocument(selectedFile);
     }
   };
 
@@ -47,18 +112,34 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
     if (capturedFile) {
       setFile(capturedFile);
       setError('');
+      setValidationResult(null);
       
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result);
       };
       reader.readAsDataURL(capturedFile);
+
+      // Validate the document
+      validateDocument(capturedFile);
     }
   };
 
   const handleUpload = async () => {
     if (!file) {
       setError('Please select a file to upload');
+      return;
+    }
+
+    // Check if document is validated and authentic
+    if (validationResult && !validationResult.isAuthentic) {
+      setError('Cannot upload fake or invalid documents. Please select an authentic government document.');
+      return;
+    }
+
+    // Check if validation is still in progress
+    if (validating) {
+      setError('Please wait for document validation to complete');
       return;
     }
 
@@ -240,6 +321,8 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
                       onClick={() => {
                         setFile(null);
                         setPreview(null);
+                        setValidationResult(null);
+                        setError('');
                       }}
                       className="text-sm text-blue-600 hover:text-blue-700 mt-2"
                     >
@@ -287,6 +370,8 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
                       onClick={() => {
                         setFile(null);
                         setPreview(null);
+                        setValidationResult(null);
+                        setError('');
                       }}
                       className="text-sm text-blue-600 hover:text-blue-700"
                     >
@@ -307,6 +392,79 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
               <p className="text-sm text-gray-500">
                 Coming soon - Scan QR codes from DigiLocker and other sources
               </p>
+            </div>
+          )}
+
+          {/* Document Validation Status */}
+          {file && validating && (
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <Loader2 className="h-5 w-5 text-blue-600 animate-spin mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">
+                    Validating document authenticity...
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    Checking if this is a valid government document
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {file && validationResult && validationResult.isAuthentic && !validationResult.warning && (
+            <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-green-900">
+                    Document appears to be authentic
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    This document passed validation checks
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {file && validationResult && validationResult.isAuthentic && validationResult.warning && (
+            <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-900">
+                    {validationResult.message}
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Proceeding without validation
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {file && validationResult && !validationResult.isAuthentic && (
+            <div className="mt-4 bg-red-50 border-2 border-red-300 rounded-lg p-4">
+              <div className="flex items-start">
+                <AlertTriangle className="h-6 w-6 text-red-600 mr-3 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-base font-bold text-red-900 mb-2">
+                    ⚠️ Fake Document Detected
+                  </p>
+                  <p className="text-sm text-red-800 mb-2">
+                    This document appears to be fake or not a valid government document.
+                  </p>
+                  <p className="text-sm font-medium text-red-900">
+                    This document cannot be uploaded. Please provide an authentic government document.
+                  </p>
+                  {validationResult.details && (
+                    <div className="mt-2 text-xs text-red-700 bg-red-100 p-2 rounded">
+                      <p>Confidence: {validationResult.details.confidence?.toFixed(1)}%</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -437,13 +595,24 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
           </button>
           <button
             onClick={handleUpload}
-            disabled={!file || uploading}
+            disabled={!file || uploading || validating || (validationResult && !validationResult.isAuthentic)}
             className="btn-primary flex items-center disabled:bg-gray-300 disabled:cursor-not-allowed"
+            title={
+              validating ? 'Validating document...' :
+              (validationResult && !validationResult.isAuthentic) ? 'Cannot upload fake documents' :
+              !file ? 'Please select a file' :
+              ''
+            }
           >
             {uploading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 {performOCR ? 'Uploading & Processing...' : 'Uploading...'}
+              </>
+            ) : validating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Validating...
               </>
             ) : (
               <>
