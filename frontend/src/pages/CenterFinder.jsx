@@ -7,6 +7,14 @@ import CenterInfoPanel from '../components/map/CenterInfoPanel';
 import centerService from '../services/centerService';
 import { MapPin, List, Grid, ArrowLeft, Phone } from 'lucide-react';
 
+// Koovappally, Kerala — PIN 686518 (9°31'0"N 76°49'0"E)
+const DEFAULT_LOCATION = { lat: 9.5167, lng: 76.8167 };
+
+// Only accept GPS if it's within Kerala bounds
+function isValidKeralaCoord(lat, lng) {
+  return lat >= 8.0 && lat <= 13.0 && lng >= 74.5 && lng <= 78.0;
+}
+
 const CenterFinder = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -16,11 +24,11 @@ const CenterFinder = () => {
   const [filteredCenters, setFilteredCenters] = useState([]);
   const [selectedCenter, setSelectedCenter] = useState(null);
   const [selectedService, setSelectedService] = useState(null);
-  const [userLocation, setUserLocation] = useState(null);
+  const [userLocation, setUserLocation] = useState(DEFAULT_LOCATION); // default to Kottayam region
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [viewMode, setViewMode] = useState('map'); // 'map' or 'list'
-  const [searchRadius, setSearchRadius] = useState(10); // km - Default to 10km for local view
+  const [viewMode, setViewMode] = useState('map');
+  const [searchRadius, setSearchRadius] = useState(20); // default 20km
 
   useEffect(() => {
     const loadData = async () => {
@@ -60,19 +68,8 @@ const CenterFinder = () => {
       }
       
       setCenters(allCenters);
-      
-      // If user location is available and no service filter, show nearby centers by default
-      if (userLocation && !serviceId) {
-        const centersWithDistance = centerService.filterCentersByDistance(
-          allCenters, 
-          userLocation.lat, 
-          userLocation.lng, 
-          searchRadius
-        );
-        setFilteredCenters(centersWithDistance);
-      } else {
-        setFilteredCenters(allCenters);
-      }
+      // Apply radius filter immediately using current location (default or GPS)
+      applyRadiusFilter(userLocation, searchRadius, allCenters);
     } catch (error) {
       console.error('Error loading centers:', error);
       setError('Failed to load Akshaya centers. Please try again.');
@@ -86,43 +83,69 @@ const CenterFinder = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
-          // Automatically load nearby centers within 10km
-          loadNearbyCenters(latitude, longitude, 10);
+          // Only use GPS if it's a valid Kerala coordinate
+          if (!isValidKeralaCoord(latitude, longitude)) {
+            console.log('GPS returned non-Kerala coords, keeping default location');
+            return;
+          }
+          const loc = { lat: latitude, lng: longitude };
+          setUserLocation(loc);
+          applyRadiusFilter(loc, searchRadius);
         },
         (error) => {
-          console.log('Geolocation error:', error);
-          // Continue without user location - show all centers
-          setFilteredCenters(centers);
+          console.log('Geolocation error — keeping default location:', error);
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000 // 5 minutes
-        }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
       );
-    } else {
-      // Geolocation not supported - show all centers
-      setFilteredCenters(centers);
     }
   };
 
+  // Client-side radius filter — always reliable regardless of backend geo index
+  const applyRadiusFilter = (loc, radius, allCentersList) => {
+    const source = allCentersList || centers;
+    if (!loc || radius === null) {
+      setFilteredCenters(source);
+      return;
+    }
+    const filtered = centerService.filterCentersByDistance(
+      source,
+      loc.lat,
+      loc.lng,
+      radius
+    );
+    setFilteredCenters(filtered);
+  };
+
   const loadNearbyCenters = async (lat, lng, radius = searchRadius) => {
+    // Primary: client-side filter (always works)
+    const loc = { lat, lng };
+    applyRadiusFilter(loc, radius);
+
+    // Secondary: try backend for server-sorted results (optional enhancement)
     try {
       const response = await centerService.getNearbyCenters(lat, lng, radius);
-      setFilteredCenters(response.centers || []);
+      if (response.centers && response.centers.length > 0) {
+        // Backend returned results — use them (they include accurate distance)
+        let backendCenters = response.centers;
+        if (serviceId) {
+          backendCenters = backendCenters.filter(center =>
+            center.services && center.services.some(s => s._id === serviceId)
+          );
+        }
+        setFilteredCenters(backendCenters);
+      }
+      // If backend returns 0 results, keep the client-side filtered results
     } catch (error) {
-      console.error('Error loading nearby centers:', error);
-      // Fall back to all centers
-      setFilteredCenters(centers);
+      console.error('Backend nearby failed, using client-side filter:', error);
+      // Client-side filter already applied above — nothing more to do
     }
   };
 
   const handleSearch = async (query) => {
     if (!query.trim()) {
-      // Clear search - show all centers or nearby if user location available
-      if (userLocation) {
-        loadNearbyCenters(userLocation.lat, userLocation.lng);
+      // Clear search — re-apply current radius filter
+      if (userLocation && searchRadius) {
+        applyRadiusFilter(userLocation, searchRadius);
       } else {
         setFilteredCenters(centers);
       }
@@ -130,7 +153,7 @@ const CenterFinder = () => {
     }
 
     try {
-      const response = await centerService.searchCenters(query, searchRadius);
+      const response = await centerService.searchCenters(query, searchRadius || 50);
       setFilteredCenters(response.centers || []);
     } catch (error) {
       console.error('Error searching centers:', error);
@@ -140,7 +163,7 @@ const CenterFinder = () => {
 
   const handleLocationFound = (coordinates) => {
     setUserLocation(coordinates);
-    loadNearbyCenters(coordinates.lat, coordinates.lng);
+    applyRadiusFilter(coordinates, searchRadius || 10);
   };
 
   const handleCenterSelect = async (centerId) => {
@@ -283,9 +306,7 @@ const CenterFinder = () => {
                         key={radius}
                         onClick={() => {
                           setSearchRadius(radius);
-                          if (userLocation) {
-                            loadNearbyCenters(userLocation.lat, userLocation.lng, radius);
-                          }
+                          loadNearbyCenters(userLocation.lat, userLocation.lng, radius);
                         }}
                         className={`px-3 py-1 text-sm rounded-full transition-colors ${
                           searchRadius === radius
@@ -302,8 +323,8 @@ const CenterFinder = () => {
               
               <button
                 onClick={() => {
-                  setFilteredCenters(centers);
                   setSearchRadius(null);
+                  setFilteredCenters(centers);
                 }}
                 className={`px-3 py-1 text-sm rounded-full transition-colors ${
                   searchRadius === null

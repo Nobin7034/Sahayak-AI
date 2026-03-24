@@ -32,6 +32,8 @@ const OnlineDocumentReview = ({
   const [editingDocument, setEditingDocument] = useState(null);
   const [uploadingDocument, setUploadingDocument] = useState(null);
   const [showPinInput, setShowPinInput] = useState(true);
+  const [previewDocId, setPreviewDocId] = useState(null);
+  const [docImageUrls, setDocImageUrls] = useState({});
 
   const handlePinSubmit = async (e) => {
     e.preventDefault();
@@ -145,15 +147,76 @@ const OnlineDocumentReview = ({
     }
   };
 
-  const handleUploadMissing = (documentType) => {
-    setUploadingDocument(documentType);
+  const getDocumentImageUrl = (document) => {
+    if (!document.filePath) return null;
+    const normalized = document.filePath.replace(/\\/g, '/');
+    const idx = normalized.indexOf('uploads/');
+    if (idx === -1) return null;
+    return '/' + normalized.slice(idx);
   };
 
-  const handleUploadComplete = (newDocument) => {
-    // Add newly uploaded document to the list
-    setDocumentData(prev => [...prev, newDocument]);
+  const handleViewDocument = async (docId) => {
+    if (previewDocId === docId) {
+      setPreviewDocId(null);
+      return;
+    }
+    // If we already fetched this image, just show it
+    if (docImageUrls[docId]) {
+      setPreviewDocId(docId);
+      return;
+    }
+    try {
+      let token = localStorage.getItem('token');
+      if (!token && auth.currentUser) token = await auth.currentUser.getIdToken(true);
+      const response = await fetch(`/api/document-locker/documents/${docId}/view`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin })
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      if (blob.type.startsWith('image/') || blob.type === 'application/pdf') {
+        const url = URL.createObjectURL(blob);
+        setDocImageUrls(prev => ({ ...prev, [docId]: { url, type: blob.type } }));
+        setPreviewDocId(docId);
+      }
+    } catch (err) {
+      console.error('Failed to load document image:', err);
+    }
+  };
+
+  const normalizeDocumentNameToType = (documentName) => {
+    if (!documentName) return null;
+    const nameToTypeMap = {
+      'aadhaar card': 'aadhaar_card', 'aadhar card': 'aadhaar_card',
+      'pan card': 'pan_card', 'voter id': 'voter_id', 'voter id card': 'voter_id',
+      'driving license': 'driving_license', 'driving licence': 'driving_license',
+      'passport': 'passport', 'ration card': 'ration_card',
+      'birth certificate': 'birth_certificate', 'death certificate': 'death_certificate',
+      'income certificate': 'income_certificate', 'caste certificate': 'caste_certificate',
+      'community certificate': 'community_certificate', 'domicile certificate': 'domicile_certificate',
+      'residence certificate': 'residence_certificate', 'marriage certificate': 'marriage_certificate',
+      'bank passbook': 'bank_passbook', 'salary slip': 'salary_slip',
+      'property document': 'property_document', 'educational certificate': 'educational_certificate',
+      'medical certificate': 'medical_certificate', 'photo': 'photo', 'photograph': 'photo',
+    };
+    return nameToTypeMap[documentName.toLowerCase().trim()] ||
+      documentName.toLowerCase().trim().replace(/\s+/g, '_');
+  };
+
+  const handleUploadMissing = (doc) => {
+    setUploadingDocument(doc);
+  };
+
+  const handleUploadComplete = (newDocument, uploadedDocType) => {
+    // Backend returns documentId, normalize to _id for consistency with locker docs
+    const normalizedDoc = { ...newDocument, _id: newDocument._id || newDocument.documentId };
+    setDocumentData(prev => [...prev, normalizedDoc]);
     setMissingDocuments(prev =>
-      prev.filter(doc => doc.documentType !== newDocument.documentType)
+      prev.filter(doc => {
+        const docType = normalizeDocumentNameToType(doc.documentName);
+        return docType !== uploadedDocType && doc.documentId !== newDocument.documentId;
+      })
     );
     setUploadingDocument(null);
   };
@@ -319,10 +382,11 @@ const OnlineDocumentReview = ({
           
           {documentData.map((document) => {
             const completeness = getDataCompletenessScore(document);
+            const docId = document._id || document.documentId;
             
             return (
               <div
-                key={document._id}
+                key={docId}
                 className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start justify-between">
@@ -385,6 +449,13 @@ const OnlineDocumentReview = ({
                   {/* Actions */}
                   <div className="flex flex-col space-y-2">
                     <button
+                      onClick={() => handleViewDocument(docId)}
+                      className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 text-sm"
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span>{previewDocId === docId ? 'Hide' : 'View'}</span>
+                    </button>
+                    <button
                       onClick={() => handleEditDocument(document)}
                       className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 text-sm"
                     >
@@ -399,6 +470,25 @@ const OnlineDocumentReview = ({
                     )}
                   </div>
                 </div>
+
+                {/* Document Image Preview */}
+                {previewDocId === docId && docImageUrls[docId] && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    {docImageUrls[docId].type === 'application/pdf' ? (
+                      <iframe
+                        src={docImageUrls[docId].url}
+                        className="w-full h-72 rounded-lg border border-gray-200"
+                        title={document.name}
+                      />
+                    ) : (
+                      <img
+                        src={docImageUrls[docId].url}
+                        alt={document.name}
+                        className="max-h-72 w-auto rounded-lg border border-gray-200 mx-auto block"
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -412,9 +502,9 @@ const OnlineDocumentReview = ({
             Missing Documents ({missingDocuments.length})
           </h3>
           
-          {missingDocuments.map((doc, index) => (
+          {missingDocuments.map((doc) => (
             <div
-              key={index}
+              key={doc.documentId}
               className="border border-yellow-200 bg-yellow-50 rounded-lg p-4"
             >
               <div className="flex items-center justify-between">
@@ -474,7 +564,7 @@ const OnlineDocumentReview = ({
         <DocumentUploadModal
           documentType={uploadingDocument}
           pin={pin}
-          onUploadComplete={handleUploadComplete}
+          onUploadComplete={(newDoc) => handleUploadComplete(newDoc, normalizeDocumentNameToType(uploadingDocument?.documentName) || uploadingDocument)}
           onCancel={() => setUploadingDocument(null)}
         />
       )}

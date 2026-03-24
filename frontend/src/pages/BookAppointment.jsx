@@ -65,9 +65,9 @@ const BookAppointment = () => {
   const { user } = useAuth();
   
   // Parse selected documents from URL
-  const selectedDocuments = documentsParam ? JSON.parse(decodeURIComponent(documentsParam)) : [];
+  const selectedDocuments = documentsParam ? (() => { try { return JSON.parse(decodeURIComponent(documentsParam)); } catch { return []; } })() : [];
   const processingMode = processingModeParam || 'physical';
-  const structuredData = structuredDataParam ? JSON.parse(decodeURIComponent(structuredDataParam)) : null;
+  const structuredData = structuredDataParam ? (() => { try { return JSON.parse(decodeURIComponent(structuredDataParam)); } catch { return null; } })() : null;
   
   // Create authenticated axios instance
   const authAxios = createAuthenticatedAxios();

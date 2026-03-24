@@ -6,8 +6,7 @@ import {
   FileText,
   Loader2,
   CheckCircle,
-  AlertTriangle,
-  QrCode
+  AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 import { auth } from '../firebase';
@@ -259,20 +258,6 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
               <Camera className="h-5 w-5" />
               <span>Camera</span>
             </button>
-            
-            <button
-              onClick={() => setUploadMethod('qr')}
-              className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-lg border-2 transition-colors ${
-                uploadMethod === 'qr'
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              disabled
-              title="QR scan coming soon"
-            >
-              <QrCode className="h-5 w-5" />
-              <span>QR Scan</span>
-            </button>
           </div>
 
           {/* Upload Area */}
@@ -380,18 +365,6 @@ const DocumentUploadModal = ({ documentType, pin, onUploadComplete, onCancel }) 
                   </div>
                 </div>
               )}
-            </div>
-          )}
-
-          {uploadMethod === 'qr' && (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-              <QrCode className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-2">
-                QR Code Scanning
-              </p>
-              <p className="text-sm text-gray-500">
-                Coming soon - Scan QR codes from DigiLocker and other sources
-              </p>
             </div>
           )}
 

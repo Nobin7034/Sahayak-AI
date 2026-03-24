@@ -12,7 +12,6 @@ class OCRService {
 
   /**
    * Extract text from image using Tesseract.js
-   * Enhanced with better OCR settings for 75%+ accuracy
    */
   async extractText(imagePath, options = {}) {
     try {
@@ -21,16 +20,15 @@ class OCRService {
       
       const { data } = await Tesseract.recognize(
         processedImagePath,
-        'eng+hin', // English and Hindi support
+        'eng+hin',
         {
           logger: m => {
             if (m.status === 'recognizing text') {
               console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
             }
           },
-          // Enhanced Tesseract configuration for better accuracy
+          // Do NOT use char_whitelist — it strips valid characters and kills accuracy
           tessedit_pageseg_mode: Tesseract.PSM.AUTO,
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/-:., ',
           preserve_interword_spaces: '1',
           ...options
         }
@@ -38,11 +36,7 @@ class OCRService {
       
       // Clean up processed image if it's different from original
       if (processedImagePath !== imagePath) {
-        try {
-          fs.unlinkSync(processedImagePath);
-        } catch (cleanupError) {
-          console.warn('Failed to cleanup processed image:', cleanupError);
-        }
+        try { fs.unlinkSync(processedImagePath); } catch {}
       }
       
       console.log(`OCR Confidence: ${data.confidence.toFixed(2)}%`);
@@ -62,46 +56,35 @@ class OCRService {
 
   /**
    * Preprocess image for better OCR accuracy
-   * Enhanced preprocessing for 75%+ accuracy
    */
   async preprocessImage(imagePath) {
     try {
-      const processedPath = imagePath.replace(/\.(jpg|jpeg|png)$/i, '_processed.png');
+      const processedPath = imagePath.replace(/\.(jpg|jpeg|png|webp)$/i, '_processed.png');
       
-      // Get image metadata first
       const metadata = await sharp(imagePath).metadata();
       
-      // Calculate optimal size (larger images = better OCR)
-      const targetWidth = Math.max(metadata.width, 3000);
+      // Scale up small images — Tesseract works best at ~300 DPI equivalent
+      // For typical document photos, target ~2400px wide
+      const targetWidth = Math.min(Math.max(metadata.width * 2, 2400), 4800);
       
       await sharp(imagePath)
-        // Resize to larger dimensions for better text recognition
-        .resize(targetWidth, null, { 
+        .resize(targetWidth, null, {
           withoutEnlargement: false,
           fit: 'inside',
           kernel: sharp.kernel.lanczos3
         })
-        // Convert to grayscale
         .grayscale()
-        // Enhance contrast
+        // Normalize histogram for even lighting
         .normalize()
-        // Apply adaptive threshold for better text separation
-        .linear(1.5, -(128 * 1.5) + 128)
-        // Sharpen text edges
-        .sharpen({ sigma: 1.5 })
-        // Reduce noise
-        .median(3)
-        // High quality output
-        .png({ 
-          quality: 100,
-          compressionLevel: 0
-        })
+        // Mild sharpening only — aggressive sharpening creates artifacts
+        .sharpen({ sigma: 0.8, m1: 0.5, m2: 3 })
+        .png({ quality: 100, compressionLevel: 0 })
         .toFile(processedPath);
       
       return processedPath;
     } catch (error) {
       console.error('Image preprocessing failed:', error);
-      return imagePath; // Return original if preprocessing fails
+      return imagePath;
     }
   }
 
@@ -110,78 +93,66 @@ class OCRService {
    */
   extractAadhaarData(ocrResult) {
     const text = ocrResult.text;
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const data = {};
     
-    // Extract Aadhaar number (12 digits)
-    const aadhaarMatch = text.match(/\b\d{4}\s*\d{4}\s*\d{4}\b/);
+    // Aadhaar number — 12 digits, possibly space-separated in groups of 4
+    const aadhaarMatch = text.match(/\b(\d{4}[\s\-]?\d{4}[\s\-]?\d{4})\b/);
     if (aadhaarMatch) {
-      data.aadhaarNumber = aadhaarMatch[0].replace(/\s/g, '');
+      data.aadhaarNumber = aadhaarMatch[1].replace(/[\s\-]/g, '');
     }
     
-    // Extract name (usually after "Name:" or before DOB)
+    // Name — try labeled patterns first, then fall back to all-caps lines
     const namePatterns = [
-      /(?:Name[:\s]*|नाम[:\s]*)(.*?)(?:\n|Date of Birth|DOB|जन्म)/i,
-      /^([A-Z\s]+)$/m
+      /(?:Name|नाम)\s*[:\s]+([A-Za-z][A-Za-z\s]{2,40}?)(?:\r?\n|$)/i,
+      /(?:^|\n)([A-Z][A-Z\s]{4,30})(?:\r?\n|Male|Female|DOB|Date)/m,
     ];
-    
-    for (const pattern of namePatterns) {
-      const nameMatch = text.match(pattern);
-      if (nameMatch && nameMatch[1]) {
-        data.fullName = nameMatch[1].trim();
-        break;
+    for (const p of namePatterns) {
+      const m = text.match(p);
+      if (m?.[1]?.trim().length > 2) { data.fullName = m[1].trim(); break; }
+    }
+    // Fallback: first all-caps line that looks like a name
+    if (!data.fullName) {
+      for (const line of lines) {
+        if (/^[A-Z][A-Z\s]{4,35}$/.test(line) && !/GOVERNMENT|INDIA|UNIQUE|AUTHORITY|AADHAAR/i.test(line)) {
+          data.fullName = line; break;
+        }
       }
     }
     
-    // Extract Date of Birth
+    // DOB
     const dobPatterns = [
-      /(?:DOB|Date of Birth|जन्म तिथि)[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i,
-      /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/
+      /(?:DOB|Date of Birth|जन्म तिथि|Year of Birth)\s*[:\s]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i,
+      /(?:DOB|Date of Birth)\s*[:\s]+(\d{4})/i,
+      /\b(\d{2}[\/\-]\d{2}[\/\-]\d{4})\b/,
     ];
-    
-    for (const pattern of dobPatterns) {
-      const dobMatch = text.match(pattern);
-      if (dobMatch) {
-        data.dateOfBirth = this.parseDate(dobMatch[1]);
-        break;
-      }
+    for (const p of dobPatterns) {
+      const m = text.match(p); if (m) { data.dateOfBirth = this.parseDate(m[1]); break; }
     }
     
-    // Extract gender
-    const genderMatch = text.match(/(?:Gender|लिंग)[:\s]*(Male|Female|पुरुष|महिला)/i);
+    // Gender
+    const genderMatch = text.match(/\b(Male|Female|MALE|FEMALE|पुरुष|महिला)\b/);
     if (genderMatch) {
-      data.gender = genderMatch[1].toLowerCase().includes('male') || genderMatch[1].includes('पुरुष') ? 'Male' : 'Female';
+      const g = genderMatch[1].toLowerCase();
+      data.gender = (g === 'male' || g === 'पुरुष') ? 'Male' : 'Female';
     }
     
-    // Extract father's name
-    const fatherMatch = text.match(/(?:Father|पिता)[:\s]*(.*?)(?:\n|Address|पता)/i);
-    if (fatherMatch) {
-      data.fatherName = fatherMatch[1].trim();
-    }
+    // Father name
+    const fatherMatch = text.match(/(?:S\/O|D\/O|Father|पिता)\s*[:\s]+([A-Za-z\s]{3,40}?)(?:\r?\n|Address|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
     
-    // Extract address
-    const addressMatch = text.match(/(?:Address|पता)[:\s]*(.*?)(?:\n.*?PIN|$)/is);
-    if (addressMatch) {
-      data.address = this.parseAddress(addressMatch[1]);
-    }
+    // Address — everything after "Address" label until PIN
+    const addressMatch = text.match(/(?:Address|पता)\s*[:\s]+([\s\S]{10,200}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
     
-    // Extract PIN code
-    const pinMatch = text.match(/PIN[:\s]*(\d{6})/i) || text.match(/(\d{6})/);
+    // PIN code
+    const pinMatch = text.match(/\b(\d{6})\b/);
     if (pinMatch) {
-      data.address = data.address || {};
-      data.address.pincode = pinMatch[1];
+      if (!data.address) data.address = {};
+      if (typeof data.address === 'object') data.address.pincode = pinMatch[1];
     }
     
-    // Extract mobile number
-    const mobileMatch = text.match(/(?:Mobile|Mob)[:\s]*(\d{10})/i);
-    if (mobileMatch) {
-      data.mobileNumber = mobileMatch[1];
-    }
-    
-    return {
-      ...data,
-      rawText: text,
-      confidence: ocrResult.confidence
-    };
+    return { ...data, rawText: text, confidence: ocrResult.confidence };
   }
 
   /**
@@ -240,31 +211,48 @@ class OCRService {
    */
   extractRationCardData(ocrResult) {
     const text = ocrResult.text;
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     const data = {};
     
-    // Extract ration card number
-    const rationMatch = text.match(/(?:Card No|कार्ड संख्या)[:\s]*([A-Z0-9]+)/i);
-    if (rationMatch) {
-      data.rationCardNumber = rationMatch[1];
+    // Ration card number — various formats
+    const rationMatch = text.match(/(?:Card\s*(?:No|Number)|RC\s*No|Ration\s*Card\s*No|कार्ड\s*(?:संख्या|नं))\s*[:\s]+([A-Z0-9\/\-]+)/i)
+      || text.match(/\b([A-Z]{2,4}[\/\-]?\d{6,12})\b/);
+    if (rationMatch) data.rationCardNumber = rationMatch[1].trim();
+    
+    // Head of family name
+    const namePatterns = [
+      /(?:Head\s*of\s*Family|HoF|मुखिया|Name\s*of\s*Head)\s*[:\s]+([A-Za-z\s]{3,40}?)(?:\r?\n|Father|Address|$)/i,
+      /(?:Name|नाम)\s*[:\s]+([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i,
+    ];
+    for (const p of namePatterns) {
+      const m = text.match(p);
+      if (m?.[1]?.trim().length > 2) { data.fullName = m[1].trim(); break; }
+    }
+    // Fallback: first reasonable all-caps line
+    if (!data.fullName) {
+      for (const line of lines) {
+        if (/^[A-Z][A-Z\s]{4,35}$/.test(line) && !/GOVERNMENT|INDIA|RATION|CARD|STATE/i.test(line)) {
+          data.fullName = line; break;
+        }
+      }
     }
     
-    // Extract head of family name
-    const nameMatch = text.match(/(?:Head of Family|मुखिया)[:\s]*(.*?)(?:\n|Father)/i);
-    if (nameMatch) {
-      data.fullName = nameMatch[1].trim();
+    // Address
+    const addressMatch = text.match(/(?:Address|पता|Residence)\s*[:\s]+([\s\S]{5,200}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    
+    // PIN code
+    const pinMatch = text.match(/\b(\d{6})\b/);
+    if (pinMatch) {
+      if (!data.address) data.address = {};
+      if (typeof data.address === 'object') data.address.pincode = pinMatch[1];
     }
     
-    // Extract address
-    const addressMatch = text.match(/(?:Address|पता)[:\s]*(.*?)(?:\n.*?PIN|$)/is);
-    if (addressMatch) {
-      data.address = this.parseAddress(addressMatch[1]);
-    }
+    // Category (APL/BPL/AAY etc.)
+    const categoryMatch = text.match(/\b(APL|BPL|AAY|PHH|NPHH|Antyodaya)\b/i);
+    if (categoryMatch) data.category = categoryMatch[1].toUpperCase();
     
-    return {
-      ...data,
-      rawText: text,
-      confidence: ocrResult.confidence
-    };
+    return { ...data, rawText: text, confidence: ocrResult.confidence };
   }
 
   /**
@@ -536,15 +524,46 @@ class OCRService {
           extractedData = this.extractBirthCertificateData(ocrResult);
           break;
         case 'death_certificate':
+          extractedData = this.extractDeathCertificateData(ocrResult);
+          break;
         case 'caste_certificate':
+          extractedData = this.extractCasteCertificateData(ocrResult);
+          break;
         case 'community_certificate':
+          extractedData = this.extractCommunityCertificateData(ocrResult);
+          break;
         case 'domicile_certificate':
+          extractedData = this.extractDomicileCertificateData(ocrResult);
+          break;
         case 'residence_certificate':
+          extractedData = this.extractResidenceCertificateData(ocrResult);
+          break;
         case 'marriage_certificate':
+          extractedData = this.extractMarriageCertificateData(ocrResult);
+          break;
         case 'sslc_certificate':
+          extractedData = this.extractSSLCData(ocrResult);
+          break;
         case 'pension_certificate':
-          // Use generic extraction for these document types
-          extractedData = this.extractGenericData(ocrResult);
+          extractedData = this.extractPensionCertificateData(ocrResult);
+          break;
+        case 'passport':
+          extractedData = this.extractPassportData(ocrResult);
+          break;
+        case 'disability_certificate':
+          extractedData = this.extractDisabilityCertificateData(ocrResult);
+          break;
+        case 'employment_certificate':
+          extractedData = this.extractEmploymentCertificateData(ocrResult);
+          break;
+        case 'land_record':
+          extractedData = this.extractLandRecordData(ocrResult);
+          break;
+        case 'bank_passbook':
+          extractedData = this.extractBankPassbookData(ocrResult);
+          break;
+        case 'educational_certificate':
+          extractedData = this.extractEducationalCertificateData(ocrResult);
           break;
         default:
           extractedData = {
@@ -777,6 +796,318 @@ class OCRService {
     data.rawText = text;
     data.confidence = ocrResult.confidence;
 
+    return data;
+  }
+
+  /** Extract Death Certificate data */
+  extractDeathCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number)|Registration\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.registrationNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Name\s*of\s*(?:Deceased|Dead\s*Person)|Deceased)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Father|Age|Date|$)/i);
+    if (nameMatch) data.deceasedName = nameMatch[1].trim();
+    const dodMatch = text.match(/(?:Date\s*of\s*Death|Death\s*Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (dodMatch) data.dateOfDeath = this.parseDate(dodMatch[1]);
+    const placeMatch = text.match(/(?:Place\s*of\s*Death)[:\s]*([A-Za-z\s,]+?)(?:\r?\n|$)/i);
+    if (placeMatch) data.placeOfDeath = placeMatch[1].trim();
+    const ageMatch = text.match(/(?:Age)[:\s]*(\d+)/i);
+    if (ageMatch) data.age = parseInt(ageMatch[1]);
+    const genderMatch = text.match(/\b(Male|Female|MALE|FEMALE)\b/);
+    if (genderMatch) data.gender = genderMatch[1].charAt(0).toUpperCase() + genderMatch[1].slice(1).toLowerCase();
+    const causeMatch = text.match(/(?:Cause\s*of\s*Death)[:\s]*([A-Za-z\s,]+?)(?:\r?\n|$)/i);
+    if (causeMatch) data.causeOfDeath = causeMatch[1].trim();
+    const fatherMatch = text.match(/(?:Father|Husband|S\/O|H\/O)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Issued\s*on)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const authorityMatch = text.match(/(?:Registrar|Issued\s*by)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (authorityMatch) data.issuingAuthority = authorityMatch[1].trim();
+    const addressMatch = text.match(/(?:Address|Residence)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Caste Certificate data */
+  extractCasteCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.certificateNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Name|नाम)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Father|Son|Daughter|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const fatherMatch = text.match(/(?:Father|Son\s*of|Daughter\s*of|S\/O|D\/O)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const casteMatch = text.match(/(?:Caste|Community|जाति)[:\s]*([A-Za-z\s\/]+?)(?:\r?\n|Religion|$)/i);
+    if (casteMatch) data.caste = casteMatch[1].trim();
+    const religionMatch = text.match(/(?:Religion|धर्म)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (religionMatch) data.religion = religionMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Issued\s*on|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const authorityMatch = text.match(/(?:Issued\s*by|Authority|Tahsildar|Revenue)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (authorityMatch) data.issuingAuthority = authorityMatch[1].trim();
+    const addressMatch = text.match(/(?:Address|Resident\s*of)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Community Certificate data */
+  extractCommunityCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.certificateNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Father|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const fatherMatch = text.match(/(?:Father|S\/O|D\/O)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const communityMatch = text.match(/(?:Community|belongs\s*to)[:\s]*([A-Za-z\s\/]+?)(?:\r?\n|Religion|$)/i);
+    if (communityMatch) data.community = communityMatch[1].trim();
+    const religionMatch = text.match(/(?:Religion)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (religionMatch) data.religion = religionMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const authorityMatch = text.match(/(?:Issued\s*by|Authority)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (authorityMatch) data.issuingAuthority = authorityMatch[1].trim();
+    const addressMatch = text.match(/(?:Address|Resident\s*of)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Domicile Certificate data */
+  extractDomicileCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.certificateNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Father|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const fatherMatch = text.match(/(?:Father|S\/O)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const motherMatch = text.match(/(?:Mother|M\/O)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (motherMatch) data.motherName = motherMatch[1].trim();
+    const dobMatch = text.match(/(?:Date\s*of\s*Birth|DOB)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (dobMatch) data.dateOfBirth = this.parseDate(dobMatch[1]);
+    const yearsMatch = text.match(/(?:residing|resident|domicile)\s*(?:for|since)?\s*(\d+)\s*years?/i);
+    if (yearsMatch) data.yearsOfResidence = parseInt(yearsMatch[1]);
+    const addressMatch = text.match(/(?:Permanent\s*Address|Address|Resident\s*of)[:\s]+([\s\S]{5,200}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.permanentAddress = addressMatch[1].trim().replace(/\n/g, ', ');
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const authorityMatch = text.match(/(?:Issued\s*by|Authority|Tahsildar)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (authorityMatch) data.issuingAuthority = authorityMatch[1].trim();
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Residence Certificate data */
+  extractResidenceCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.certificateNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Father|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const fatherMatch = text.match(/(?:Father|Husband|S\/O|H\/O)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const localBodyMatch = text.match(/(?:Panchayat|Municipality|Corporation|Local\s*Body)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (localBodyMatch) data.localBody = localBodyMatch[1].trim();
+    const periodMatch = text.match(/(?:Period\s*of\s*Residence|residing\s*since)[:\s]*([A-Za-z0-9\s\-\/]+?)(?:\r?\n|$)/i);
+    if (periodMatch) data.periodOfResidence = periodMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const authorityMatch = text.match(/(?:Issued\s*by|Authority)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (authorityMatch) data.issuingAuthority = authorityMatch[1].trim();
+    const addressMatch = text.match(/(?:Address|Resident\s*of)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Marriage Certificate data */
+  extractMarriageCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const regMatch = text.match(/(?:Registration\s*(?:No|Number)|Reg\s*No)[:\s]*([A-Z0-9\/\-]+)/i);
+    if (regMatch) data.registrationNumber = regMatch[1].trim();
+    const husbandMatch = text.match(/(?:Husband|Groom|Bridegroom)['\s]*s?\s*Name[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Wife|Bride|Date|$)/i);
+    if (husbandMatch) data.husbandName = husbandMatch[1].trim();
+    const wifeMatch = text.match(/(?:Wife|Bride)['\s]*s?\s*Name[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Date|Place|$)/i);
+    if (wifeMatch) data.wifeName = wifeMatch[1].trim();
+    const domMatch = text.match(/(?:Date\s*of\s*Marriage|Marriage\s*Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (domMatch) data.dateOfMarriage = this.parseDate(domMatch[1]);
+    const placeMatch = text.match(/(?:Place\s*of\s*Marriage|Venue)[:\s]*([A-Za-z\s,]+?)(?:\r?\n|$)/i);
+    if (placeMatch) data.placeOfMarriage = placeMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Issued\s*on)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const authorityMatch = text.match(/(?:Registrar|Issued\s*by)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (authorityMatch) data.issuingAuthority = authorityMatch[1].trim();
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract SSLC / 10th Certificate data */
+  extractSSLCData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const regMatch = text.match(/(?:Register\s*(?:No|Number)|Roll\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (regMatch) data.registerNumber = regMatch[1].trim();
+    const nameMatch = text.match(/(?:Name\s*of\s*(?:Student|Candidate)|Student['\s]*s?\s*Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|DOB|Date|Father|$)/i);
+    if (nameMatch) data.studentName = nameMatch[1].trim();
+    const dobMatch = text.match(/(?:Date\s*of\s*Birth|DOB)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (dobMatch) data.dateOfBirth = this.parseDate(dobMatch[1]);
+    const fatherMatch = text.match(/(?:Father)['\s]*s?\s*Name[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Mother|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const motherMatch = text.match(/(?:Mother)['\s]*s?\s*Name[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (motherMatch) data.motherName = motherMatch[1].trim();
+    const schoolMatch = text.match(/(?:School|Institution)[:\s]*([A-Za-z\s,]+?)(?:\r?\n|$)/i);
+    if (schoolMatch) data.schoolName = schoolMatch[1].trim();
+    const yearMatch = text.match(/(?:Year\s*of\s*Passing|Passed\s*in|Month\s*&\s*Year)[:\s]*(?:[A-Za-z]+\s*)?(\d{4})/i);
+    if (yearMatch) data.yearOfPassing = parseInt(yearMatch[1]);
+    const marksMatch = text.match(/(?:Total\s*Marks|Percentage|Grade|Result)[:\s]*([A-Z0-9.%\s]+?)(?:\r?\n|$)/i);
+    if (marksMatch) data.marksGrade = marksMatch[1].trim();
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Pension Certificate data */
+  extractPensionCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const pensionIdMatch = text.match(/(?:PPO\s*(?:No|Number)|Pension\s*(?:ID|No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (pensionIdMatch) data.pensionId = pensionIdMatch[1].trim();
+    const nameMatch = text.match(/(?:Name\s*of\s*Pensioner|Pensioner['\s]*s?\s*Name|Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (nameMatch) data.pensionerName = nameMatch[1].trim();
+    const typeMatch = text.match(/(?:Type\s*of\s*Pension|Pension\s*Type)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (typeMatch) data.pensionType = typeMatch[1].trim();
+    const aadhaarMatch = text.match(/\b(\d{4}[\s\-]?\d{4}[\s\-]?\d{4})\b/);
+    if (aadhaarMatch) data.aadhaarNumber = aadhaarMatch[1].replace(/[\s\-]/g, '');
+    const bankMatch = text.match(/(?:Bank\s*Account|Account\s*(?:No|Number))[:\s]*([A-Z0-9\s]+?)(?:\r?\n|$)/i);
+    if (bankMatch) data.bankAccountDetails = bankMatch[1].trim();
+    const amountMatch = text.match(/(?:Monthly\s*Pension|Pension\s*Amount|Amount)[:\s]*(?:Rs\.?|₹)?\s*([0-9,]+)/i);
+    if (amountMatch) data.amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const addressMatch = text.match(/(?:Address)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Disability Certificate data */
+  extractDisabilityCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.certificateNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Father|Guardian|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const fatherMatch = text.match(/(?:Father|Guardian)['\s]*s?\s*Name[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const dobMatch = text.match(/(?:Date\s*of\s*Birth|DOB)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (dobMatch) data.dateOfBirth = this.parseDate(dobMatch[1]);
+    const disTypeMatch = text.match(/(?:Type\s*of\s*Disability|Nature\s*of\s*Disability|Disability)[:\s]*([A-Za-z\s,]+?)(?:\r?\n|Percentage|%|$)/i);
+    if (disTypeMatch) data.disabilityType = disTypeMatch[1].trim();
+    const percentMatch = text.match(/(\d+)\s*%/);
+    if (percentMatch) data.disabilityPercentage = parseInt(percentMatch[1]);
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const expiryMatch = text.match(/(?:Valid\s*Till|Expiry\s*Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (expiryMatch) data.expiryDate = this.parseDate(expiryMatch[1]);
+    const authorityMatch = text.match(/(?:Medical\s*Authority|Issued\s*by|Hospital)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (authorityMatch) data.issuingAuthority = authorityMatch[1].trim();
+    const addressMatch = text.match(/(?:Address)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Employment / Experience Certificate data */
+  extractEmploymentCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.certificateNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Employee\s*Name|Name\s*of\s*Employee|Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Employee\s*ID|Designation|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const empIdMatch = text.match(/(?:Employee\s*(?:ID|Code|No))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (empIdMatch) data.employeeId = empIdMatch[1].trim();
+    const employerMatch = text.match(/(?:Organization|Company|Employer|Firm)[:\s]*([A-Za-z\s,\.]+?)(?:\r?\n|$)/i);
+    if (employerMatch) data.employerName = employerMatch[1].trim();
+    const designationMatch = text.match(/(?:Designation|Post|Position)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (designationMatch) data.designation = designationMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Land Record / Patta data */
+  extractLandRecordData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const surveyMatch = text.match(/(?:Survey\s*(?:No|Number)|Patta\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (surveyMatch) data.surveyNumber = surveyMatch[1].trim();
+    const nameMatch = text.match(/(?:Owner|Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|Father|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const fatherMatch = text.match(/(?:Father|S\/O)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (fatherMatch) data.fatherName = fatherMatch[1].trim();
+    const areaMatch = text.match(/(?:Area|Extent)[:\s]*([0-9.]+\s*(?:Acres?|Hectares?|Cents?|Sq\.?\s*(?:Ft|Meters?)))/i);
+    if (areaMatch) data.area = areaMatch[1].trim();
+    const landTypeMatch = text.match(/(?:Land\s*Type|Classification|Nature)[:\s]*([A-Za-z\s]+?)(?:\r?\n|$)/i);
+    if (landTypeMatch) data.landType = landTypeMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    const addressMatch = text.match(/(?:Village|Taluk|District|Location)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Bank Passbook data */
+  extractBankPassbookData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const accMatch = text.match(/(?:Account\s*(?:No|Number))[:\s]*([0-9\s]{9,18})/i);
+    if (accMatch) data.accountNumber = accMatch[1].replace(/\s/g, '').trim();
+    const nameMatch = text.match(/(?:Account\s*Holder|Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const bankMatch = text.match(/(?:Bank\s*Name|Bank)[:\s]*([A-Za-z\s]+?)(?:\r?\n|Branch|IFSC|$)/i);
+    if (bankMatch) data.bankName = bankMatch[1].trim();
+    const ifscMatch = text.match(/(?:IFSC\s*(?:Code)?)[:\s]*([A-Z]{4}0[A-Z0-9]{6})/i);
+    if (ifscMatch) data.ifscCode = ifscMatch[1].toUpperCase();
+    const branchMatch = text.match(/(?:Branch)[:\s]*([A-Za-z\s,]+?)(?:\r?\n|IFSC|$)/i);
+    if (branchMatch) data.branchName = branchMatch[1].trim();
+    const addressMatch = text.match(/(?:Address)[:\s]+([\s\S]{5,150}?)(?:\d{6}|$)/i);
+    if (addressMatch) data.address = this.parseAddress(addressMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
+    return data;
+  }
+
+  /** Extract Educational Certificate data */
+  extractEducationalCertificateData(ocrResult) {
+    const text = ocrResult.text;
+    const data = {};
+    const certMatch = text.match(/(?:Certificate\s*(?:No|Number)|Roll\s*(?:No|Number))[:\s]*([A-Z0-9\/\-]+)/i);
+    if (certMatch) data.certificateNumber = certMatch[1].trim();
+    const nameMatch = text.match(/(?:Name\s*of\s*(?:Student|Candidate)|Student['\s]*s?\s*Name|Name)[:\s]*([A-Za-z\s]{3,40}?)(?:\r?\n|DOB|Date|$)/i);
+    if (nameMatch) data.fullName = nameMatch[1].trim();
+    const dobMatch = text.match(/(?:Date\s*of\s*Birth|DOB)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (dobMatch) data.dateOfBirth = this.parseDate(dobMatch[1]);
+    const institutionMatch = text.match(/(?:University|College|Institution|School)[:\s]*([A-Za-z\s,]+?)(?:\r?\n|$)/i);
+    if (institutionMatch) data.institutionName = institutionMatch[1].trim();
+    const courseMatch = text.match(/(?:Course|Degree|Programme|Program)[:\s]*([A-Za-z\s.]+?)(?:\r?\n|$)/i);
+    if (courseMatch) data.courseName = courseMatch[1].trim();
+    const yearMatch = text.match(/(?:Year\s*of\s*Passing|Passed\s*in)[:\s]*(?:[A-Za-z]+\s*)?(\d{4})/i);
+    if (yearMatch) data.yearOfPassing = parseInt(yearMatch[1]);
+    const marksMatch = text.match(/(?:Marks|Percentage|Grade|CGPA)[:\s]*([A-Z0-9.%\s]+?)(?:\r?\n|$)/i);
+    if (marksMatch) data.marksGrade = marksMatch[1].trim();
+    const issueDateMatch = text.match(/(?:Date\s*of\s*Issue|Date)[:\s]*(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/i);
+    if (issueDateMatch) data.issueDate = this.parseDate(issueDateMatch[1]);
+    data.rawText = text; data.confidence = ocrResult.confidence;
     return data;
   }
 }

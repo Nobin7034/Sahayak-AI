@@ -23,7 +23,9 @@ const lockerDocumentSchema = new mongoose.Schema({
     enum: [
       'aadhaar_card',
       'pan_card',
+      'passport',
       'voter_id',
+      'driving_license',
       'ration_card',
       'birth_certificate',
       'death_certificate',
@@ -33,16 +35,17 @@ const lockerDocumentSchema = new mongoose.Schema({
       'domicile_certificate',
       'residence_certificate',
       'marriage_certificate',
-      'driving_license',
       'sslc_certificate',
       'pension_certificate',
-      // Legacy document types (for existing documents)
-      'passport',
+      'disability_certificate',
+      'employment_certificate',
+      'land_record',
+      'medical_certificate',
       'bank_passbook',
+      'educational_certificate',
+      // Legacy
       'salary_slip',
       'property_document',
-      'educational_certificate',
-      'medical_certificate',
       'other'
     ],
     required: true
@@ -82,11 +85,34 @@ const lockerDocumentSchema = new mongoose.Schema({
     // Document-specific fields
     aadhaarNumber: String,
     panNumber: String,
+    passportNumber: String,
     voterIdNumber: String,
     rationCardNumber: String,
     licenseNumber: String,
     certificateNumber: String,
     registrationNumber: String,
+    // Additional identity fields
+    nationality: String,
+    mobileNumber: String,
+    bloodGroup: String,
+    // Disability certificate
+    disabilityType: String,
+    disabilityPercentage: Number,
+    // Employment certificate
+    employeeId: String,
+    employerName: String,
+    designation: String,
+    // Land record
+    surveyNumber: String,
+    landType: String,
+    // Bank passbook
+    accountNumber: String,
+    bankName: String,
+    ifscCode: String,
+    branchName: String,
+    // Educational
+    institutionName: String,
+    courseName: String,
     
     // Family information
     fatherName: String,

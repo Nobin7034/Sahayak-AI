@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import DocumentTemplateReview from '../components/DocumentTemplateReview';
 import {
   Lock,
   Unlock,
@@ -89,7 +90,15 @@ const DocumentLocker = () => {
     { value: 'marriage_certificate', label: 'Marriage Certificate', icon: '💒' },
     { value: 'driving_license', label: 'Driving License', icon: '🚗' },
     { value: 'sslc_certificate', label: 'SSLC Certificate', icon: '🎓' },
-    { value: 'pension_certificate', label: 'Pension Certificate', icon: '👴' }
+    { value: 'pension_certificate', label: 'Pension Certificate', icon: '👴' },
+    { value: 'passport', label: 'Passport', icon: '✈️' },
+    { value: 'disability_certificate', label: 'Disability Certificate', icon: '♿' },
+    { value: 'employment_certificate', label: 'Employment Certificate', icon: '💼' },
+    { value: 'land_record', label: 'Land Record / Patta', icon: '🌾' },
+    { value: 'medical_certificate', label: 'Medical Certificate', icon: '🏥' },
+    { value: 'bank_passbook', label: 'Bank Passbook', icon: '🏦' },
+    { value: 'educational_certificate', label: 'Educational Certificate', icon: '📚' },
+    { value: 'other', label: 'Other Document', icon: '📄' }
   ];
 
   useEffect(() => {
@@ -615,165 +624,88 @@ const DocumentLocker = () => {
     return <AlertTriangle className="w-4 h-4" />;
   };
 
-  // Get relevant fields for each document type
-  const getRelevantFields = (documentType) => {
-    const fieldMappings = {
-      aadhaar_card: ['aadhaarNumber', 'fullName', 'dateOfBirth', 'gender', 'address'],
-      
-      pan_card: ['panNumber', 'fullName', 'fatherName', 'dateOfBirth'],
-      
-      voter_id: ['voterIdNumber', 'fullName', 'fatherName', 'motherName', 'spouseName', 'dateOfBirth', 'gender', 'address'],
-      
-      ration_card: ['rationCardNumber', 'cardType', 'headOfFamily', 'familyMembers', 'address', 'fpsNumber'],
-      
-      birth_certificate: ['childName', 'dateOfBirth', 'placeOfBirth', 'gender', 'fatherName', 'motherName', 'registrationNumber'],
-      
-      death_certificate: ['deceasedName', 'dateOfDeath', 'placeOfDeath', 'age', 'gender', 'causeOfDeath', 'registrationNumber'],
-      
-      income_certificate: ['fullName', 'address', 'annualIncome', 'incomeSource', 'certificateNumber', 'issueDate', 'validity'],
-      
-      caste_certificate: ['fullName', 'fatherName', 'caste', 'religion', 'address', 'certificateNumber', 'issuingAuthority'],
-      
-      community_certificate: ['fullName', 'community', 'religion', 'address', 'certificateNumber', 'issueDate'],
-      
-      domicile_certificate: ['fullName', 'fatherName', 'motherName', 'permanentAddress', 'yearsOfResidence', 'certificateNumber', 'issueDate'],
-      
-      residence_certificate: ['fullName', 'address', 'localBody', 'periodOfResidence', 'certificateNumber', 'issueDate'],
-      
-      marriage_certificate: ['husbandName', 'wifeName', 'dateOfMarriage', 'placeOfMarriage', 'registrationNumber', 'issuingAuthority'],
-      
-      driving_license: ['licenseNumber', 'fullName', 'dateOfBirth', 'address', 'vehicleClass', 'issueDate', 'validity'],
-      
-      sslc_certificate: ['studentName', 'registerNumber', 'dateOfBirth', 'schoolName', 'yearOfPassing', 'marksGrade'],
-      
-      pension_certificate: ['pensionerName', 'pensionType', 'pensionId', 'aadhaarNumber', 'bankAccountDetails', 'amount'],
-      
-      // Legacy document types
-      passport: ['passportNumber', 'fullName', 'dateOfBirth', 'address', 'issueDate', 'validity', 'issuingAuthority'],
-      bank_passbook: ['accountNumber', 'fullName', 'bankName', 'ifscCode', 'address'],
-      salary_slip: ['fullName', 'employeeId', 'employerName', 'monthYear', 'grossSalary'],
-      property_document: ['fullName', 'propertyNumber', 'surveyNumber', 'area', 'address'],
-      educational_certificate: ['fullName', 'certificateNumber', 'institutionName', 'issueDate', 'grade'],
-      medical_certificate: ['fullName', 'certificateNumber', 'doctorName', 'hospitalName', 'issueDate'],
-      other: ['fullName', 'dateOfBirth', 'address']
-    };
-    
-    return fieldMappings[documentType] || ['fullName', 'dateOfBirth', 'address'];
+  // Centralized document template field definitions (20+ document types)
+  const DOCUMENT_TEMPLATES = {
+    aadhaar_card:          ['aadhaarNumber','fullName','dateOfBirth','gender','mobileNumber','fatherName','address'],
+    pan_card:              ['panNumber','fullName','fatherName','dateOfBirth'],
+    passport:              ['passportNumber','fullName','nationality','dateOfBirth','gender','placeOfBirth','issueDate','expiryDate','issuingAuthority','address'],
+    voter_id:              ['voterIdNumber','fullName','fatherName','motherName','spouseName','dateOfBirth','age','gender','address'],
+    driving_license:       ['licenseNumber','fullName','dateOfBirth','fatherName','bloodGroup','vehicleClass','issueDate','expiryDate','issuingAuthority','address'],
+    ration_card:           ['rationCardNumber','cardType','fullName','familyMembers','fpsNumber','address'],
+    birth_certificate:     ['registrationNumber','childName','dateOfBirth','gender','placeOfBirth','fatherName','motherName','issueDate','issuingAuthority','address'],
+    death_certificate:     ['registrationNumber','deceasedName','dateOfDeath','placeOfDeath','age','gender','causeOfDeath','fatherName','issueDate','issuingAuthority','address'],
+    marriage_certificate:  ['registrationNumber','husbandName','wifeName','dateOfMarriage','placeOfMarriage','issueDate','issuingAuthority','address'],
+    income_certificate:    ['certificateNumber','fullName','fatherName','annualIncome','incomeSource','issueDate','expiryDate','issuingAuthority','address'],
+    caste_certificate:     ['certificateNumber','fullName','fatherName','caste','religion','issueDate','issuingAuthority','address'],
+    community_certificate: ['certificateNumber','fullName','fatherName','community','religion','issueDate','issuingAuthority','address'],
+    domicile_certificate:  ['certificateNumber','fullName','fatherName','motherName','dateOfBirth','permanentAddress','yearsOfResidence','issueDate','issuingAuthority','address'],
+    residence_certificate: ['certificateNumber','fullName','fatherName','localBody','periodOfResidence','issueDate','issuingAuthority','address'],
+    sslc_certificate:      ['registerNumber','studentName','dateOfBirth','fatherName','motherName','schoolName','yearOfPassing','marksGrade'],
+    pension_certificate:   ['pensionId','pensionerName','pensionType','aadhaarNumber','bankAccountDetails','amount','issueDate','address'],
+    disability_certificate:['certificateNumber','fullName','fatherName','dateOfBirth','disabilityType','disabilityPercentage','issueDate','expiryDate','issuingAuthority','address'],
+    employment_certificate:['certificateNumber','fullName','employeeId','employerName','designation','issueDate','address'],
+    land_record:           ['surveyNumber','fullName','fatherName','area','landType','issueDate','issuingAuthority','address'],
+    medical_certificate:   ['certificateNumber','fullName','dateOfBirth','doctorName','hospitalName','issueDate','address'],
+    bank_passbook:         ['accountNumber','fullName','bankName','ifscCode','branchName','address'],
+    educational_certificate:['certificateNumber','fullName','dateOfBirth','institutionName','courseName','yearOfPassing','marksGrade','issueDate'],
+    salary_slip:           ['fullName','employeeId','employerName','monthYear','grossSalary'],
+    property_document:     ['fullName','propertyNumber','surveyNumber','area','address'],
+    other:                 ['fullName','dateOfBirth','certificateNumber','issueDate','issuingAuthority','address'],
   };
 
-  // Get field label
+  const getRelevantFields = (documentType) => {
+    return DOCUMENT_TEMPLATES[documentType] || ['fullName', 'dateOfBirth', 'address'];
+  };
+
+  // Get field label for display
   const getFieldLabel = (fieldName) => {
     const labels = {
-      // Common fields
-      fullName: 'Full Name',
-      dateOfBirth: 'Date of Birth',
-      gender: 'Gender',
-      address: 'Address',
-      
-      // Aadhaar Card
-      aadhaarNumber: 'Aadhaar Number',
-      
-      // PAN Card
-      panNumber: 'PAN Number',
-      fatherName: "Father's Name",
-      
-      // Voter ID
-      voterIdNumber: 'EPIC Number',
-      motherName: "Mother's Name",
-      spouseName: "Spouse's Name",
-      
-      // Ration Card
-      rationCardNumber: 'Ration Card Number',
-      cardType: 'Card Type (APL/BPL/AAY/PHH)',
-      headOfFamily: 'Head of Family',
-      familyMembers: 'Family Member Names',
-      fpsNumber: 'FPS (Ration Shop) Number',
-      
-      // Birth Certificate
-      childName: "Child's Name",
-      placeOfBirth: 'Place of Birth',
-      registrationNumber: 'Registration Number',
-      
-      // Death Certificate
-      deceasedName: "Deceased Person's Name",
-      dateOfDeath: 'Date of Death',
-      placeOfDeath: 'Place of Death',
-      age: 'Age',
-      causeOfDeath: 'Cause of Death',
-      
-      // Income Certificate
-      annualIncome: 'Annual Income (₹)',
-      incomeSource: 'Income Source',
-      certificateNumber: 'Certificate Number',
-      issueDate: 'Issue Date',
-      validity: 'Validity',
-      
-      // Caste Certificate
-      caste: 'Caste / Community',
-      religion: 'Religion',
-      issuingAuthority: 'Issuing Authority',
-      
-      // Community Certificate
-      community: 'Community',
-      
-      // Domicile Certificate
-      permanentAddress: 'Permanent Address',
-      yearsOfResidence: 'Years of Residence',
-      
-      // Residence Certificate
-      localBody: 'Local Body',
-      periodOfResidence: 'Period of Residence',
-      
-      // Marriage Certificate
-      husbandName: "Husband's Name",
-      wifeName: "Wife's Name",
-      dateOfMarriage: 'Date of Marriage',
-      placeOfMarriage: 'Place of Marriage',
-      
-      // Driving License
-      licenseNumber: 'License Number',
-      vehicleClass: 'Vehicle Class',
-      
-      // SSLC Certificate
-      studentName: 'Student Name',
-      registerNumber: 'Register Number',
-      schoolName: 'School Name',
-      yearOfPassing: 'Year of Passing',
-      marksGrade: 'Marks / Grade',
-      
-      // Pension Certificate
-      pensionerName: 'Pensioner Name',
-      pensionType: 'Pension Type',
-      pensionId: 'Pension ID',
-      bankAccountDetails: 'Bank Account Details',
-      amount: 'Amount',
-      
-      // Legacy document types
-      passportNumber: 'Passport Number',
-      accountNumber: 'Account Number',
-      bankName: 'Bank Name',
-      ifscCode: 'IFSC Code',
-      employeeId: 'Employee ID',
-      employerName: 'Employer Name',
-      monthYear: 'Month/Year',
-      grossSalary: 'Gross Salary',
-      propertyNumber: 'Property Number',
-      surveyNumber: 'Survey Number',
-      area: 'Area',
-      institutionName: 'Institution Name',
-      grade: 'Grade/Percentage',
-      doctorName: "Doctor's Name",
-      hospitalName: 'Hospital Name'
+      fullName:'Full Name', dateOfBirth:'Date of Birth', gender:'Gender', address:'Address',
+      mobileNumber:'Mobile Number', nationality:'Nationality', bloodGroup:'Blood Group',
+      aadhaarNumber:'Aadhaar Number',
+      panNumber:'PAN Number',
+      passportNumber:'Passport Number', placeOfBirth:'Place of Birth',
+      voterIdNumber:'EPIC Number',
+      licenseNumber:'License Number', vehicleClass:'Vehicle Class',
+      rationCardNumber:'Ration Card Number', cardType:'Card Type (APL/BPL/AAY/PHH)',
+      familyMembers:'Family Members', fpsNumber:'FPS (Ration Shop) Number',
+      registrationNumber:'Registration Number', childName:"Child's Name",
+      deceasedName:"Deceased Person's Name", dateOfDeath:'Date of Death', placeOfDeath:'Place of Death',
+      causeOfDeath:'Cause of Death', age:'Age',
+      husbandName:"Husband's Name", wifeName:"Wife's Name",
+      dateOfMarriage:'Date of Marriage', placeOfMarriage:'Place of Marriage',
+      annualIncome:'Annual Income (₹)', incomeSource:'Source of Income',
+      certificateNumber:'Certificate Number', issueDate:'Date of Issue',
+      expiryDate:'Valid Till / Expiry Date', issuingAuthority:'Issuing Authority',
+      fatherName:"Father's Name", motherName:"Mother's Name", spouseName:"Spouse's Name",
+      caste:'Caste / Sub-Caste', religion:'Religion',
+      community:'Community',
+      permanentAddress:'Permanent Address', yearsOfResidence:'Years of Residence',
+      localBody:'Local Body / Panchayat', periodOfResidence:'Period of Residence',
+      registerNumber:'Register Number', studentName:"Student's Name",
+      schoolName:'School Name', yearOfPassing:'Year of Passing', marksGrade:'Marks / Grade',
+      pensionId:'Pension ID / PPO Number', pensionerName:"Pensioner's Name",
+      pensionType:'Pension Type', bankAccountDetails:'Bank Account Details', amount:'Monthly Amount (₹)',
+      disabilityType:'Type of Disability', disabilityPercentage:'Disability Percentage (%)',
+      employeeId:'Employee ID', employerName:'Employer / Organization', designation:'Designation',
+      surveyNumber:'Survey / Patta Number', area:'Land Area', landType:'Land Type',
+      doctorName:"Doctor's Name", hospitalName:'Hospital / Clinic Name',
+      accountNumber:'Account Number', bankName:'Bank Name',
+      ifscCode:'IFSC Code', branchName:'Branch Name',
+      institutionName:'Institution / University', courseName:'Course / Degree',
+      propertyNumber:'Property Number', grossSalary:'Gross Salary', monthYear:'Month / Year',
     };
-    
-    return labels[fieldName] || fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    return labels[fieldName] || fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
   };
 
   // Get input type for field
   const getInputType = (fieldName) => {
-    if (['dateOfBirth', 'dateOfDeath', 'dateOfMarriage', 'issueDate', 'validity'].includes(fieldName)) return 'date';
-    if (['annualIncome', 'amount', 'age', 'yearsOfResidence', 'yearOfPassing'].includes(fieldName)) return 'number';
-    if (fieldName === 'familyMembers') return 'textarea';
+    const dateFields = ['dateOfBirth','dateOfDeath','dateOfMarriage','issueDate','expiryDate','validity'];
+    const numberFields = ['annualIncome','amount','age','yearsOfResidence','yearOfPassing','disabilityPercentage'];
+    const textareaFields = ['familyMembers','bankAccountDetails'];
+    if (dateFields.includes(fieldName)) return 'date';
+    if (numberFields.includes(fieldName)) return 'number';
+    if (textareaFields.includes(fieldName)) return 'textarea';
     return 'text';
   };
 
@@ -1979,295 +1911,12 @@ const DocumentLocker = () => {
 
         {/* OCR Verification Modal */}
         {showOCRVerification && ocrVerificationData && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">OCR Data Verification & Editing</h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Common fields will be automatically synchronized across all your documents
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowOCRVerification(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Raw OCR Text - Read Only */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 text-blue-600">Raw OCR Extracted Text</h3>
-                  <div className="bg-blue-50 rounded-lg p-4 space-y-4 max-h-96 overflow-y-auto">
-                    {/* Document Type */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">Document Type:</label>
-                      <p className="text-gray-900 capitalize">{ocrVerificationData.documentType.replace('_', ' ')}</p>
-                    </div>
-                    
-                    {/* OCR Confidence */}
-                    {ocrVerificationData.extractedData?.confidence && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">OCR Confidence:</label>
-                        <div className="flex items-center gap-2">
-                          <p className="text-gray-900">{ocrVerificationData.extractedData.confidence.toFixed(1)}%</p>
-                          {ocrVerificationData.extractedData.confidence >= 75 ? (
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">High</span>
-                          ) : ocrVerificationData.extractedData.confidence >= 60 ? (
-                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">Medium</span>
-                          ) : (
-                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Low</span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Raw Text Display */}
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 mb-2 block">
-                        Extracted Text from Document:
-                      </label>
-                      <div className="bg-white border border-gray-300 rounded p-3 font-mono text-sm text-gray-800 whitespace-pre-wrap max-h-64 overflow-y-auto">
-                        {ocrVerificationData.extractedData?.rawText || 'No text extracted'}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">
-                        This is the raw text extracted from your document. Use the form on the right to correct any errors.
-                      </p>
-                    </div>
-                    
-                    {/* Verification Status */}
-                    {ocrVerificationData.extractedData?.isVerified && (
-                      <div className="pt-3 border-t">
-                        <div className="flex items-center text-green-600">
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          <span className="text-sm font-medium">Verified</span>
-                        </div>
-                        {ocrVerificationData.extractedData.verifiedAt && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Verified on {new Date(ocrVerificationData.extractedData.verifiedAt).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Editable Verification Form */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 text-green-600">Edit & Verify Data</h3>
-                  <form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const formData = new FormData(e.target);
-                    
-                    // Build updated data object with only relevant fields
-                    const updatedData = {
-                      ...ocrVerificationData.extractedData,
-                      isVerified: true,
-                      verifiedAt: new Date(),
-                      verifiedBy: user.userId
-                    };
-                    
-                    // Get relevant fields for this document type
-                    const relevantFields = getRelevantFields(ocrVerificationData.documentType);
-                    
-                    // Update each relevant field
-                    relevantFields.forEach(fieldName => {
-                      if (fieldName === 'address') {
-                        // Handle address separately
-                        const addressFields = ['addressLine1', 'addressLine2', 'city', 'state', 'pincode', 'country'];
-                        const address = {};
-                        let hasAddressData = false;
-                        
-                        addressFields.forEach(addrField => {
-                          const value = formData.get(addrField);
-                          if (value) {
-                            hasAddressData = true;
-                            const key = addrField.replace('address', '').replace('Line', 'line');
-                            address[key.charAt(0).toLowerCase() + key.slice(1)] = value;
-                          }
-                        });
-                        
-                        if (hasAddressData) {
-                          updatedData.address = {
-                            line1: address.line1 || '',
-                            line2: address.line2 || '',
-                            city: address.city || '',
-                            state: address.state || '',
-                            pincode: address.pincode || '',
-                            country: address.country || 'India'
-                          };
-                        }
-                      } else {
-                        const value = formData.get(fieldName);
-                        if (value !== null && value !== '') {
-                          // Handle date fields
-                          if (fieldName.includes('Date')) {
-                            updatedData[fieldName] = new Date(value);
-                          } else {
-                            updatedData[fieldName] = value;
-                          }
-                        }
-                      }
-                    });
-                    
-                    // Update OCR data with automatic synchronization
-                    await updateOCRData(ocrVerificationData._id, updatedData);
-                  }}>
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {/* Render editable fields based on document type */}
-                      {getRelevantFields(ocrVerificationData.documentType).map(fieldName => {
-                        if (fieldName === 'address') {
-                          const address = ocrVerificationData.extractedData?.address || {};
-                          return (
-                            <div key="address" className="border-t pt-4">
-                              <h4 className="font-medium text-gray-900 mb-3">Address Information</h4>
-                              <div className="grid grid-cols-1 gap-3">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 1:</label>
-                                  <input
-                                    type="text"
-                                    name="addressLine1"
-                                    defaultValue={address.line1 || ''}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Enter address line 1"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2:</label>
-                                  <input
-                                    type="text"
-                                    name="addressLine2"
-                                    defaultValue={address.line2 || ''}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Enter address line 2"
-                                  />
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">City:</label>
-                                    <input
-                                      type="text"
-                                      name="city"
-                                      defaultValue={address.city || ''}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      placeholder="Enter city"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">State:</label>
-                                    <input
-                                      type="text"
-                                      name="state"
-                                      defaultValue={address.state || ''}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      placeholder="Enter state"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">PIN Code:</label>
-                                    <input
-                                      type="text"
-                                      name="pincode"
-                                      defaultValue={address.pincode || ''}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      placeholder="Enter PIN code"
-                                      maxLength="6"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Country:</label>
-                                    <input
-                                      type="text"
-                                      name="country"
-                                      defaultValue={address.country || 'India'}
-                                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                      placeholder="Enter country"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }
-                        
-                        const value = ocrVerificationData.extractedData?.[fieldName];
-                        const inputType = getInputType(fieldName);
-                        let inputValue = value || '';
-                        
-                        if (inputType === 'date' && value) {
-                          inputValue = new Date(value).toISOString().split('T')[0];
-                        }
-                        
-                        return (
-                          <div key={fieldName}>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {getFieldLabel(fieldName)}:
-                            </label>
-                            <input
-                              type={inputType}
-                              name={fieldName}
-                              defaultValue={inputValue}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder={`Enter ${getFieldLabel(fieldName).toLowerCase()}`}
-                              maxLength={fieldName === 'aadhaarNumber' ? '12' : fieldName === 'panNumber' ? '10' : undefined}
-                              style={fieldName === 'panNumber' ? { textTransform: 'uppercase' } : undefined}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    <div className="flex space-x-3 mt-6 pt-4 border-t">
-                      <button
-                        type="button"
-                        onClick={() => setShowOCRVerification(false)}
-                        className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={processing}
-                        className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center"
-                      >
-                        {processing ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Save & Sync Data
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-
-              {/* Raw OCR Text Section */}
-              <div className="mt-8 border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4 text-purple-600">Raw OCR Text</h3>
-                <div className="bg-purple-50 rounded-lg p-4">
-                  <textarea
-                    readOnly
-                    className="w-full h-32 p-3 border border-purple-200 rounded-lg bg-white text-sm font-mono resize-none"
-                    placeholder="Raw OCR text will appear here..."
-                    value={ocrVerificationData.extractedData?.rawText || 'No raw text available'}
-                  />
-                  <p className="text-xs text-purple-600 mt-2">
-                    This is the raw text extracted by OCR. Use this to manually verify and correct the structured data above.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <DocumentTemplateReview
+            document={ocrVerificationData}
+            onSave={(updatedData) => updateOCRData(ocrVerificationData._id, updatedData)}
+            onClose={() => { setShowOCRVerification(false); setOCRVerificationData(null); }}
+            processing={processing}
+          />
         )}
 
         {/* Cross-Validation Results Modal */}
@@ -2410,3 +2059,5 @@ const DocumentLocker = () => {
 };
 
 export default DocumentLocker;
+
+

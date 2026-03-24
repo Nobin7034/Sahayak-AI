@@ -7,6 +7,7 @@ import { authenticate } from '../middleware/auth.js';
 import DocumentLocker from '../models/DocumentLocker.js';
 import LockerDocument from '../models/LockerDocument.js';
 import ocrService from '../services/ocrService.js';
+import { getTemplateFields } from '../config/documentTemplates.js';
 
 const router = express.Router();
 
@@ -467,49 +468,61 @@ router.post('/upload', authenticate, upload.single('document'), async (req, res)
       console.log(`OCR Result: ${confidenceLevel} confidence (${extractedData.confidence.toFixed(2)}%)`);
     }
     
-    // Auto-fill with existing profile data
-    try {
-      console.log('Auto-filling data from existing documents...');
-      const existingDocuments = await LockerDocument.find({
-        locker: locker._id,
-        isActive: true
-      });
-      
-      if (existingDocuments.length > 0) {
-        // Aggregate common data from existing documents
-        const profileData = {};
+    // Auto-fill with existing profile data — only for fields OCR didn't extract
+    const ocrExtractedFields = Object.keys(extractedData).filter(
+      k => k !== 'rawText' && k !== 'confidence' && k !== 'ocrError' && extractedData[k] !== ''
+    );
+    console.log(`OCR extracted ${ocrExtractedFields.length} fields:`, ocrExtractedFields);
+
+    // Only auto-fill if OCR ran and got at least some data, or if OCR was skipped
+    // Never auto-fill when OCR ran but got nothing — that means the image was unreadable
+    const ocrRan = shouldPerformOCR && req.file.mimetype.startsWith('image/');
+    const ocrGotData = ocrExtractedFields.length > 0;
+
+    if (!ocrRan || ocrGotData) {
+      try {
+        console.log('Auto-filling missing fields from existing documents...');
+        const existingDocuments = await LockerDocument.find({
+          locker: locker._id,
+          isActive: true
+        });
         
-        existingDocuments.forEach(doc => {
-          if (doc.extractedData) {
-            Object.entries(doc.extractedData).forEach(([key, value]) => {
-              if (value && key !== 'rawText' && key !== 'confidence' && key !== 'isVerified' && key !== 'verifiedAt' && key !== 'verifiedBy' && key !== 'ocrError') {
-                if (key === 'address' && typeof value === 'object') {
-                  if (!profileData.address) profileData.address = {};
-                  Object.entries(value).forEach(([addrKey, addrValue]) => {
-                    if (addrValue && !profileData.address[addrKey]) {
-                      profileData.address[addrKey] = addrValue;
-                    }
-                  });
-                } else if (!profileData[key]) {
-                  profileData[key] = value;
+        if (existingDocuments.length > 0) {
+          const profileData = {};
+          
+          existingDocuments.forEach(doc => {
+            if (doc.extractedData) {
+              Object.entries(doc.extractedData).forEach(([key, value]) => {
+                if (value && key !== 'rawText' && key !== 'confidence' && key !== 'isVerified' && key !== 'verifiedAt' && key !== 'verifiedBy' && key !== 'ocrError') {
+                  if (key === 'address' && typeof value === 'object') {
+                    if (!profileData.address) profileData.address = {};
+                    Object.entries(value).forEach(([addrKey, addrValue]) => {
+                      if (addrValue && !profileData.address[addrKey]) {
+                        profileData.address[addrKey] = addrValue;
+                      }
+                    });
+                  } else if (!profileData[key]) {
+                    profileData[key] = value;
+                  }
                 }
-              }
-            });
-          }
-        });
-        
-        // Merge profile data with extracted data (OCR data takes precedence)
-        Object.entries(profileData).forEach(([key, value]) => {
-          if (!extractedData[key] || extractedData[key] === '') {
-            extractedData[key] = value;
-          }
-        });
-        
-        console.log('Auto-filled fields:', Object.keys(profileData));
+              });
+            }
+          });
+          
+          // Merge — OCR data always takes precedence
+          Object.entries(profileData).forEach(([key, value]) => {
+            if (!extractedData[key] || extractedData[key] === '') {
+              extractedData[key] = value;
+            }
+          });
+          
+          console.log('Auto-filled fields:', Object.keys(profileData));
+        }
+      } catch (autoFillError) {
+        console.error('Auto-fill error (non-critical):', autoFillError);
       }
-    } catch (autoFillError) {
-      console.error('Auto-fill error (non-critical):', autoFillError);
-      // Continue without auto-fill
+    } else {
+      console.log('Skipping auto-fill: OCR ran but extracted no fields — image may be unreadable');
     }
     
     // Ensure extractedData is always an object
@@ -652,6 +665,10 @@ function normalizeDocumentNameToType(documentName) {
     'property document': 'property_document',
     'educational certificate': 'educational_certificate',
     'medical certificate': 'medical_certificate',
+    'disability certificate': 'disability_certificate',
+    'employment certificate': 'employment_certificate',
+    'land record': 'land_record',
+    'patta': 'land_record',
     
     // Common variations
     'photo': 'photo',
@@ -1754,3 +1771,5 @@ function performCrossValidation(documents) {
 }
 
 export default router;
+
+

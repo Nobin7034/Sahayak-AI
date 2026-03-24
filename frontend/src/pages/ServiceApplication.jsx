@@ -27,12 +27,20 @@ import DocumentValidation from '../components/DocumentValidation'
 import ProcessingModeSelection from '../components/ProcessingModeSelection'
 import OnlineDocumentReview from '../components/OnlineDocumentReview'
 
+// Koovappally, Kerala — PIN 686518 (9°31'0"N 76°49'0"E)
+const DEFAULT_LOCATION = { lat: 9.5167, lng: 76.8167 };
+
+// Only accept GPS if it's within Kerala bounds
+function isValidKeralaCoord(lat, lng) {
+  return lat >= 8.0 && lat <= 13.0 && lng >= 74.5 && lng <= 78.0;
+}
+
 const ServiceApplication = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   
   // State management
-  const [currentStep, setCurrentStep] = useState(1) // 1: Review Documents, 2: Select Documents, 3: Center Selection, 4: Processing Mode, 5: Appointment
+  const [currentStep, setCurrentStep] = useState(1)
   const [service, setService] = useState(null)
   const [centers, setCenters] = useState([])
   const [filteredCenters, setFilteredCenters] = useState([])
@@ -40,14 +48,14 @@ const ServiceApplication = () => {
   const [selectedDocuments, setSelectedDocuments] = useState([])
   const [documentValidation, setDocumentValidation] = useState(null)
   const [documentRequirements, setDocumentRequirements] = useState(null)
-  const [processingMode, setProcessingMode] = useState(null) // 'physical' or 'online'
+  const [processingMode, setProcessingMode] = useState(null)
   const [structuredDocumentData, setStructuredDocumentData] = useState(null)
-  const [userLocation, setUserLocation] = useState(null)
+  const [userLocation, setUserLocation] = useState(DEFAULT_LOCATION) // default to Kottayam region
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState({ open: false, title: '', url: '' })
-  const [viewMode, setViewMode] = useState('map') // 'map' or 'list'
-  const [searchRadius, setSearchRadius] = useState(10) // km
+  const [viewMode, setViewMode] = useState('map')
+  const [searchRadius, setSearchRadius] = useState(20) // default 20km
 
   useEffect(() => {
     fetchService()
@@ -66,19 +74,32 @@ const ServiceApplication = () => {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
+          // Only use GPS if it's a valid Kerala coordinate
+          if (!isValidKeralaCoord(latitude, longitude)) {
+            console.log('GPS returned non-Kerala coords, keeping default location');
+            return;
+          }
+          const loc = { lat: latitude, lng: longitude };
+          setUserLocation(loc);
+          if (centers.length > 0) applyRadiusFilter(loc, searchRadius, centers);
         },
         (error) => {
-          console.log('Geolocation error:', error);
-          // Continue without user location
+          console.log('Geolocation error — keeping default location:', error);
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000 // 5 minutes
-        }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
       );
     }
+  };
+
+  // Client-side radius filter
+  const applyRadiusFilter = (loc, radius, centerList) => {
+    const source = centerList || centers;
+    if (!loc || radius === null) {
+      setFilteredCenters(source);
+      return;
+    }
+    const filtered = centerService.filterCentersByDistance(source, loc.lat, loc.lng, radius);
+    setFilteredCenters(filtered);
   };
 
   const fetchService = async () => {
@@ -101,32 +122,12 @@ const ServiceApplication = () => {
   const fetchAvailableCenters = async () => {
     try {
       const response = await centerService.getAllCenters()
-      
-      // Filter centers that offer the selected service
       const centersWithService = response.centers.filter(center => 
         center.services.some(s => s._id === service._id)
       )
-      
       setCenters(centersWithService)
-      
-      // If user location is available, filter by distance
-      if (userLocation && centersWithService.length > 0) {
-        try {
-          const centersWithDistance = centerService.filterCentersByDistance(
-            centersWithService, 
-            userLocation.lat, 
-            userLocation.lng, 
-            searchRadius
-          )
-          setFilteredCenters(centersWithDistance)
-        } catch (distanceError) {
-          console.error('Error filtering by distance:', distanceError)
-          // Fallback to showing all centers with service
-          setFilteredCenters(centersWithService)
-        }
-      } else {
-        setFilteredCenters(centersWithService)
-      }
+      // Apply radius filter immediately — userLocation is always set (default or GPS)
+      applyRadiusFilter(userLocation, searchRadius, centersWithService)
     } catch (error) {
       console.error('Centers fetch error:', error)
       setError('Failed to fetch available centers')
@@ -135,23 +136,11 @@ const ServiceApplication = () => {
 
   const handleSearch = async (query) => {
     if (!query.trim()) {
-      // Clear search - show all centers or nearby if user location available
-      if (userLocation) {
-        const centersWithDistance = centerService.filterCentersByDistance(
-          centers, 
-          userLocation.lat, 
-          userLocation.lng, 
-          searchRadius
-        )
-        setFilteredCenters(centersWithDistance)
-      } else {
-        setFilteredCenters(centers)
-      }
-      return
+      applyRadiusFilter(userLocation, searchRadius);
+      return;
     }
-
     try {
-      const response = await centerService.searchCenters(query, searchRadius)
+      const response = await centerService.searchCenters(query, searchRadius || 50)
       setFilteredCenters(response.centers || [])
     } catch (error) {
       console.error('Error searching centers:', error)
@@ -161,28 +150,12 @@ const ServiceApplication = () => {
 
   const handleLocationFound = (coordinates) => {
     setUserLocation(coordinates)
-    if (centers.length > 0) {
-      const centersWithDistance = centerService.filterCentersByDistance(
-        centers, 
-        coordinates.lat, 
-        coordinates.lng, 
-        searchRadius
-      )
-      setFilteredCenters(centersWithDistance)
-    }
+    applyRadiusFilter(coordinates, searchRadius);
   }
 
   const handleRadiusChange = (radius) => {
     setSearchRadius(radius)
-    if (userLocation && centers.length > 0) {
-      const centersWithDistance = centerService.filterCentersByDistance(
-        centers, 
-        userLocation.lat, 
-        userLocation.lng, 
-        radius
-      )
-      setFilteredCenters(centersWithDistance)
-    }
+    applyRadiusFilter(userLocation, radius);
   }
 
   const fetchDocumentRequirements = async () => {
@@ -260,11 +233,10 @@ const ServiceApplication = () => {
 
   const handleBookAppointment = () => {
     if (selectedCenter) {
-      // Include selected documents and processing mode in the booking URL
       const params = new URLSearchParams({
         service: service._id,
         center: selectedCenter._id,
-        documents: JSON.stringify(selectedDocuments),
+        documents: encodeURIComponent(JSON.stringify(selectedDocuments)),
         processingMode: processingMode || 'physical'
       });
       navigate(`/book-appointment?${params.toString()}`);
@@ -273,13 +245,12 @@ const ServiceApplication = () => {
 
   const handleBookAppointmentWithData = (structuredData) => {
     if (selectedCenter) {
-      // Include structured data for online processing
       const params = new URLSearchParams({
         service: service._id,
         center: selectedCenter._id,
-        documents: JSON.stringify(selectedDocuments),
+        documents: encodeURIComponent(JSON.stringify(selectedDocuments)),
         processingMode: 'online',
-        structuredData: JSON.stringify(structuredData)
+        structuredData: encodeURIComponent(JSON.stringify(structuredData))
       });
       navigate(`/book-appointment?${params.toString()}`);
     }
@@ -501,34 +472,42 @@ const ServiceApplication = () => {
                 />
               </div>
 
-              {/* Distance Filter */}
-              {userLocation && (
-                <div className="mb-4 flex items-center justify-between text-sm">
-                  <span className="text-gray-600">
-                    {filteredCenters.length} center{filteredCenters.length !== 1 ? 's' : ''} found
-                    {searchRadius && ` within ${searchRadius}km`}
-                  </span>
-                  
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-700 font-medium">Distance:</span>
-                    <div className="flex space-x-1">
-                      {[5, 10, 20, 50].map((radius) => (
-                        <button
-                          key={radius}
-                          onClick={() => handleRadiusChange(radius)}
-                          className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                            searchRadius === radius
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {radius}km
-                        </button>
-                      ))}
-                    </div>
+              {/* Distance Filter — always visible */}
+              <div className="mb-4 flex items-center justify-between text-sm">
+                <span className="text-gray-600">
+                  {filteredCenters.length} center{filteredCenters.length !== 1 ? 's' : ''} found
+                  {searchRadius !== null ? ` within ${searchRadius}km` : ' (all centers)'}
+                </span>
+                
+                <div className="flex items-center space-x-2">
+                  <span className="text-gray-700 font-medium">Distance:</span>
+                  <div className="flex space-x-1">
+                    {[5, 10, 20, 50].map((radius) => (
+                      <button
+                        key={radius}
+                        onClick={() => handleRadiusChange(radius)}
+                        className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                          searchRadius === radius
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {radius}km
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => { setSearchRadius(null); setFilteredCenters(centers); }}
+                      className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                        searchRadius === null
+                          ? 'bg-gray-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      All
+                    </button>
                   </div>
                 </div>
-              )}
+              </div>
 
               {viewMode === 'map' ? (
                 /* Map View */

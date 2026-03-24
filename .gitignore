@@ -50,3 +50,6 @@ ml-service/*.pyc
 ml-service/.pytest_cache/
 ml-service/models/*.h5
 ml-service/m
+
+# LaTeX files
+*.tex
