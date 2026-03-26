@@ -72,10 +72,45 @@ const BookAppointment = () => {
   // Create authenticated axios instance
   const authAxios = createAuthenticatedAxios();
 
+  // Document field definitions per document type (mirrors locker DOCUMENT_TEMPLATES)
+  const DOCUMENT_FIELD_LABELS = {
+    aadhaarNumber: 'Aadhaar Number', panNumber: 'PAN Number', voterIdNumber: 'Voter ID Number',
+    passportNumber: 'Passport Number', licenseNumber: 'License Number', rationCardNumber: 'Ration Card Number',
+    fullName: 'Full Name', dateOfBirth: 'Date of Birth', gender: 'Gender',
+    mobileNumber: 'Mobile Number', fatherName: "Father's Name", motherName: "Mother's Name",
+    spouseName: "Spouse's Name", address: 'Address', nationality: 'Nationality',
+    bloodGroup: 'Blood Group', placeOfBirth: 'Place of Birth', issueDate: 'Issue Date',
+    expiryDate: 'Expiry Date', issuingAuthority: 'Issuing Authority', annualIncome: 'Annual Income',
+    caste: 'Caste', religion: 'Religion', community: 'Community', age: 'Age',
+    certificateNumber: 'Certificate Number', registrationNumber: 'Registration Number',
+    childName: 'Child Name', deceasedName: 'Deceased Name', dateOfDeath: 'Date of Death',
+    husbandName: 'Husband Name', wifeName: 'Wife Name', dateOfMarriage: 'Date of Marriage',
+    accountNumber: 'Account Number', bankName: 'Bank Name', ifscCode: 'IFSC Code',
+    incomeSource: 'Income Source', vehicleClass: 'Vehicle Class', cardType: 'Card Type',
+    headOfFamily: 'Head of Family', familyMembers: 'Family Members',
+  };
+
+  const DOCUMENT_TEMPLATES = {
+    aadhaar_card: ['aadhaarNumber','fullName','dateOfBirth','gender','mobileNumber','fatherName','address'],
+    pan_card: ['panNumber','fullName','fatherName','dateOfBirth'],
+    passport: ['passportNumber','fullName','nationality','dateOfBirth','gender','placeOfBirth','issueDate','expiryDate','address'],
+    voter_id: ['voterIdNumber','fullName','fatherName','motherName','spouseName','dateOfBirth','gender','address'],
+    driving_license: ['licenseNumber','fullName','dateOfBirth','fatherName','bloodGroup','vehicleClass','issueDate','expiryDate','address'],
+    ration_card: ['rationCardNumber','cardType','fullName','headOfFamily','address'],
+    birth_certificate: ['registrationNumber','childName','dateOfBirth','gender','fatherName','motherName','address'],
+    death_certificate: ['registrationNumber','deceasedName','dateOfDeath','fatherName','address'],
+    marriage_certificate: ['registrationNumber','husbandName','wifeName','dateOfMarriage','address'],
+    income_certificate: ['certificateNumber','fullName','fatherName','annualIncome','incomeSource','address'],
+    caste_certificate: ['certificateNumber','fullName','fatherName','caste','religion','address'],
+    community_certificate: ['certificateNumber','fullName','fatherName','community','religion','address'],
+    bank_passbook: ['accountNumber','fullName','bankName','ifscCode','address'],
+  };
+
   const [service, setService] = useState(null);
   const [services, setServices] = useState([]);
   const [center, setCenter] = useState(null);
   const [availableCenters, setAvailableCenters] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
   const [formData, setFormData] = useState({
     centerId: centerId || '',
     serviceId: serviceId || '',
@@ -96,6 +131,7 @@ const BookAppointment = () => {
     loadInitialData();
     loadRazorpayConfig();
     loadAllServices();
+    loadUserProfile();
   }, []);
 
   useEffect(() => {
@@ -125,6 +161,74 @@ const BookAppointment = () => {
     if (centerId) {
       setFormData(prev => ({ ...prev, centerId }));
     }
+  };
+
+  const loadUserProfile = async () => {
+    try {
+      const response = await authAxios.get('/api/auth/me');
+      if (response.data.success) {
+        setUserProfile(response.data.user);
+      }
+    } catch (error) {
+      console.error('Failed to load user profile:', error);
+    }
+  };
+
+  // Build aggregated applicant info from structuredData (locker) + user profile
+  const getApplicantInfo = () => {
+    const info = {};
+    // Start with user profile basics
+    if (userProfile) {
+      if (userProfile.name) info.fullName = userProfile.name;
+      if (userProfile.phone) info.mobileNumber = userProfile.phone;
+      if (userProfile.email) info.email = userProfile.email;
+    }
+    // Override/enrich with locker OCR data (more accurate)
+    if (structuredData?.documents) {
+      structuredData.documents.forEach(doc => {
+        if (doc.extractedData) {
+          Object.entries(doc.extractedData).forEach(([key, value]) => {
+            if (value && !['rawText','confidence','isVerified','verifiedAt','verifiedBy','ocrError'].includes(key)) {
+              if (!info[key]) info[key] = value;
+            }
+          });
+        }
+      });
+    }
+    // Also pull from userProfile aggregated profile if available
+    if (structuredData?.userProfile) {
+      Object.entries(structuredData.userProfile).forEach(([key, value]) => {
+        if (value && !info[key]) info[key] = value;
+      });
+    }
+    return info;
+  };
+
+  // Get fields to display based on selected document types
+  const getDisplayFields = () => {
+    if (!structuredData?.documents?.length) {
+      // No locker data — show basic fields from user profile
+      return ['fullName', 'mobileNumber', 'email'];
+    }
+    const fieldSet = new Set(['fullName', 'mobileNumber']);
+    structuredData.documents.forEach(doc => {
+      const docType = doc.documentType;
+      const templateFields = DOCUMENT_TEMPLATES[docType] || ['fullName', 'address'];
+      templateFields.forEach(f => fieldSet.add(f));
+    });
+    return Array.from(fieldSet);
+  };
+
+  const formatFieldValue = (key, value) => {
+    if (!value) return '—';
+    if (key === 'dateOfBirth' || key === 'issueDate' || key === 'expiryDate' || key === 'dateOfDeath' || key === 'dateOfMarriage') {
+      try { return new Date(value).toLocaleDateString('en-IN'); } catch { return value; }
+    }
+    if (key === 'address' && typeof value === 'object') {
+      return [value.street, value.city, value.district, value.state, value.pincode].filter(Boolean).join(', ');
+    }
+    if (key === 'annualIncome') return `₹${Number(value).toLocaleString('en-IN')}`;
+    return String(value);
   };
 
   const loadRazorpayConfig = async () => {
@@ -592,6 +696,47 @@ const BookAppointment = () => {
               </div>
             )}
             
+            {/* Applicant Information */}
+            {(() => {
+              const applicantInfo = getApplicantInfo();
+              const displayFields = getDisplayFields();
+              const hasData = displayFields.some(f => applicantInfo[f]);
+              if (!hasData) return null;
+              return (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <User className="h-5 w-5 text-blue-600" />
+                    <h3 className="font-medium text-blue-900">Applicant Information</h3>
+                    {structuredData?.documents?.length > 0 && (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                        From Documents
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {displayFields.map(field => {
+                      const value = applicantInfo[field];
+                      if (!value) return null;
+                      const label = DOCUMENT_FIELD_LABELS[field] || field;
+                      return (
+                        <div key={field} className="bg-white rounded-md px-3 py-2 border border-blue-100">
+                          <p className="text-xs text-blue-600 font-medium">{label}</p>
+                          <p className="text-sm text-gray-900 mt-0.5 break-words">
+                            {formatFieldValue(field, value)}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {structuredData?.documents?.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-3">
+                      Data fetched from your document locker. Staff will verify this information.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Service Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
